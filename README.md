@@ -99,17 +99,18 @@ claude-code-runner -m sonnet "Explain this codebase"
 
 Signals give Claude a way to control execution flow. Instruct Claude to output these signals in your prompts or templates, and the runner will respond accordingly.
 
-| Signal                   | Effect                           |
-| ------------------------ | -------------------------------- |
-| `:::RUNNER::DONE:::`     | Exit successfully                |
-| `:::RUNNER::CONTINUE:::` | Continue to next iteration       |
-| `:::RUNNER::BLOCKED:::`  | Exit with error (awaiting human) |
-| `:::RUNNER::ERROR:::`    | Exit with error                  |
+| Signal                      | Effect                           |
+| --------------------------- | -------------------------------- |
+| `:::RUNNER::REPEAT_STEP:::` | Run the same step again          |
+| `:::RUNNER::BLOCKED:::`     | Exit with error (awaiting human) |
+| `:::RUNNER::ERROR:::`       | Exit with error                  |
+
+No signal means success—the runner exits when Claude finishes without outputting a signal.
 
 **Example prompt using signals:**
 
 ```bash
-claude-code-runner "Fix all lint errors in src/. Output :::RUNNER::DONE::: when complete, or :::RUNNER::BLOCKED::: if you need human input."
+claude-code-runner "Fix all lint errors in src/. Output :::RUNNER::BLOCKED::: if you need human input."
 ```
 
 **Example template with signals** (`.claude/commands/fix-tests.md`):
@@ -117,12 +118,11 @@ claude-code-runner "Fix all lint errors in src/. Output :::RUNNER::DONE::: when 
 ```markdown
 Run the test suite for $1.
 
-- If all tests pass, output :::RUNNER::DONE:::
-- If tests fail and you can fix them, fix them and output :::RUNNER::CONTINUE::: to re-run
+- If tests fail and you can fix them, fix them and output :::RUNNER::REPEAT_STEP::: to re-run
 - If tests fail and you need help, output :::RUNNER::BLOCKED::: with an explanation
 ```
 
-This pattern enables self-correcting loops: Claude attempts a fix, signals `CONTINUE` to retry, and only exits when done or stuck.
+This pattern enables self-correcting loops: Claude attempts a fix, signals `REPEAT_STEP` to retry, and exits when done or stuck.
 
 **Defaults:**
 

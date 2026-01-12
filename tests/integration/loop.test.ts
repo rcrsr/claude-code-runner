@@ -31,11 +31,11 @@ describe('loop integration', () => {
     vi.useRealTimers();
   });
 
-  it('runs 3 iterations when CONTINUE signal is returned twice then DONE', async () => {
+  it('runs 3 iterations when REPEAT_STEP signal is returned twice then completion', async () => {
     const mockSpawn = vi.mocked(spawnClaude);
     const mockDetect = vi.mocked(detectRunnerSignal);
 
-    // Simulate 3 iterations: continue, continue, done
+    // Simulate 3 iterations: repeat_step, repeat_step, complete
     let callCount = 0;
     mockSpawn.mockImplementation(async () => {
       callCount++;
@@ -46,10 +46,10 @@ describe('loop integration', () => {
       };
     });
 
-    // Return continue for first 2, done for 3rd
+    // Return repeat_step for first 2, null (complete) for 3rd
     mockDetect.mockImplementation(() => {
-      if (callCount < 3) return 'continue';
-      return 'done';
+      if (callCount < 3) return 'repeat_step';
+      return null;
     });
 
     const context: RunnerContext = {
@@ -70,7 +70,7 @@ describe('loop integration', () => {
     expect(mockSpawn).toHaveBeenCalledTimes(3);
   });
 
-  it('stops at max iterations when CONTINUE keeps being returned', async () => {
+  it('stops at max iterations when REPEAT_STEP keeps being returned', async () => {
     const mockSpawn = vi.mocked(spawnClaude);
     const mockDetect = vi.mocked(detectRunnerSignal);
 
@@ -80,8 +80,8 @@ describe('loop integration', () => {
       claudeText: 'Still working...',
     });
 
-    // Always return continue
-    mockDetect.mockReturnValue('continue');
+    // Always return repeat_step
+    mockDetect.mockReturnValue('repeat_step');
 
     const context: RunnerContext = {
       config: createMockConfig({ maxIterations: 3, iterationPauseMs: 0 }),
@@ -113,7 +113,7 @@ describe('loop integration', () => {
       claudeText: 'Done',
     });
 
-    mockDetect.mockReturnValue('done');
+    mockDetect.mockReturnValue(null);
 
     const context: RunnerContext = {
       config: createMockConfig({ maxIterations: 10, iterationPauseMs: 0 }),

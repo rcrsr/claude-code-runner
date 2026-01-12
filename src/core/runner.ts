@@ -75,15 +75,7 @@ export async function runWithSignals(
     const status = detectRunnerSignal(claudeText);
     const totalDuration = Math.round((Date.now() - startTime) / 1000);
 
-    if (status === 'done') {
-      printRunner(
-        `${colors.green}Run completed${colors.reset} [${iteration}] steps in ${formatElapsed(totalDuration)}`
-      );
-      logger.log(
-        `\nCOMPLETE after ${iteration} iterations, ${totalDuration}s total`
-      );
-      return 'ok';
-    } else if (status === 'blocked') {
+    if (status === 'blocked') {
       printRunner(
         `${colors.red}Run blocked${colors.reset} [${iteration}] steps in ${formatElapsed(totalDuration)}`
       );
@@ -99,8 +91,8 @@ export async function runWithSignals(
         `\nERROR after ${iteration} iterations, ${totalDuration}s total`
       );
       return 'error';
-    } else if (status === 'continue') {
-      printRunner(`Claude requested iteration ${iteration + 1}`);
+    } else if (status === 'repeat_step') {
+      printRunner(`Claude requested to repeat the step`);
       logger.log(`Iteration ${iteration} complete, continuing...`);
       await sleep(iterationPauseMs);
     } else {

@@ -2,14 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { detectRunnerSignal } from '../../src/parsers/signals.js';
 
 describe('detectRunnerSignal', () => {
-  it('detects DONE signal', () => {
-    const text = 'Task completed successfully :::RUNNER::DONE:::';
-    expect(detectRunnerSignal(text)).toBe('done');
-  });
-
-  it('detects CONTINUE signal', () => {
-    const text = 'Moving to next step :::RUNNER::CONTINUE:::';
-    expect(detectRunnerSignal(text)).toBe('continue');
+  it('detects REPEAT_STEP signal', () => {
+    const text = 'Need to retry :::RUNNER::REPEAT_STEP:::';
+    expect(detectRunnerSignal(text)).toBe('repeat_step');
   });
 
   it('detects BLOCKED signal', () => {
@@ -30,10 +25,10 @@ describe('detectRunnerSignal', () => {
   it('detects signal in multiline text', () => {
     const text = `
       Processing...
-      Done with first step
-      :::RUNNER::CONTINUE:::
+      Need another pass
+      :::RUNNER::REPEAT_STEP:::
       More text after
     `;
-    expect(detectRunnerSignal(text)).toBe('continue');
+    expect(detectRunnerSignal(text)).toBe('repeat_step');
   });
 });

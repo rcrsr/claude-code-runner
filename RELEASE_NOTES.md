@@ -1,5 +1,15 @@
 # Release Notes
 
+## v0.3.0
+
+### Signal Changes
+
+- Removed `:::RUNNER::DONE:::` signal (no signal now means success)
+- Renamed `:::RUNNER::CONTINUE:::` to `:::RUNNER::REPEAT_STEP:::`
+- Updated repeat message: "Claude requested to repeat the step"
+
+---
+
 ## v0.2.0
 
 ### Output Improvements

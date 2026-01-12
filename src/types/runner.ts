@@ -10,11 +10,10 @@ export type Subcommand = 'prompt' | 'command' | 'script';
  * Runner signals for iteration control
  * Claude outputs these to control the runner loop
  */
-export type RunnerSignal = 'done' | 'continue' | 'blocked' | 'error';
+export type RunnerSignal = 'repeat_step' | 'blocked' | 'error';
 
 export const RUNNER_SIGNALS = {
-  DONE: ':::RUNNER::DONE:::',
-  CONTINUE: ':::RUNNER::CONTINUE:::',
+  REPEAT_STEP: ':::RUNNER::REPEAT_STEP:::',
   BLOCKED: ':::RUNNER::BLOCKED:::',
   ERROR: ':::RUNNER::ERROR:::',
 } as const;

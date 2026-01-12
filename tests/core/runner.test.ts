@@ -51,7 +51,7 @@ describe('runWithSignals', () => {
 
   describe('signal detection', () => {
     it('returns ok when Claude outputs DONE signal', async () => {
-      vi.mocked(detectRunnerSignal).mockReturnValue('done');
+      vi.mocked(detectRunnerSignal).mockReturnValue(null);
 
       const result = await runWithSignals('test', 'test', Date.now(), context);
 
@@ -74,10 +74,10 @@ describe('runWithSignals', () => {
       expect(result).toBe('error');
     });
 
-    it('continues iteration when Claude outputs CONTINUE signal', async () => {
+    it('continues iteration when Claude outputs REPEAT_STEP signal', async () => {
       vi.mocked(detectRunnerSignal)
-        .mockReturnValueOnce('continue')
-        .mockReturnValueOnce('done');
+        .mockReturnValueOnce('repeat_step')
+        .mockReturnValueOnce(null);
 
       const promise = runWithSignals('test', 'test', Date.now(), context);
       await vi.advanceTimersByTimeAsync(100);
@@ -114,7 +114,7 @@ describe('runWithSignals', () => {
   describe('iteration control', () => {
     it('stops after maxIterations with error result', async () => {
       context.config.maxIterations = 2;
-      vi.mocked(detectRunnerSignal).mockReturnValue('continue');
+      vi.mocked(detectRunnerSignal).mockReturnValue('repeat_step');
 
       const promise = runWithSignals('test', 'test', Date.now(), context);
 
@@ -130,8 +130,8 @@ describe('runWithSignals', () => {
 
     it('prints iteration header for iterations > 1', async () => {
       vi.mocked(detectRunnerSignal)
-        .mockReturnValueOnce('continue')
-        .mockReturnValueOnce('done');
+        .mockReturnValueOnce('repeat_step')
+        .mockReturnValueOnce(null);
 
       const promise = runWithSignals('test', 'test', Date.now(), context);
       await vi.advanceTimersByTimeAsync(100);
@@ -139,20 +139,20 @@ describe('runWithSignals', () => {
 
       const calls = consoleSpy.mock.calls.map((c) => c[0] as string);
       const hasIterationMsg = calls.some((c) =>
-        c.includes('Claude requested iteration 2')
+        c.includes('Claude requested to repeat the step')
       );
 
       expect(hasIterationMsg).toBe(true);
     });
 
     it('does not print iteration message for first iteration', async () => {
-      vi.mocked(detectRunnerSignal).mockReturnValue('done');
+      vi.mocked(detectRunnerSignal).mockReturnValue(null);
 
       await runWithSignals('test', 'test', Date.now(), context);
 
       const calls = consoleSpy.mock.calls.map((c) => c[0] as string);
       const hasIterationMsg = calls.some((c) =>
-        c.includes('Claude requested iteration')
+        c.includes('Claude requested to repeat the step')
       );
 
       expect(hasIterationMsg).toBe(false);
@@ -161,8 +161,8 @@ describe('runWithSignals', () => {
     it('pauses between iterations using iterationPauseMs', async () => {
       context.config.iterationPauseMs = 500;
       vi.mocked(detectRunnerSignal)
-        .mockReturnValueOnce('continue')
-        .mockReturnValueOnce('done');
+        .mockReturnValueOnce('repeat_step')
+        .mockReturnValueOnce(null);
 
       const startTime = Date.now();
       const promise = runWithSignals('test', 'test', startTime, context);
@@ -184,7 +184,7 @@ describe('runWithSignals', () => {
 
   describe('context passing', () => {
     it('passes prompt to spawnClaude', async () => {
-      vi.mocked(detectRunnerSignal).mockReturnValue('done');
+      vi.mocked(detectRunnerSignal).mockReturnValue(null);
 
       await runWithSignals('my test prompt', 'my test prompt', Date.now(), context);
 
@@ -194,7 +194,7 @@ describe('runWithSignals', () => {
     });
 
     it('passes cwd to spawnClaude', async () => {
-      vi.mocked(detectRunnerSignal).mockReturnValue('done');
+      vi.mocked(detectRunnerSignal).mockReturnValue(null);
 
       await runWithSignals('test', 'test', Date.now(), context);
 
@@ -205,7 +205,7 @@ describe('runWithSignals', () => {
 
     it('passes verbosity to spawnClaude', async () => {
       context.config.verbosity = 'verbose';
-      vi.mocked(detectRunnerSignal).mockReturnValue('done');
+      vi.mocked(detectRunnerSignal).mockReturnValue(null);
 
       await runWithSignals('test', 'test', Date.now(), context);
 
@@ -215,7 +215,7 @@ describe('runWithSignals', () => {
     });
 
     it('passes logger to spawnClaude', async () => {
-      vi.mocked(detectRunnerSignal).mockReturnValue('done');
+      vi.mocked(detectRunnerSignal).mockReturnValue(null);
 
       await runWithSignals('test', 'test', Date.now(), context);
 
@@ -225,7 +225,7 @@ describe('runWithSignals', () => {
     });
 
     it('passes formatterState to spawnClaude', async () => {
-      vi.mocked(detectRunnerSignal).mockReturnValue('done');
+      vi.mocked(detectRunnerSignal).mockReturnValue(null);
 
       await runWithSignals('test', 'test', Date.now(), context);
 
@@ -236,7 +236,7 @@ describe('runWithSignals', () => {
 
     it('passes parallelThresholdMs to spawnClaude', async () => {
       context.config.parallelThresholdMs = 200;
-      vi.mocked(detectRunnerSignal).mockReturnValue('done');
+      vi.mocked(detectRunnerSignal).mockReturnValue(null);
 
       await runWithSignals('test', 'test', Date.now(), context);
 
@@ -248,7 +248,7 @@ describe('runWithSignals', () => {
 
   describe('output formatting', () => {
     it('prints Run completed on done signal', async () => {
-      vi.mocked(detectRunnerSignal).mockReturnValue('done');
+      vi.mocked(detectRunnerSignal).mockReturnValue(null);
 
       await runWithSignals('test', 'test', Date.now(), context);
 
@@ -282,7 +282,7 @@ describe('runWithSignals', () => {
 
     it('prints Max iterations when exceeded', async () => {
       context.config.maxIterations = 1;
-      vi.mocked(detectRunnerSignal).mockReturnValue('continue');
+      vi.mocked(detectRunnerSignal).mockReturnValue('repeat_step');
 
       const promise = runWithSignals('test', 'test', Date.now(), context);
       await vi.advanceTimersByTimeAsync(100);
@@ -295,7 +295,7 @@ describe('runWithSignals', () => {
     });
 
     it('logs to logger', async () => {
-      vi.mocked(detectRunnerSignal).mockReturnValue('done');
+      vi.mocked(detectRunnerSignal).mockReturnValue(null);
 
       await runWithSignals('test', 'test', Date.now(), context);
 
@@ -304,8 +304,8 @@ describe('runWithSignals', () => {
   });
 
   describe('edge cases', () => {
-    it('handles immediate DONE on first iteration', async () => {
-      vi.mocked(detectRunnerSignal).mockReturnValue('done');
+    it('handles immediate completion on first iteration', async () => {
+      vi.mocked(detectRunnerSignal).mockReturnValue(null);
 
       const result = await runWithSignals('test', 'test', Date.now(), context);
 
@@ -313,11 +313,11 @@ describe('runWithSignals', () => {
       expect(spawnClaude).toHaveBeenCalledTimes(1);
     });
 
-    it('handles multiple CONTINUE then DONE', async () => {
+    it('handles multiple REPEAT_STEP then completion', async () => {
       vi.mocked(detectRunnerSignal)
-        .mockReturnValueOnce('continue')
-        .mockReturnValueOnce('continue')
-        .mockReturnValueOnce('done');
+        .mockReturnValueOnce('repeat_step')
+        .mockReturnValueOnce('repeat_step')
+        .mockReturnValueOnce(null);
 
       const promise = runWithSignals('test', 'test', Date.now(), context);
       await vi.advanceTimersByTimeAsync(100);
@@ -331,7 +331,7 @@ describe('runWithSignals', () => {
 
     it('handles BLOCKED on second iteration', async () => {
       vi.mocked(detectRunnerSignal)
-        .mockReturnValueOnce('continue')
+        .mockReturnValueOnce('repeat_step')
         .mockReturnValueOnce('blocked');
 
       const promise = runWithSignals('test', 'test', Date.now(), context);
@@ -345,7 +345,7 @@ describe('runWithSignals', () => {
 
     it('handles maxIterations = 1', async () => {
       context.config.maxIterations = 1;
-      vi.mocked(detectRunnerSignal).mockReturnValue('continue');
+      vi.mocked(detectRunnerSignal).mockReturnValue('repeat_step');
 
       const promise = runWithSignals('test', 'test', Date.now(), context);
       await vi.advanceTimersByTimeAsync(100);
@@ -358,12 +358,12 @@ describe('runWithSignals', () => {
 
     it('uses claudeText from spawnClaude for signal detection', async () => {
       vi.mocked(spawnClaude).mockResolvedValue(
-        createMockRunResult({ claudeText: ':::RUNNER::DONE:::' })
+        createMockRunResult({ claudeText: ':::RUNNER::BLOCKED:::' })
       );
 
       await runWithSignals('test', 'test', Date.now(), context);
 
-      expect(detectRunnerSignal).toHaveBeenCalledWith(':::RUNNER::DONE:::');
+      expect(detectRunnerSignal).toHaveBeenCalledWith(':::RUNNER::BLOCKED:::');
     });
   });
 });

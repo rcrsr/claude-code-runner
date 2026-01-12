@@ -9,11 +9,8 @@ import { RUNNER_SIGNALS, type RunnerSignal } from '../types/runner.js';
  * Returns null if no signal found
  */
 export function detectRunnerSignal(text: string): RunnerSignal | null {
-  if (text.includes(RUNNER_SIGNALS.DONE)) {
-    return 'done';
-  }
-  if (text.includes(RUNNER_SIGNALS.CONTINUE)) {
-    return 'continue';
+  if (text.includes(RUNNER_SIGNALS.REPEAT_STEP)) {
+    return 'repeat_step';
   }
   if (text.includes(RUNNER_SIGNALS.BLOCKED)) {
     return 'blocked';

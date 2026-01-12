@@ -347,8 +347,7 @@ describe('printUsage', () => {
     printUsage();
 
     const output = logSpy.mock.calls[0]?.[0] as string;
-    expect(output).toContain('RUNNER::DONE');
-    expect(output).toContain('RUNNER::CONTINUE');
+    expect(output).toContain('RUNNER::REPEAT_STEP');
     expect(output).toContain('RUNNER::BLOCKED');
     expect(output).toContain('RUNNER::ERROR');
   });

@@ -158,9 +158,8 @@ Subcommands:
   command <name> [args]      Load .claude/commands/<name>.md (supports RUNNER signals)
   script <file>              Run commands from file, stop on ERROR/BLOCKED
 
-Iteration Status Signals (output by Claude to control loop):
-  :::RUNNER::DONE:::         Exit successfully
-  :::RUNNER::CONTINUE:::     Continue to next iteration
+Iteration Signals (control runner execution):
+  :::RUNNER::REPEAT_STEP:::  Run the same step again
   :::RUNNER::BLOCKED:::      Exit with error (awaiting human intervention)
   :::RUNNER::ERROR:::        Exit with error (something went wrong)
 
