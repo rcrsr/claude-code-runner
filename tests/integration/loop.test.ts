@@ -59,7 +59,12 @@ describe('loop integration', () => {
       cwd: '/tmp',
     };
 
-    const resultPromise = runWithSignals('test prompt', 'test prompt', Date.now(), context);
+    const resultPromise = runWithSignals(
+      'test prompt',
+      'test prompt',
+      Date.now(),
+      context
+    );
 
     // Advance timers for each iteration
     await vi.runAllTimersAsync();
@@ -90,7 +95,12 @@ describe('loop integration', () => {
       cwd: '/tmp',
     };
 
-    const resultPromise = runWithSignals('test prompt', 'test prompt', Date.now(), context);
+    const resultPromise = runWithSignals(
+      'test prompt',
+      'test prompt',
+      Date.now(),
+      context
+    );
     await vi.runAllTimersAsync();
     const result = await resultPromise;
 
@@ -156,7 +166,12 @@ describe('loop integration', () => {
       cwd: '/tmp',
     };
 
-    const result = await runWithSignals('test prompt', 'test prompt', Date.now(), context);
+    const result = await runWithSignals(
+      'test prompt',
+      'test prompt',
+      Date.now(),
+      context
+    );
 
     expect(result).toBe('blocked');
     expect(mockSpawn).toHaveBeenCalledTimes(1);
@@ -181,7 +196,12 @@ describe('loop integration', () => {
       cwd: '/tmp',
     };
 
-    const result = await runWithSignals('test prompt', 'test prompt', Date.now(), context);
+    const result = await runWithSignals(
+      'test prompt',
+      'test prompt',
+      Date.now(),
+      context
+    );
 
     expect(result).toBe('error');
     expect(mockSpawn).toHaveBeenCalledTimes(1);

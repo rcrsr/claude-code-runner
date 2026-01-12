@@ -186,7 +186,12 @@ describe('runWithSignals', () => {
     it('passes prompt to spawnClaude', async () => {
       vi.mocked(detectRunnerSignal).mockReturnValue(null);
 
-      await runWithSignals('my test prompt', 'my test prompt', Date.now(), context);
+      await runWithSignals(
+        'my test prompt',
+        'my test prompt',
+        Date.now(),
+        context
+      );
 
       expect(spawnClaude).toHaveBeenCalledWith(
         expect.objectContaining({ prompt: 'my test prompt' })
