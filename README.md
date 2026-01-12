@@ -6,6 +6,7 @@ Deterministic, scripted, unattended Claude Code execution.
 
 - **Run unattended** — Execute Claude commands in CI/CD pipelines and automation scripts
 - **Script multiple commands** — Chain prompts together in a single run
+- **Iterative runs with fresh context per phase** — Each command starts with a clean slate, ideal for phase-based implementation plans
 - **Self-correcting loops** — Users can configure prompts with [runner signals](#runner-signals) to control execution, like retry, complete, or escalation to a human
 - **Full visibility** — Watch tool calls stream in real-time
 - **Complete logs** — Every session captured for debugging and review
@@ -13,7 +14,7 @@ Deterministic, scripted, unattended Claude Code execution.
 ## Prerequisites
 
 - Node.js 18 or later
-- [Claude CLI](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated
 
 ## Installation
 
