@@ -19,7 +19,14 @@ import {
   type PendingTool,
   type Verbosity,
 } from '../types/runner.js';
-import { colors, formatDuration, shortenPath, truncate } from './colors.js';
+import {
+  colors,
+  formatDuration,
+  printRunner,
+  shortenPath,
+  timestampPrefix,
+  truncate,
+} from './colors.js';
 import type { Logger } from './logger.js';
 
 /**
@@ -76,8 +83,8 @@ function formatToolUse(
   const inTask = state.activeTask !== null;
   const indent = inTask ? '  │ ' : '';
   const prefix = indented
-    ? `${indent}  → `
-    : `${indent}${colors.yellow}[TOOL]${colors.reset} `;
+    ? `${timestampPrefix()}${indent}  → `
+    : `${timestampPrefix()}${indent}${colors.yellow}[TOOL]${colors.reset} `;
   const name = tool.name;
   const input = tool.input;
 
@@ -103,10 +110,10 @@ function formatToolUse(
     // Mark task as active and print task header
     state.activeTask = { name: taskType, description: taskDesc, id: tool.id };
     console.log(
-      `${colors.yellow}[TASK]${colors.reset} ${colors.magenta}${taskType}${colors.reset} ${taskDesc}`
+      `${timestampPrefix()}${colors.yellow}[TASK]${colors.reset} ${colors.magenta}${taskType}${colors.reset} ${taskDesc}`
     );
     console.log(
-      `  ${colors.dim}┌─────────────────────────────────────────────────${colors.reset}`
+      `${timestampPrefix()}  ${colors.dim}┌─────────────────────────────────────────────────${colors.reset}`
     );
     return;
   } else if (name === 'Write' || name === 'Edit') {
@@ -140,7 +147,7 @@ export function flushPendingTools(
   } else {
     // Group parallel tools
     console.log(
-      `${colors.yellow}[TOOL ×${state.pendingTools.length}]${colors.reset} ${colors.dim}(parallel)${colors.reset}`
+      `${timestampPrefix()}${colors.yellow}[TOOL ×${state.pendingTools.length}]${colors.reset} ${colors.dim}(parallel)${colors.reset}`
     );
     for (const tool of state.pendingTools) {
       formatToolUse(tool, true, state);
@@ -182,15 +189,15 @@ function printToolResult(
   const showLines = lines.slice(0, maxLines);
   for (const line of showLines) {
     console.log(
-      `${indent}  ${colors.dim}${truncate(line, 150)}${colors.reset}`
+      `${timestampPrefix()}${indent}  ${colors.dim}${truncate(line, 150)}${colors.reset}`
     );
   }
   if (lines.length > maxLines) {
     console.log(
-      `${indent}  ${colors.dim}... (${lines.length - maxLines} more lines)${colors.reset}${durationStr}`
+      `${timestampPrefix()}${indent}  ${colors.dim}... (${lines.length - maxLines} more lines)${colors.reset}${durationStr}`
     );
   } else if (durationStr) {
-    console.log(`${indent}  ${durationStr}`);
+    console.log(`${timestampPrefix()}${indent}  ${durationStr}`);
   }
 }
 
@@ -210,7 +217,7 @@ function printTaskResult(
 
   // Close the task visual box with duration
   console.log(
-    `  ${colors.dim}└─────────────────────────────────────────────────${colors.reset}${durationStr}`
+    `${timestampPrefix()}  ${colors.dim}└─────────────────────────────────────────────────${colors.reset}${durationStr}`
   );
 
   // Extract the text part of task result, skip agentId line
@@ -223,7 +230,7 @@ function printTaskResult(
     const maxLen = verbosity === 'verbose' ? 500 : 200;
     const summary = lines.join(' ').replace(/\s+/g, ' ');
     console.log(
-      `  ${colors.green}→ ${truncate(summary, maxLen)}${colors.reset}`
+      `${timestampPrefix()}  ${colors.green}→ ${truncate(summary, maxLen)}${colors.reset}`
     );
   }
 
@@ -245,29 +252,7 @@ export function formatMessage(
   let claudeText = '';
 
   if (isSystemInitMessage(msg)) {
-    if (verbosity !== 'quiet') {
-      console.log(
-        `${colors.blue}[INIT]${colors.reset} ${msg.model} | ${msg.tools?.length ?? 0} tools`
-      );
-      if (msg.mcp_servers && verbosity === 'verbose') {
-        const connected = msg.mcp_servers
-          .filter((s) => s.status === 'connected')
-          .map((s) => s.name);
-        const failed = msg.mcp_servers
-          .filter((s) => s.status === 'failed')
-          .map((s) => s.name);
-        if (connected.length) {
-          console.log(
-            `  ${colors.green}MCP:${colors.reset} ${connected.join(', ')}`
-          );
-        }
-        if (failed.length) {
-          console.log(
-            `  ${colors.red}MCP failed:${colors.reset} ${failed.join(', ')}`
-          );
-        }
-      }
-    }
+    // Skip init messages - config is shown by runner
   } else if (isAssistantMessage(msg)) {
     flushPendingTools(state, verbosity);
 
@@ -281,14 +266,15 @@ export function formatMessage(
             !block.text.startsWith("I'll ") &&
             !block.text.startsWith('Let me ')
           ) {
+            const text = block.text.replace(/[\r\n]+/g, ' ').trim();
             console.log(
-              `${colors.green}[ANSWER]${colors.reset} ${truncate(block.text, 500)}`
+              `${timestampPrefix()}${colors.green}[ANSWER]${colors.reset} ${truncate(text, 500)}`
             );
           }
         } else {
-          const maxLen = verbosity === 'verbose' ? 1000 : 300;
+          const text = block.text.replace(/[\r\n]+/g, ' ').trim();
           console.log(
-            `${colors.green}[CLAUDE]${colors.reset} ${truncate(block.text, maxLen)}`
+            `${timestampPrefix()}${colors.green}[CLAUDE]${colors.reset} ${text}`
           );
         }
       } else if (isToolUseBlock(block)) {
@@ -346,7 +332,7 @@ export function formatMessage(
 
         if (isError) {
           console.log(
-            `  ${colors.red}ERROR: ${truncate(content, 100)}${colors.reset}${durationStr}`
+            `${timestampPrefix()}  ${colors.red}ERROR: ${truncate(content, 100)}${colors.reset}${durationStr}`
           );
         } else if (state.activeTask?.id === toolUseId) {
           // Task completing
@@ -362,12 +348,12 @@ export function formatMessage(
       const duration = msg.duration_ms
         ? `${(msg.duration_ms / 1000).toFixed(1)}s`
         : '?';
-      console.log(`${colors.magenta}[DONE]${colors.reset} ${duration}`);
+      printRunner(`Claude completed step in ${duration}`);
     }
   } else {
     if (verbosity === 'verbose') {
       console.log(
-        `${colors.dim}[${msg.type.toUpperCase()}] ${truncate(JSON.stringify(msg), 100)}${colors.reset}`
+        `${timestampPrefix()}${colors.dim}[${msg.type.toUpperCase()}] ${truncate(JSON.stringify(msg), 100)}${colors.reset}`
       );
     }
   }

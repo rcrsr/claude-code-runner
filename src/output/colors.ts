@@ -69,3 +69,40 @@ export function shortenPath(filePath: string): string {
     .replace(/.*\/\.claude\//, '.claude/')
     .replace(/.*\/infra\//, 'infra/');
 }
+
+/**
+ * Format current timestamp as HH:MM:SS.mmm
+ */
+export function formatTimestamp(date: Date = new Date()): string {
+  const h = date.getHours().toString().padStart(2, '0');
+  const m = date.getMinutes().toString().padStart(2, '0');
+  const s = date.getSeconds().toString().padStart(2, '0');
+  const ms = date.getMilliseconds().toString().padStart(3, '0');
+  return `${h}:${m}:${s}.${ms}`;
+}
+
+/**
+ * Format elapsed seconds as hh:mm:ss
+ */
+export function formatElapsed(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Get a timestamped prefix for output lines
+ */
+export function timestampPrefix(): string {
+  return `${colors.dim}${formatTimestamp()}${colors.reset} `;
+}
+
+/**
+ * Print a [RUNNER] control message with timestamp
+ */
+export function printRunner(message: string): void {
+  console.log(
+    `${timestampPrefix()}${colors.magenta}[RUNNER]${colors.reset} ${message}`
+  );
+}

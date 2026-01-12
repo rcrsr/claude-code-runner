@@ -22,6 +22,7 @@ export interface ClaudeProcessOptions {
   logger: Logger;
   formatterState: FormatterState;
   parallelThresholdMs: number;
+  model: string | null;
 }
 
 /**
@@ -35,6 +36,7 @@ export function spawnClaude(options: ClaudeProcessOptions): Promise<RunResult> {
     logger,
     formatterState,
     parallelThresholdMs,
+    model,
   } = options;
 
   return new Promise((resolve) => {
@@ -45,24 +47,26 @@ export function spawnClaude(options: ClaudeProcessOptions): Promise<RunResult> {
     let claudeText = '';
     const parser = createStreamParser();
 
-    const ptyProcess: IPty = pty.spawn(
-      'claude',
-      [
-        '-p',
-        prompt,
-        '--dangerously-skip-permissions',
-        '--verbose',
-        '--output-format',
-        'stream-json',
-      ],
-      {
-        name: 'xterm-256color',
-        cols: 200,
-        rows: 50,
-        cwd,
-        env: { ...process.env },
-      }
-    );
+    const args = [
+      '-p',
+      prompt,
+      '--dangerously-skip-permissions',
+      '--verbose',
+      '--output-format',
+      'stream-json',
+    ];
+
+    if (model) {
+      args.push('--model', model);
+    }
+
+    const ptyProcess: IPty = pty.spawn('claude', args, {
+      name: 'xterm-256color',
+      cols: 200,
+      rows: 50,
+      cwd,
+      env: { ...process.env },
+    });
 
     ptyProcess.onData((data: string) => {
       const messages = parser.process(data);

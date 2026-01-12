@@ -1,9 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  printRunner,
   stripAnsi,
   truncate,
   formatDuration,
   shortenPath,
+  formatTimestamp,
+  timestampPrefix,
 } from '../../src/output/colors.js';
 
 describe('stripAnsi', () => {
@@ -72,5 +75,71 @@ describe('shortenPath', () => {
 
   it('returns short paths unchanged', () => {
     expect(shortenPath('src/file.ts')).toBe('src/file.ts');
+  });
+});
+
+describe('formatTimestamp', () => {
+  it('formats time as HH:MM:SS.mmm', () => {
+    const date = new Date('2024-01-15T09:05:03.042Z');
+    const result = formatTimestamp(date);
+    // Note: result depends on timezone, so just check format
+    expect(result).toMatch(/^\d{2}:\d{2}:\d{2}\.\d{3}$/);
+  });
+
+  it('pads single digit values with zeros', () => {
+    const date = new Date('2024-01-15T01:02:03.004Z');
+    const result = formatTimestamp(date);
+    expect(result).toMatch(/^\d{2}:\d{2}:\d{2}\.\d{3}$/);
+  });
+
+  it('uses current time when no date provided', () => {
+    const result = formatTimestamp();
+    expect(result).toMatch(/^\d{2}:\d{2}:\d{2}\.\d{3}$/);
+  });
+});
+
+describe('timestampPrefix', () => {
+  it('returns timestamp with ANSI dim codes and trailing space', () => {
+    const result = timestampPrefix();
+    // Should contain dim code, timestamp, reset code, and space
+    expect(result).toContain('\x1b[2m'); // dim
+    expect(result).toContain('\x1b[0m'); // reset
+    expect(result).toMatch(/\d{2}:\d{2}:\d{2}\.\d{3}/); // timestamp
+    expect(result.endsWith(' ')).toBe(true); // trailing space
+  });
+
+  it('stripping ANSI leaves just timestamp and space', () => {
+    const result = timestampPrefix();
+    const stripped = stripAnsi(result);
+    expect(stripped).toMatch(/^\d{2}:\d{2}:\d{2}\.\d{3} $/);
+  });
+});
+
+describe('printRunner', () => {
+  let consoleSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    consoleSpy.mockRestore();
+  });
+
+  it('prints message with [RUNNER] prefix and timestamp', () => {
+    printRunner('Test message');
+
+    expect(consoleSpy).toHaveBeenCalledTimes(1);
+    const output = consoleSpy.mock.calls[0]?.[0] as string;
+    expect(output).toContain('[RUNNER]');
+    expect(output).toContain('Test message');
+    expect(output).toMatch(/\d{2}:\d{2}:\d{2}\.\d{3}/);
+  });
+
+  it('uses magenta color for [RUNNER] label', () => {
+    printRunner('Test');
+
+    const output = consoleSpy.mock.calls[0]?.[0] as string;
+    expect(output).toContain('\x1b[35m'); // magenta
   });
 });

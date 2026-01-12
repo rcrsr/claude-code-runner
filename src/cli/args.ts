@@ -16,6 +16,7 @@ interface RawArgs {
   positionalArgs: string[];
   verbosity: Verbosity;
   enableLog: boolean;
+  model: string | null;
 }
 
 /**
@@ -24,28 +25,29 @@ interface RawArgs {
 function extractOptions(args: string[]): RawArgs {
   let verbosity: Verbosity = 'normal';
   let enableLog = true;
+  let model: string | null = null;
   const positionalArgs: string[] = [];
 
-  for (const arg of args) {
-    switch (arg) {
-      case '--quiet':
-        verbosity = 'quiet';
-        break;
-      case '--normal':
-        verbosity = 'normal';
-        break;
-      case '--verbose':
-        verbosity = 'verbose';
-        break;
-      case '--no-log':
-        enableLog = false;
-        break;
-      default:
-        positionalArgs.push(arg);
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--quiet') {
+      verbosity = 'quiet';
+    } else if (arg === '--normal') {
+      verbosity = 'normal';
+    } else if (arg === '--verbose') {
+      verbosity = 'verbose';
+    } else if (arg === '--no-log') {
+      enableLog = false;
+    } else if (arg === '--model' || arg === '-m') {
+      model = args[++i] ?? null;
+    } else if (arg?.startsWith('--model=')) {
+      model = arg.slice(8);
+    } else {
+      positionalArgs.push(arg ?? '');
     }
   }
 
-  return { positionalArgs, verbosity, enableLog };
+  return { positionalArgs, verbosity, enableLog, model };
 }
 
 /**
@@ -76,10 +78,11 @@ export function parseCommandLine(line: string): { prompt: string } {
  * Parse CLI arguments
  */
 export function parseArgs(args: string[]): ParsedArgs {
-  const { positionalArgs, verbosity, enableLog } = extractOptions(args);
+  const { positionalArgs, verbosity, enableLog, model } = extractOptions(args);
 
   const subcommand = (positionalArgs[0] ?? 'prompt') as Subcommand;
   let prompt = '';
+  let displayCommand = '';
   let scriptMode = false;
   let scriptLines: string[] = [];
 
@@ -92,6 +95,7 @@ export function parseArgs(args: string[]): ParsedArgs {
         process.exit(1);
       }
       prompt = loadCommandTemplate(commandName, positionalArgs.slice(2));
+      displayCommand = positionalArgs.slice(1).join(' ');
       break;
     }
     case 'script': {
@@ -111,22 +115,26 @@ export function parseArgs(args: string[]): ParsedArgs {
         .map((l) => l.trim())
         .filter((l) => l && !l.startsWith('#')); // Skip empty lines and comments
       scriptMode = true;
+      displayCommand = `script ${scriptFile}`;
       break;
     }
     case 'prompt':
       prompt =
         positionalArgs.slice(1).join(' ') || 'Tell me about this project';
+      displayCommand = `"${prompt}"`;
       break;
   }
 
   const config: Partial<RunnerConfig> = {
     verbosity,
     enableLog,
+    model,
   };
 
   return {
     subcommand: scriptMode ? 'script' : subcommand,
     prompt,
+    displayCommand,
     scriptLines,
     scriptMode,
     config,
@@ -157,9 +165,10 @@ Iteration Status Signals (output by Claude to control loop):
   :::RUNNER::ERROR:::        Exit with error (something went wrong)
 
 Options:
-  --quiet      Minimal output (errors only)
-  --normal     Default output level
-  --verbose    Full output with all details
-  --no-log     Disable logging to file (enabled by default)
+  --quiet              Minimal output (errors only)
+  --normal             Default output level
+  --verbose            Full output with all details
+  --no-log             Disable logging to file (enabled by default)
+  --model, -m <model>  Specify Claude model (e.g., sonnet, opus, haiku)
 `);
 }

@@ -43,6 +43,7 @@ export interface RunnerConfig {
   maxIterations: number;
   parallelThresholdMs: number;
   iterationPauseMs: number;
+  model: string | null;
 }
 
 /**
@@ -55,6 +56,7 @@ export const DEFAULT_CONFIG: RunnerConfig = {
   maxIterations: 10,
   parallelThresholdMs: 100,
   iterationPauseMs: 2000,
+  model: null,
 };
 
 /**
@@ -63,6 +65,7 @@ export const DEFAULT_CONFIG: RunnerConfig = {
 export interface ParsedArgs {
   subcommand: Subcommand;
   prompt: string;
+  displayCommand: string; // Original command for display (e.g., "command increment /tmp/counter.txt 3")
   scriptLines: string[];
   scriptMode: boolean;
   config: Partial<RunnerConfig>;

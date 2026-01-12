@@ -6,7 +6,7 @@
 
 import { parseArgs, parseCommandLine } from './cli/args.js';
 import { type RunnerContext, runWithSignals } from './core/runner.js';
-import { colors, formatDuration, truncate } from './output/colors.js';
+import { colors, formatElapsed, printRunner } from './output/colors.js';
 import { createFormatterState } from './output/formatter.js';
 import { createLogger } from './output/logger.js';
 import { DEFAULT_CONFIG, type RunnerConfig } from './types/runner.js';
@@ -41,8 +41,14 @@ async function main(): Promise<void> {
     cwd: process.cwd(),
   };
 
-  // Print header
-  printHeader(parsed.subcommand, config.verbosity, logger.filePath);
+  // Print config with [RUNNER] messages
+  printRunner(`Mode: ${parsed.subcommand} | Verbosity: ${config.verbosity}`);
+  if (config.model) {
+    printRunner(`Model: ${config.model}`);
+  }
+  if (logger.filePath) {
+    printRunner(`Log: ${logger.filePath}`);
+  }
   logger.log(`Started: ${new Date().toISOString()}`);
 
   if (parsed.scriptMode) {
@@ -50,29 +56,13 @@ async function main(): Promise<void> {
     await runScriptMode(parsed.scriptLines, context, totalStart);
   } else {
     // Single command mode
-    await runSingleMode(parsed.prompt, context, totalStart);
-  }
-}
-
-/**
- * Print runner header
- */
-function printHeader(
-  mode: string,
-  verbosity: string,
-  logFile: string | null
-): void {
-  console.log(
-    `${colors.bold}════════════════════════════════════════════════════════════${colors.reset}`
-  );
-  console.log(
-    `${colors.bold}Claude Code Runner${colors.reset} ${colors.dim}(${verbosity}, ${mode})${colors.reset}`
-  );
-  console.log(
-    `${colors.bold}════════════════════════════════════════════════════════════${colors.reset}`
-  );
-  if (logFile) {
-    console.log(`${colors.dim}Log:${colors.reset} ${logFile}`);
+    await runSingleMode(
+      parsed.prompt,
+      parsed.subcommand,
+      parsed.displayCommand,
+      context,
+      totalStart
+    );
   }
 }
 
@@ -81,14 +71,19 @@ function printHeader(
  */
 async function runSingleMode(
   prompt: string,
+  subcommand: string,
+  displayCommand: string,
   context: RunnerContext,
   startTime: number
 ): Promise<void> {
-  console.log(`${colors.dim}Prompt:${colors.reset} ${truncate(prompt, 80)}`);
-  console.log('');
-  context.logger.log(`Prompt: ${prompt}\n`);
+  context.logger.log(`${subcommand}: ${displayCommand}\n`);
 
-  const result = await runWithSignals(prompt, startTime, context);
+  const result = await runWithSignals(
+    prompt,
+    displayCommand,
+    startTime,
+    context
+  );
   context.logger.close();
   process.exit(result === 'ok' ? 0 : 1);
 }
@@ -101,38 +96,27 @@ async function runScriptMode(
   context: RunnerContext,
   startTime: number
 ): Promise<void> {
-  console.log(
-    `${colors.dim}Script:${colors.reset} ${scriptLines.length} commands`
-  );
-  console.log('');
+  printRunner(`Running script: ${scriptLines.length} commands`);
   context.logger.log(`Script: ${scriptLines.length} commands\n`);
 
   for (const [i, line] of scriptLines.entries()) {
-    printScriptStep(i + 1, scriptLines.length, line);
     context.logger.log(`\n=== [${i + 1}/${scriptLines.length}] ${line} ===\n`);
 
     let result: 'ok' | 'blocked' | 'error';
     try {
       const parsed = parseCommandLine(line);
-      result = await runWithSignals(parsed.prompt, startTime, context);
+      result = await runWithSignals(parsed.prompt, line, startTime, context);
     } catch (err) {
-      console.log(
-        `${colors.red}PARSE ERROR:${colors.reset} ${(err as Error).message}`
+      printRunner(
+        `${colors.red}Parse error:${colors.reset} ${(err as Error).message}`
       );
       result = 'error';
     }
 
     if (result === 'blocked' || result === 'error') {
       const totalDuration = Math.round((Date.now() - startTime) / 1000);
-      console.log('');
-      console.log(
-        `${colors.bold}════════════════════════════════════════════════════════════${colors.reset}`
-      );
-      console.log(
-        `${colors.red}SCRIPT STOPPED${colors.reset} at step ${i + 1}/${scriptLines.length} | Total: ${formatDuration(totalDuration * 1000)}`
-      );
-      console.log(
-        `${colors.bold}════════════════════════════════════════════════════════════${colors.reset}`
+      printRunner(
+        `${colors.red}Script stopped${colors.reset} [${i + 1}/${scriptLines.length}] steps in ${formatElapsed(totalDuration)}`
       );
       context.logger.log(
         `\nSCRIPT STOPPED at step ${i + 1}, ${totalDuration}s total`
@@ -144,37 +128,14 @@ async function runScriptMode(
 
   // All commands completed
   const totalDuration = Math.round((Date.now() - startTime) / 1000);
-  console.log('');
-  console.log(
-    `${colors.bold}════════════════════════════════════════════════════════════${colors.reset}`
-  );
-  console.log(
-    `${colors.green}SCRIPT COMPLETE${colors.reset} | ${scriptLines.length} commands | Total: ${formatDuration(totalDuration * 1000)}`
-  );
-  console.log(
-    `${colors.bold}════════════════════════════════════════════════════════════${colors.reset}`
+  printRunner(
+    `${colors.green}Script completed${colors.reset} [${scriptLines.length}] steps in ${formatElapsed(totalDuration)}`
   );
   context.logger.log(
     `\nSCRIPT COMPLETE, ${scriptLines.length} commands, ${totalDuration}s total`
   );
   context.logger.close();
   process.exit(0);
-}
-
-/**
- * Print script step header
- */
-function printScriptStep(current: number, total: number, line: string): void {
-  console.log(
-    `${colors.cyan}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`
-  );
-  console.log(
-    `${colors.cyan}[${current}/${total}]${colors.reset} ${truncate(line, 60)}`
-  );
-  console.log(
-    `${colors.cyan}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`
-  );
-  console.log('');
 }
 
 // Run main
