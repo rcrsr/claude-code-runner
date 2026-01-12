@@ -1,0 +1,66 @@
+{
+  "name": "@rcrsr/claude-code-runner",
+  "version": "0.1.0",
+  "description": "Execute Claude CLI with PTY handling, real-time tool visualization, and iterative execution support",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "claude-code-runner": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rcrsr/claude-code-runner.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rcrsr/claude-code-runner/issues"
+  },
+  "homepage": "https://github.com/rcrsr/claude-code-runner#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "format": "prettier --write src/ tests/",
+    "format:check": "prettier --check src/ tests/",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm run test",
+    "clean": "rm -rf dist coverage",
+    "prepublishOnly": "npm run check && npm run build"
+  },
+  "keywords": [
+    "claude",
+    "cli",
+    "runner",
+    "automation"
+  ],
+  "author": "Andre Bremer",
+  "license": "MIT",
+  "dependencies": {
+    "node-pty": "^1.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/node": "^20.11.0",
+    "@vitest/coverage-v8": "^2.0.0",
+    "eslint": "^9.0.0",
+    "eslint-plugin-simple-import-sort": "^12.1.1",
+    "prettier": "^3.2.0",
+    "tsc-files": "^1.1.4",
+    "typescript": "^5.3.0",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
