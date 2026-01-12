@@ -81,12 +81,19 @@ Scripts stop on `BLOCKED` or `ERROR` signals, letting you catch issues before co
 
 ### Options
 
-| Option      | Description                  |
-| ----------- | ---------------------------- |
-| `--quiet`   | Minimal output (errors only) |
-| `--normal`  | Default output level         |
-| `--verbose` | Full output with details     |
-| `--no-log`  | Disable file logging         |
+| Option          | Description                                            |
+| --------------- | ------------------------------------------------------ |
+| `--model`, `-m` | Specify Claude model (e.g., `sonnet`, `opus`, `haiku`) |
+| `--quiet`       | Minimal output (errors only)                           |
+| `--normal`      | Default output level                                   |
+| `--verbose`     | Full output with details                               |
+| `--no-log`      | Disable file logging                                   |
+
+**Example with model selection:**
+
+```bash
+claude-code-runner -m sonnet "Explain this codebase"
+```
 
 ## Runner Signals
 
