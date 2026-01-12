@@ -1,15 +1,14 @@
 # Claude Code Runner
 
-Execute Claude CLI with PTY handling, real-time tool visualization, and iterative execution support.
+Deterministic, scripted, unattended Claude Code execution.
 
-## Features
+## Why Use This?
 
-- **PTY Handling**: Proper terminal emulation for Claude CLI
-- **Real-time Output**: See tool calls and responses as they happen
-- **Parallel Tool Grouping**: Groups concurrent tool calls for cleaner output
-- **Iteration Control**: Support for multi-iteration workflows via runner signals
-- **Script Mode**: Execute multiple commands from a file
-- **Verbosity Levels**: Quiet, normal, or verbose output
+- **Run unattended** — Execute Claude commands in CI/CD pipelines and automation scripts
+- **Script multiple commands** — Chain prompts together in a single run
+- **Control execution** — Claude signals when to stop, continue, or escalate to a human
+- **Full visibility** — Watch tool calls stream in real-time
+- **Complete logs** — Every session captured for debugging and review
 
 ## Installation
 
@@ -54,7 +53,7 @@ claude-code-runner --script tasks.txt
 
 ## Runner Signals
 
-Claude can output signals to control iteration:
+Claude can output signals to control execution:
 
 | Signal                   | Effect                           |
 | ------------------------ | -------------------------------- |
@@ -66,34 +65,9 @@ Claude can output signals to control iteration:
 ## Development
 
 ```bash
-# Type checking
-npm run typecheck
-
-# Linting
-npm run lint
-
-# Formatting
-npm run format
-
-# Run tests
-npm test
-
-# Run all checks
-npm run check
-```
-
-## Project Structure
-
-```
-src/
-├── index.ts          # Entry point
-├── cli/              # Argument parsing
-├── core/             # Runner logic with signal detection
-├── output/           # Formatting and logging
-├── parsers/          # Stream JSON and signal parsing
-├── process/          # PTY process management
-├── templates/        # Command template loading
-└── types/            # TypeScript type definitions
+npm run check    # Run all checks (typecheck, lint, format, test)
+npm run build    # Build the project
+npm test         # Run tests
 ```
 
 ## License
