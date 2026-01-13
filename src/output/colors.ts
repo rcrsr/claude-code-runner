@@ -138,9 +138,10 @@ async function processQueue(): Promise<void> {
   if (isProcessing || !deadDropSender) return;
   isProcessing = true;
 
-  while (messageQueue.length > 0) {
-    const msg = messageQueue.shift()!;
+  let msg = messageQueue.shift();
+  while (msg) {
     await deadDropSender(msg.content, msg.user);
+    msg = messageQueue.shift();
   }
 
   isProcessing = false;
