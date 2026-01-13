@@ -2,7 +2,7 @@
  * Core runner with iteration control and signal detection
  */
 
-import { colors, formatElapsed, printRunner } from '../output/colors.js';
+import { colors, formatDuration, printRunner } from '../output/colors.js';
 import type { FormatterState } from '../output/formatter.js';
 import type { Logger } from '../output/logger.js';
 import { detectRunnerSignal } from '../parsers/signals.js';
@@ -14,6 +14,7 @@ export interface RunnerContext {
   logger: Logger;
   formatterState: FormatterState;
   cwd: string;
+  runId: string | null;
 }
 
 /**
@@ -26,7 +27,7 @@ export async function runWithSignals(
   startTime: number,
   context: RunnerContext
 ): Promise<SignalResult> {
-  const { config, logger, formatterState, cwd } = context;
+  const { config, logger, formatterState, cwd, runId } = context;
   const {
     verbosity,
     maxIterations,
@@ -43,9 +44,9 @@ export async function runWithSignals(
 
     // Check max iterations
     if (iteration > maxIterations) {
-      const totalDuration = Math.round((Date.now() - startTime) / 1000);
+      const totalDuration = Date.now() - startTime;
       printRunner(
-        `${colors.red}Run stopped${colors.reset} max iterations (${maxIterations}) in ${formatElapsed(totalDuration)}`
+        `${colors.red}Run stopped${colors.reset} max iterations (${maxIterations}) in ${formatDuration(totalDuration)}`
       );
       logger.log(`\nMAX ITERATIONS reached after ${maxIterations}`);
       return 'error';
@@ -58,8 +59,11 @@ export async function runWithSignals(
 
     // Print running message
     if (verbosity !== 'quiet') {
-      printRunner(`Running step [${iteration}]: ${displayCommand}`);
+      printRunner(`Running step ${iteration}: ${displayCommand}`);
     }
+
+    // Update formatter with current step
+    formatterState.currentStep = iteration;
 
     // Run Claude
     const { exitCode, claudeText } = await spawnClaude({
@@ -73,22 +77,25 @@ export async function runWithSignals(
     });
 
     const status = detectRunnerSignal(claudeText);
-    const totalDuration = Math.round((Date.now() - startTime) / 1000);
+    const totalDuration = Date.now() - startTime;
+    const totalSeconds = Math.round(totalDuration / 1000);
 
+    const runLabel = runId ? ` ${runId}` : '';
+    const stepLabel = ` (${iteration} step${iteration > 1 ? 's' : ''})`;
     if (status === 'blocked') {
       printRunner(
-        `${colors.red}Run blocked${colors.reset} [${iteration}] steps in ${formatElapsed(totalDuration)}`
+        `${colors.red}Blocked run${runLabel}${colors.reset}${stepLabel} in ${formatDuration(totalDuration)}`
       );
       logger.log(
-        `\nBLOCKED after ${iteration} iterations, ${totalDuration}s total`
+        `\nBLOCKED after ${iteration} iterations, ${totalSeconds}s total`
       );
       return 'blocked';
     } else if (status === 'error') {
       printRunner(
-        `${colors.red}Run failed${colors.reset} [${iteration}] steps in ${formatElapsed(totalDuration)}`
+        `${colors.red}Failed run${runLabel}${colors.reset}${stepLabel} in ${formatDuration(totalDuration)}`
       );
       logger.log(
-        `\nERROR after ${iteration} iterations, ${totalDuration}s total`
+        `\nERROR after ${iteration} iterations, ${totalSeconds}s total`
       );
       return 'error';
     } else if (status === 'repeat_step') {
@@ -99,7 +106,7 @@ export async function runWithSignals(
       // No status signal - treat as successful single run
       const exitStatus: SignalResult = exitCode === 0 ? 'ok' : 'error';
       printRunner(
-        `${exitCode === 0 ? colors.green + 'Run completed' : colors.red + 'Run failed'}${colors.reset} [${iteration}] steps in ${formatElapsed(totalDuration)}`
+        `${exitCode === 0 ? colors.green + 'Completed run' : colors.red + 'Failed run'}${runLabel}${colors.reset}${stepLabel} in ${formatDuration(totalDuration)}`
       );
       logger.log(
         `\nCompleted after ${iteration} iteration(s), exit=${exitCode}`

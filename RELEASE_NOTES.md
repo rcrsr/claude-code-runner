@@ -1,5 +1,30 @@
 # Release Notes
 
+## v0.4.0
+
+### Output Improvements
+
+- Unified human-friendly time format: `2.5s`, `1m30s`, `1h2m3s`
+- Step numbers in completion messages: `Completed step 1 in 2.5s`
+- Step count in run completion: `Completed run X (2 steps) in 5.0s`
+- Simplified step header: `Running step 1:` (removed brackets)
+
+### Command Template Features
+
+- Added `$ARGUMENTS` variable for all arguments joined with spaces
+- Frontmatter support: `model`, `description`, `argument-hint`
+- Required vs optional arguments via hint syntax: `<required>` vs `[optional]`
+- Missing required arguments produce clear error with usage hint
+- Frontmatter `model` provides default (CLI `--model` takes precedence)
+
+### CLI Improvements
+
+- Added `--version` / `-V` flag
+- Missing template arguments now error instead of warning
+- Experimental [DeadDrop](https://deaddrop.sh) support with `--deaddrop`
+
+---
+
 ## v0.3.0
 
 ### Signal Changes
@@ -23,8 +48,8 @@
 ### New Features
 
 - Added `--model` / `-m` flag to specify Claude model (e.g., `sonnet`, `opus`, `haiku`)
-- Added iteration tracking: `Running step [1]: command args...`
-- Added elapsed time format for run summaries: `Run completed [3] steps in 00:00:41`
+- Added iteration tracking: `Running step 1: command args...`
+- Human-friendly time format: `Completed run (3 steps) in 24.0s`
 
 ---
 

@@ -37,6 +37,7 @@ describe('runWithSignals', () => {
       logger: createMockLogger(),
       formatterState: createMockFormatterState(),
       cwd: '/test/dir',
+      runId: 'TEST1234',
     };
 
     // Default mock: successful run with no signal
@@ -252,35 +253,35 @@ describe('runWithSignals', () => {
   });
 
   describe('output formatting', () => {
-    it('prints Run completed on done signal', async () => {
+    it('prints Completed run on done signal', async () => {
       vi.mocked(detectRunnerSignal).mockReturnValue(null);
 
       await runWithSignals('test', 'test', Date.now(), context);
 
       const calls = consoleSpy.mock.calls.map((c) => c[0] as string);
-      const hasComplete = calls.some((c) => c.includes('Run completed'));
+      const hasComplete = calls.some((c) => c.includes('Completed run'));
 
       expect(hasComplete).toBe(true);
     });
 
-    it('prints Run blocked on blocked signal', async () => {
+    it('prints Blocked run on blocked signal', async () => {
       vi.mocked(detectRunnerSignal).mockReturnValue('blocked');
 
       await runWithSignals('test', 'test', Date.now(), context);
 
       const calls = consoleSpy.mock.calls.map((c) => c[0] as string);
-      const hasBlocked = calls.some((c) => c.includes('Run blocked'));
+      const hasBlocked = calls.some((c) => c.includes('Blocked run'));
 
       expect(hasBlocked).toBe(true);
     });
 
-    it('prints Run failed on error signal', async () => {
+    it('prints Failed run on error signal', async () => {
       vi.mocked(detectRunnerSignal).mockReturnValue('error');
 
       await runWithSignals('test', 'test', Date.now(), context);
 
       const calls = consoleSpy.mock.calls.map((c) => c[0] as string);
-      const hasError = calls.some((c) => c.includes('Run failed'));
+      const hasError = calls.some((c) => c.includes('Failed run'));
 
       expect(hasError).toBe(true);
     });

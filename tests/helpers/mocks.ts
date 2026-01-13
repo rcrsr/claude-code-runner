@@ -38,6 +38,7 @@ export function createMockFormatterState(): FormatterState {
     lastToolTime: null,
     activeTask: null,
     toolStartTimes: new Map(),
+    currentStep: 1,
   };
 }
 

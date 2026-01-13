@@ -10,10 +10,7 @@
           { "name": "eslint", "command": "npx", "args": ["eslint", "$FILE"], "parser": "eslint", "_auto": true },
           { "name": "tsc-files", "command": "npx", "args": ["tsc-files", "--noEmit", "$FILE"], "parser": "tsc", "_auto": true }
         ],
-        ".json": [
-          { "name": "prettier", "command": "npx", "args": ["prettier", "--check", "$FILE"], "parser": "prettier", "_auto": true }
-        ],
-        ".md": [
+        ".json,.md": [
           { "name": "prettier", "command": "npx", "args": ["prettier", "--check", "$FILE"], "parser": "prettier", "_auto": true }
         ]
       }

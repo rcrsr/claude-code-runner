@@ -55,7 +55,7 @@ The runner starts by announcing its configuration. It's running in command mode 
 ### Step 1: 0 → 1
 
 ```
-21:20:16.849 [RUNNER] Running step [1]: increment /tmp/counter.txt 3
+21:20:16.849 [RUNNER] Running step 1: increment /tmp/counter.txt 3
 ```
 
 The runner spawns a fresh Claude session with the command prompt. Claude has no memory of previous runs—it only knows what the command definition tells it.
@@ -71,7 +71,7 @@ About 3.6 seconds after the step started, Claude responds with its plan. It read
 
 ```
 21:20:23.552 [CLAUDE] The value is now `1`, which is less than 3, so I'll output the repeat command: :::RUNNER::REPEAT_STEP:::
-21:20:23.600 [RUNNER] Claude completed step in 4.0s
+21:20:23.600 [RUNNER] Completed step 1 in 4.0s
 21:20:23.922 [RUNNER] Claude requested to repeat the step
 ```
 
@@ -80,7 +80,7 @@ Here's where things get interesting. Claude checks the condition from the comman
 ### Step 2: 1 → 2
 
 ```
-21:20:25.923 [RUNNER] Running step [2]: increment /tmp/counter.txt 3
+21:20:25.923 [RUNNER] Running step 2: increment /tmp/counter.txt 3
 ```
 
 Notice the 2-second gap between `21:20:23.922` and `21:20:25.923`. This deliberate delay prevents runaway loops and gives the system time to stabilize.
@@ -91,7 +91,7 @@ Notice the 2-second gap between `21:20:23.922` and `21:20:25.923`. This delibera
 21:20:30.819 [CLAUDE] The file contains "1". I'll increment it to 2 and write it back.
 21:20:31.072 [TOOL] Write /tmp/counter.txt
 21:20:32.612 [CLAUDE] The value is now 2, which is less than 3. :::RUNNER::REPEAT_STEP:::
-21:20:32.653 [RUNNER] Claude completed step in 3.9s
+21:20:32.653 [RUNNER] Completed step 2 in 3.9s
 21:20:33.009 [RUNNER] Claude requested to repeat the step
 ```
 
@@ -100,7 +100,7 @@ A new Claude session starts, completely unaware that step 1 ever happened. It re
 ### Step 3: 2 → 3
 
 ```
-21:20:35.010 [RUNNER] Running step [3]: increment /tmp/counter.txt 3
+21:20:35.010 [RUNNER] Running step 3: increment /tmp/counter.txt 3
 21:20:38.770 [CLAUDE] I'll read the file, increment the number, and check if we need to repeat.
 21:20:38.960 [TOOL] Read /tmp/counter.txt
 21:20:39.847 [CLAUDE] The current value is 2. I'll increment it to 3 and write it back.
@@ -111,8 +111,8 @@ Same pattern: read, increment, write.
 
 ```
 21:20:40.721 [CLAUDE] The value is now 3, which is not less than 3, so we stop here.
-21:20:40.784 [RUNNER] Claude completed step in 2.8s
-21:20:41.170 [RUNNER] Run completed [3] steps in 00:00:24
+21:20:40.784 [RUNNER] Completed step 3 in 2.8s
+21:20:41.170 [RUNNER] Completed run (3 steps) in 24.0s
 ```
 
 This is where the loop breaks. Claude checks: is 3 less than 3? No. So it simply says "we stop here" without outputting any signal. The runner sees no `:::RUNNER::` pattern in the response and concludes the run.

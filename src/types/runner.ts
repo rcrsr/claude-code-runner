@@ -43,6 +43,7 @@ export interface RunnerConfig {
   parallelThresholdMs: number;
   iterationPauseMs: number;
   model: string | null;
+  deaddrop: boolean;
 }
 
 /**
@@ -56,6 +57,7 @@ export const DEFAULT_CONFIG: RunnerConfig = {
   parallelThresholdMs: 100,
   iterationPauseMs: 2000,
   model: null,
+  deaddrop: false,
 };
 
 /**

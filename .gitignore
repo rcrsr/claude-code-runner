@@ -38,6 +38,9 @@ Thumbs.db
 .env.local
 .env.*.local
 
+# Claude Code local settings (contains API keys)
+.claude/settings.local.json
+
 # Temporary
 tmp/
 temp/

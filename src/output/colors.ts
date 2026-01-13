@@ -45,16 +45,22 @@ export function truncate(str: string, len: number): string {
 
 /**
  * Format duration in human-readable form
+ * Examples: 450ms, 2.5s, 1m30s, 1h2m3s
  */
 export function formatDuration(ms: number): string {
   if (ms < 1000) {
     return `${ms}ms`;
   }
-  if (ms < 60000) {
-    return `${(ms / 1000).toFixed(1)}s`;
+  const totalSeconds = ms / 1000;
+  if (totalSeconds < 60) {
+    return `${totalSeconds.toFixed(1)}s`;
   }
-  const mins = Math.floor(ms / 60000);
-  const secs = ((ms % 60000) / 1000).toFixed(0);
+  const hours = Math.floor(totalSeconds / 3600);
+  const mins = Math.floor((totalSeconds % 3600) / 60);
+  const secs = Math.round(totalSeconds % 60);
+  if (hours > 0) {
+    return `${hours}h${mins}m${secs}s`;
+  }
   return `${mins}m${secs}s`;
 }
 
@@ -82,16 +88,6 @@ export function formatTimestamp(date: Date = new Date()): string {
 }
 
 /**
- * Format elapsed seconds as hh:mm:ss
- */
-export function formatElapsed(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-}
-
-/**
  * Get a timestamped prefix for output lines
  */
 export function timestampPrefix(): string {
@@ -99,10 +95,117 @@ export function timestampPrefix(): string {
 }
 
 /**
- * Print a [RUNNER] control message with timestamp
+ * Deaddrop user type
+ */
+export type DeadDropUser = 'Runner' | 'Claude Code';
+
+/**
+ * Deaddrop send function type (to avoid circular imports)
+ */
+export type DeadDropSender = (
+  content: string,
+  user: DeadDropUser
+) => Promise<void>;
+
+/**
+ * Module-level deaddrop sender, configured once at startup
+ */
+let deadDropSender: DeadDropSender | null = null;
+
+/**
+ * Serial queue for deaddrop messages
+ */
+interface QueuedMessage {
+  content: string;
+  user: DeadDropUser;
+}
+const messageQueue: QueuedMessage[] = [];
+let isProcessing = false;
+let flushResolve: (() => void) | null = null;
+
+/**
+ * Configure the deaddrop sender for all output functions
+ * Call once at startup when --deaddrop is enabled
+ */
+export function configureDeadDrop(sender: DeadDropSender | null): void {
+  deadDropSender = sender;
+}
+
+/**
+ * Process queued messages one at a time
+ */
+async function processQueue(): Promise<void> {
+  if (isProcessing || !deadDropSender) return;
+  isProcessing = true;
+
+  while (messageQueue.length > 0) {
+    const msg = messageQueue.shift()!;
+    await deadDropSender(msg.content, msg.user);
+  }
+
+  isProcessing = false;
+
+  // Resolve flush promise if waiting
+  if (flushResolve && messageQueue.length === 0) {
+    flushResolve();
+    flushResolve = null;
+  }
+}
+
+/**
+ * Flush all pending deaddrop sends
+ * Call before process.exit to ensure all messages are sent
+ */
+export async function flushDeadDrop(): Promise<void> {
+  if (messageQueue.length === 0 && !isProcessing) return;
+
+  return new Promise<void>((resolve) => {
+    flushResolve = resolve;
+    // If not already processing, start
+    if (!isProcessing) {
+      void processQueue();
+    }
+  });
+}
+
+/**
+ * Send a message to deaddrop if configured
+ */
+function sendToDeadDrop(message: string, user: DeadDropUser): void {
+  if (deadDropSender) {
+    messageQueue.push({ content: message, user });
+    void processQueue();
+  }
+}
+
+/**
+ * Print a [RUNNER] operational message with timestamp
+ * Automatically sends to Deaddrop if configured (without prefix)
  */
 export function printRunner(message: string): void {
   console.log(
     `${timestampPrefix()}${colors.magenta}[RUNNER]${colors.reset} ${message}`
   );
+  sendToDeadDrop(stripAnsi(message), 'Runner');
+}
+
+/**
+ * Print a [RUNNER] informational message with timestamp
+ * Does NOT send to Deaddrop (used for startup config, debug info)
+ */
+export function printRunnerInfo(message: string): void {
+  console.log(
+    `${timestampPrefix()}${colors.magenta}[RUNNER]${colors.reset} ${message}`
+  );
+}
+
+/**
+ * Print a [CLAUDE] message with timestamp
+ * Automatically sends to Deaddrop if configured (without prefix)
+ */
+export function printClaude(message: string): void {
+  console.log(
+    `${timestampPrefix()}${colors.green}[CLAUDE]${colors.reset} ${message}`
+  );
+  sendToDeadDrop(stripAnsi(message), 'Claude Code');
 }

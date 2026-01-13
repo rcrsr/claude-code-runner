@@ -386,7 +386,7 @@ describe('formatMessage', () => {
 
       const output = consoleSpy.mock.calls[0]?.[0] as string;
       expect(output).toContain('[RUNNER]');
-      expect(output).toContain('Claude completed step in 5.0s');
+      expect(output).toContain('Completed step 1 in 5.0s');
     });
 
     it('skips output in quiet mode', () => {

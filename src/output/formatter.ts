@@ -22,6 +22,7 @@ import {
 import {
   colors,
   formatDuration,
+  printClaude,
   printRunner,
   shortenPath,
   timestampPrefix,
@@ -37,6 +38,7 @@ export interface FormatterState {
   lastToolTime: number | null;
   activeTask: ActiveTask | null;
   toolStartTimes: Map<string, number>;
+  currentStep: number;
 }
 
 export function createFormatterState(): FormatterState {
@@ -45,6 +47,7 @@ export function createFormatterState(): FormatterState {
     lastToolTime: null,
     activeTask: null,
     toolStartTimes: new Map(),
+    currentStep: 1,
   };
 }
 
@@ -273,9 +276,7 @@ export function formatMessage(
           }
         } else {
           const text = block.text.replace(/[\r\n]+/g, ' ').trim();
-          console.log(
-            `${timestampPrefix()}${colors.green}[CLAUDE]${colors.reset} ${text}`
-          );
+          printClaude(text);
         }
       } else if (isToolUseBlock(block)) {
         const now = Date.now();
@@ -345,10 +346,8 @@ export function formatMessage(
   } else if (isResultMessage(msg)) {
     flushPendingTools(state, verbosity);
     if (verbosity !== 'quiet') {
-      const duration = msg.duration_ms
-        ? `${(msg.duration_ms / 1000).toFixed(1)}s`
-        : '?';
-      printRunner(`Claude completed step in ${duration}`);
+      const duration = msg.duration_ms ? formatDuration(msg.duration_ms) : '?';
+      printRunner(`Completed step ${state.currentStep} in ${duration}`);
     }
   } else {
     if (verbosity === 'verbose') {

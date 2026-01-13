@@ -58,7 +58,26 @@ Review the code in $1 for:
 Output findings as a numbered list.
 ```
 
-Templates support multiple arguments (`$1`, `$2`, `$3`, etc.) and YAML frontmatter is automatically stripped.
+**Template variables:**
+
+- `$1`, `$2`, `$3`... — Positional arguments
+- `$ARGUMENTS` — All arguments joined with spaces
+
+**Frontmatter support:**
+
+```markdown
+---
+description: Review code for issues
+argument-hint: <file> [severity]
+model: claude-sonnet-4-20250514
+---
+
+Review $1 with severity level $2...
+```
+
+- `argument-hint` — Defines required `<arg>` and optional `[arg]` arguments
+- `model` — Default model for this command (CLI `--model` takes precedence)
+- `description` — Command description
 
 ### script — Run multiple commands in sequence
 
@@ -81,13 +100,15 @@ Scripts stop on `BLOCKED` or `ERROR` signals, letting you catch issues before co
 
 ### Options
 
-| Option          | Description                                            |
-| --------------- | ------------------------------------------------------ |
-| `--model`, `-m` | Specify Claude model (e.g., `sonnet`, `opus`, `haiku`) |
-| `--quiet`       | Minimal output (errors only)                           |
-| `--normal`      | Default output level                                   |
-| `--verbose`     | Full output with details                               |
-| `--no-log`      | Disable file logging                                   |
+| Option            | Description                                            |
+| ----------------- | ------------------------------------------------------ |
+| `--version`, `-V` | Print version number                                   |
+| `--model`, `-m`   | Specify Claude model (e.g., `sonnet`, `opus`, `haiku`) |
+| `--quiet`         | Minimal output (errors only)                           |
+| `--normal`        | Default output level                                   |
+| `--verbose`       | Full output with details                               |
+| `--no-log`        | Disable file logging                                   |
+| `--deaddrop`      | Enable [DeadDrop](https://deaddrop.sh) streaming       |
 
 **Example with model selection:**
 

@@ -51,7 +51,10 @@ describe('parseArgs', () => {
     });
 
     it('parses command subcommand', () => {
-      vi.mocked(loadCommandTemplate).mockReturnValue('template content');
+      vi.mocked(loadCommandTemplate).mockReturnValue({
+        prompt: 'template content',
+        frontmatter: {},
+      });
 
       const result = parseArgs(['command', 'test-cmd']);
 
@@ -92,7 +95,10 @@ describe('parseArgs', () => {
 
   describe('command subcommand', () => {
     it('loads command template with name', () => {
-      vi.mocked(loadCommandTemplate).mockReturnValue('loaded template');
+      vi.mocked(loadCommandTemplate).mockReturnValue({
+        prompt: 'loaded template',
+        frontmatter: {},
+      });
 
       const result = parseArgs(['command', 'my-cmd']);
 
@@ -101,7 +107,10 @@ describe('parseArgs', () => {
     });
 
     it('passes additional args to template', () => {
-      vi.mocked(loadCommandTemplate).mockReturnValue('template with args');
+      vi.mocked(loadCommandTemplate).mockReturnValue({
+        prompt: 'template with args',
+        frontmatter: {},
+      });
 
       parseArgs(['command', 'my-cmd', 'arg1', 'arg2']);
 
@@ -259,7 +268,10 @@ describe('parseCommandLine', () => {
 
   describe('command command', () => {
     it('loads template for command name', () => {
-      vi.mocked(loadCommandTemplate).mockReturnValue('loaded');
+      vi.mocked(loadCommandTemplate).mockReturnValue({
+        prompt: 'loaded',
+        frontmatter: {},
+      });
 
       const result = parseCommandLine('command my-cmd');
 
@@ -268,7 +280,10 @@ describe('parseCommandLine', () => {
     });
 
     it('passes arguments to template', () => {
-      vi.mocked(loadCommandTemplate).mockReturnValue('loaded');
+      vi.mocked(loadCommandTemplate).mockReturnValue({
+        prompt: 'loaded',
+        frontmatter: {},
+      });
 
       parseCommandLine('command my-cmd arg1 arg2');
 

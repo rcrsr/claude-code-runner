@@ -4,23 +4,55 @@
  * Shows intermediate tool calls and responses in real-time
  */
 
+import { randomBytes } from 'crypto';
+
 import { parseArgs, parseCommandLine } from './cli/args.js';
 import { type RunnerContext, runWithSignals } from './core/runner.js';
-import { colors, formatElapsed, printRunner } from './output/colors.js';
+import { createDeadDropClientFromEnv } from './deaddrop/index.js';
+import {
+  colors,
+  configureDeadDrop,
+  flushDeadDrop,
+  formatDuration,
+  printRunner,
+  printRunnerInfo,
+} from './output/colors.js';
 import { createFormatterState } from './output/formatter.js';
 import { createLogger } from './output/logger.js';
 import { DEFAULT_CONFIG, type RunnerConfig } from './types/runner.js';
+
+/**
+ * Generate a short unique run ID (8 chars, uppercase)
+ */
+function generateRunId(): string {
+  return randomBytes(4).toString('hex').toUpperCase();
+}
 
 async function main(): Promise<void> {
   const totalStart = Date.now();
   const args = process.argv.slice(2);
   const parsed = parseArgs(args);
 
+  // Generate run ID for this session
+  const runId = generateRunId();
+
   // Merge config with defaults
   const config: RunnerConfig = {
     ...DEFAULT_CONFIG,
     ...parsed.config,
   };
+
+  // Configure deaddrop if enabled
+  if (config.deaddrop) {
+    const client = createDeadDropClientFromEnv(runId);
+    if (!client) {
+      console.error(
+        'Error: --deaddrop requires DEADDROP_API_KEY environment variable'
+      );
+      process.exit(1);
+    }
+    configureDeadDrop(client.send.bind(client));
+  }
 
   // Create logger
   const commandName = parsed.scriptMode
@@ -39,15 +71,24 @@ async function main(): Promise<void> {
     logger,
     formatterState,
     cwd: process.cwd(),
+    runId,
   };
 
-  // Print config with [RUNNER] messages
-  printRunner(`Mode: ${parsed.subcommand} | Verbosity: ${config.verbosity}`);
+  // Emit starting run message first (operational, sent to deaddrop)
+  printRunner(`Starting run ${runId}`);
+
+  // Print config with [RUNNER] messages (informational, not sent to deaddrop)
+  printRunnerInfo(
+    `Mode: ${parsed.subcommand} | Verbosity: ${config.verbosity}`
+  );
   if (config.model) {
-    printRunner(`Model: ${config.model}`);
+    printRunnerInfo(`Model: ${config.model}`);
+  }
+  if (config.deaddrop) {
+    printRunnerInfo(`Deaddrop: enabled`);
   }
   if (logger.filePath) {
-    printRunner(`Log: ${logger.filePath}`);
+    printRunnerInfo(`Log: ${logger.filePath}`);
   }
   logger.log(`Started: ${new Date().toISOString()}`);
 
@@ -85,6 +126,7 @@ async function runSingleMode(
     context
   );
   context.logger.close();
+  await flushDeadDrop();
   process.exit(result === 'ok' ? 0 : 1);
 }
 
@@ -114,32 +156,35 @@ async function runScriptMode(
     }
 
     if (result === 'blocked' || result === 'error') {
-      const totalDuration = Math.round((Date.now() - startTime) / 1000);
+      const totalDuration = Date.now() - startTime;
       printRunner(
-        `${colors.red}Script stopped${colors.reset} [${i + 1}/${scriptLines.length}] steps in ${formatElapsed(totalDuration)}`
+        `${colors.red}Script stopped${colors.reset} [${i + 1}/${scriptLines.length}] steps in ${formatDuration(totalDuration)}`
       );
       context.logger.log(
-        `\nSCRIPT STOPPED at step ${i + 1}, ${totalDuration}s total`
+        `\nSCRIPT STOPPED at step ${i + 1}, ${Math.round(totalDuration / 1000)}s total`
       );
       context.logger.close();
+      await flushDeadDrop();
       process.exit(1);
     }
   }
 
   // All commands completed
-  const totalDuration = Math.round((Date.now() - startTime) / 1000);
+  const totalDuration = Date.now() - startTime;
   printRunner(
-    `${colors.green}Script completed${colors.reset} [${scriptLines.length}] steps in ${formatElapsed(totalDuration)}`
+    `${colors.green}Script completed${colors.reset} [${scriptLines.length}] steps in ${formatDuration(totalDuration)}`
   );
   context.logger.log(
-    `\nSCRIPT COMPLETE, ${scriptLines.length} commands, ${totalDuration}s total`
+    `\nSCRIPT COMPLETE, ${scriptLines.length} commands, ${Math.round(totalDuration / 1000)}s total`
   );
   context.logger.close();
+  await flushDeadDrop();
   process.exit(0);
 }
 
 // Run main
 main().catch((err: unknown) => {
-  console.error('Fatal error:', err);
+  const message = err instanceof Error ? err.message : String(err);
+  console.error(`Error: ${message}`);
   process.exit(1);
 });

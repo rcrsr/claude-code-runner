@@ -3,8 +3,12 @@
  */
 
 import * as fs from 'fs';
+import { createRequire } from 'module';
 
 import { loadCommandTemplate } from '../templates/command.js';
+
+const require = createRequire(import.meta.url);
+const pkg = require('../../package.json') as { version: string };
 import type {
   ParsedArgs,
   RunnerConfig,
@@ -17,15 +21,23 @@ interface RawArgs {
   verbosity: Verbosity;
   enableLog: boolean;
   model: string | null;
+  deaddrop: boolean;
 }
 
 /**
  * Extract options from raw args, returning positional args and config
  */
 function extractOptions(args: string[]): RawArgs {
+  // Handle --version early
+  if (args.includes('--version') || args.includes('-V')) {
+    console.log(pkg.version);
+    process.exit(0);
+  }
+
   let verbosity: Verbosity = 'normal';
   let enableLog = true;
   let model: string | null = null;
+  let deaddrop = false;
   const positionalArgs: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -38,6 +50,8 @@ function extractOptions(args: string[]): RawArgs {
       verbosity = 'verbose';
     } else if (arg === '--no-log') {
       enableLog = false;
+    } else if (arg === '--deaddrop') {
+      deaddrop = true;
     } else if (arg === '--model' || arg === '-m') {
       model = args[++i] ?? null;
     } else if (arg?.startsWith('--model=')) {
@@ -47,7 +61,7 @@ function extractOptions(args: string[]): RawArgs {
     }
   }
 
-  return { positionalArgs, verbosity, enableLog, model };
+  return { positionalArgs, verbosity, enableLog, model, deaddrop };
 }
 
 /**
@@ -65,7 +79,8 @@ export function parseCommandLine(line: string): { prompt: string } {
     if (!cmdName) {
       throw new Error('command requires a name');
     }
-    return { prompt: loadCommandTemplate(cmdName, parts.slice(2)) };
+    const { prompt } = loadCommandTemplate(cmdName, parts.slice(2));
+    return { prompt };
   } else if (cmd === 'script') {
     throw new Error('script cannot be nested');
   } else {
@@ -78,13 +93,15 @@ export function parseCommandLine(line: string): { prompt: string } {
  * Parse CLI arguments
  */
 export function parseArgs(args: string[]): ParsedArgs {
-  const { positionalArgs, verbosity, enableLog, model } = extractOptions(args);
+  const { positionalArgs, verbosity, enableLog, model, deaddrop } =
+    extractOptions(args);
 
   const subcommand = (positionalArgs[0] ?? 'prompt') as Subcommand;
   let prompt = '';
   let displayCommand = '';
   let scriptMode = false;
   let scriptLines: string[] = [];
+  let frontmatterModel: string | null = null;
 
   switch (subcommand) {
     case 'command': {
@@ -94,7 +111,12 @@ export function parseArgs(args: string[]): ParsedArgs {
         console.error('Usage: claude-code-runner command <name> [args...]');
         process.exit(1);
       }
-      prompt = loadCommandTemplate(commandName, positionalArgs.slice(2));
+      const template = loadCommandTemplate(
+        commandName,
+        positionalArgs.slice(2)
+      );
+      prompt = template.prompt;
+      frontmatterModel = template.frontmatter.model ?? null;
       displayCommand = positionalArgs.slice(1).join(' ');
       break;
     }
@@ -128,7 +150,8 @@ export function parseArgs(args: string[]): ParsedArgs {
   const config: Partial<RunnerConfig> = {
     verbosity,
     enableLog,
-    model,
+    model: model ?? frontmatterModel,
+    deaddrop,
   };
 
   return {
@@ -169,5 +192,6 @@ Options:
   --verbose            Full output with all details
   --no-log             Disable logging to file (enabled by default)
   --model, -m <model>  Specify Claude model (e.g., sonnet, opus, haiku)
+  --deaddrop           Send messages to Deaddrop (requires DEADDROP_API_KEY env var)
 `);
 }
