@@ -1,5 +1,30 @@
 # Release Notes
 
+## v0.5.0
+
+### Breaking Changes
+
+- **New script format**: Scripts now use `prompt("text")` and `command("name")` syntax instead of bare subcommands
+- **Subcommand now required**: Must specify `prompt`, `command`, or `script` explicitly
+- **Prompt text required**: `prompt` subcommand no longer accepts empty input
+
+### Script Features
+
+- **Output chaining**: Capture step output with `-> $varname` and inject into subsequent steps
+- **Automatic last result**: `$_` holds previous step output without explicit capture
+- **Variable substitution**: Use `$varname` anywhere in prompts to inject captured text
+- **Heredoc support**: Multi-line prompts with `prompt(<<EOF...EOF)` syntax
+- **Script arguments**: `$1`, `$2`, `$ARGUMENTS` substitution from CLI args
+
+### Internal Improvements
+
+- Extracted shared utilities: `parseArgumentHint`, `formatSize`
+- Centralized constants replacing magic numbers throughout codebase
+- Encapsulated DeadDropQueue in testable class
+- Added tool input type definitions for better type safety
+
+---
+
 ## v0.4.0
 
 ### Output Improvements

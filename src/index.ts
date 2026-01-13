@@ -6,26 +6,48 @@
 
 import { randomBytes } from 'crypto';
 
-import { parseArgs, parseCommandLine } from './cli/args.js';
-import { type RunnerContext, runWithSignals } from './core/runner.js';
+import { parseArgs } from './cli/args.js';
+import {
+  type RunnerContext,
+  runWithSignals,
+  type StepContext,
+} from './core/runner.js';
 import { createDeadDropClientFromEnv } from './deaddrop/index.js';
 import {
-  colors,
   configureDeadDrop,
   flushDeadDrop,
-  formatDuration,
   printRunner,
   printRunnerInfo,
 } from './output/colors.js';
 import { createFormatterState } from './output/formatter.js';
 import { createLogger } from './output/logger.js';
+import {
+  captureOutput,
+  createVariableStore,
+  getSubstitutionList,
+  loadScript,
+  substituteVariables,
+} from './script/index.js';
+import type { ScriptLine } from './script/types.js';
+import { loadCommandTemplate } from './templates/command.js';
 import { DEFAULT_CONFIG, type RunnerConfig } from './types/runner.js';
+import { formatSize } from './utils/formatting.js';
 
 /**
  * Generate a short unique run ID (8 chars, uppercase)
  */
 function generateRunId(): string {
   return randomBytes(4).toString('hex').toUpperCase();
+}
+
+/**
+ * Format variables used for "with X" clause
+ */
+function formatVarsUsed(vars: string[]): string {
+  if (vars.length === 0) return '';
+  // Convert $_ to "last result", keep others as-is
+  const labels = vars.map((v) => (v === '$_' ? 'last result' : v));
+  return `with ${labels.join(', ')}: `;
 }
 
 async function main(): Promise<void> {
@@ -92,94 +114,117 @@ async function main(): Promise<void> {
   }
   logger.log(`Started: ${new Date().toISOString()}`);
 
-  if (parsed.scriptMode) {
-    // Script mode: run each line
-    await runScriptMode(parsed.scriptLines, context, totalStart);
+  // Build script lines - single prompt/command becomes a 1-step script
+  let lines: ScriptLine[];
+  let scriptArgs: string[] = [];
+
+  if (parsed.scriptMode && parsed.scriptFile) {
+    const script = loadScript(parsed.scriptFile, parsed.scriptArgs);
+    lines = script.lines;
+    scriptArgs = parsed.scriptArgs;
   } else {
-    // Single command mode
-    await runSingleMode(
-      parsed.prompt,
-      parsed.subcommand,
-      parsed.displayCommand,
+    // Single prompt or command becomes a 1-step script
+    lines = [{ type: 'prompt', text: parsed.prompt }];
+  }
+
+  // Run the script
+  const success = await runScript(lines, scriptArgs, context, totalStart);
+  context.logger.close();
+  await flushDeadDrop();
+  process.exit(success ? 0 : 1);
+}
+
+/**
+ * Build display string for a script line
+ */
+function getDisplayLine(line: ScriptLine): string {
+  if (line.type === 'prompt') {
+    const preview =
+      line.text.length > 50 ? line.text.slice(0, 50) + '...' : line.text;
+    return `"${preview}"`;
+  }
+  return `command("${line.name}")`;
+}
+
+/**
+ * Run a script (unified execution for single prompts and multi-step scripts)
+ */
+async function runScript(
+  lines: ScriptLine[],
+  scriptArgs: string[],
+  context: RunnerContext,
+  startTime: number
+): Promise<boolean> {
+  const store = createVariableStore();
+  let completedSteps = 0;
+
+  for (const [i, line] of lines.entries()) {
+    const stepNum = i + 1;
+    const displayLine = getDisplayLine(line);
+
+    context.logger.log(`\n=== Step ${stepNum}: ${displayLine} ===\n`);
+
+    // Get the prompt text
+    let promptText: string;
+    if (line.type === 'prompt') {
+      promptText = line.text;
+    } else {
+      const template = loadCommandTemplate(line.name, line.args);
+      promptText = template.prompt;
+    }
+
+    // Substitute variables
+    const varsUsed = getSubstitutionList(promptText, store);
+    const finalPrompt = substituteVariables(promptText, store, scriptArgs);
+
+    // Build display: show substituted prompt and what variables were used
+    const substitutedDisplay = getDisplayLine({
+      type: 'prompt',
+      text: finalPrompt,
+    });
+    const withClause = formatVarsUsed(varsUsed);
+
+    // Set step number for formatter output
+    context.formatterState.currentStep = stepNum;
+
+    // Run via runWithSignals (handles iterations, signals, output)
+    const stepContext: StepContext = { stepNum };
+    const result = await runWithSignals(
+      finalPrompt,
+      `${withClause}${substitutedDisplay}`,
+      startTime,
       context,
-      totalStart
+      stepContext
     );
-  }
-}
 
-/**
- * Run in single command mode (prompt or command)
- */
-async function runSingleMode(
-  prompt: string,
-  subcommand: string,
-  displayCommand: string,
-  context: RunnerContext,
-  startTime: number
-): Promise<void> {
-  context.logger.log(`${subcommand}: ${displayCommand}\n`);
+    // Capture output for variable store
+    captureOutput(store, result.claudeText, line.capture);
 
-  const result = await runWithSignals(
-    prompt,
-    displayCommand,
-    startTime,
-    context
-  );
-  context.logger.close();
-  await flushDeadDrop();
-  process.exit(result === 'ok' ? 0 : 1);
-}
+    // Print step completion with result size
+    const durationMs = context.formatterState.lastStepDurationMs;
+    const duration = durationMs ? `${(durationMs / 1000).toFixed(1)}s` : '?';
+    const size = formatSize(result.claudeText.length);
+    const captureLabel = line.capture ? `$${line.capture}` : 'result';
+    printRunner(
+      `Completed step ${stepNum} in ${duration}, ${captureLabel} = ${size}`
+    );
 
-/**
- * Run in script mode
- */
-async function runScriptMode(
-  scriptLines: string[],
-  context: RunnerContext,
-  startTime: number
-): Promise<void> {
-  printRunner(`Running script: ${scriptLines.length} commands`);
-  context.logger.log(`Script: ${scriptLines.length} commands\n`);
-
-  for (const [i, line] of scriptLines.entries()) {
-    context.logger.log(`\n=== [${i + 1}/${scriptLines.length}] ${line} ===\n`);
-
-    let result: 'ok' | 'blocked' | 'error';
-    try {
-      const parsed = parseCommandLine(line);
-      result = await runWithSignals(parsed.prompt, line, startTime, context);
-    } catch (err) {
-      printRunner(
-        `${colors.red}Parse error:${colors.reset} ${(err as Error).message}`
-      );
-      result = 'error';
+    // Handle failure (runWithSignals already printed the error)
+    if (result.status !== 'ok') {
+      return false;
     }
 
-    if (result === 'blocked' || result === 'error') {
-      const totalDuration = Date.now() - startTime;
-      printRunner(
-        `${colors.red}Script stopped${colors.reset} [${i + 1}/${scriptLines.length}] steps in ${formatDuration(totalDuration)}`
-      );
-      context.logger.log(
-        `\nSCRIPT STOPPED at step ${i + 1}, ${Math.round(totalDuration / 1000)}s total`
-      );
-      context.logger.close();
-      await flushDeadDrop();
-      process.exit(1);
-    }
+    completedSteps++;
   }
 
-  // All commands completed
+  // Print completion with run ID, step count, and duration
   const totalDuration = Date.now() - startTime;
+  const stepWord = completedSteps === 1 ? 'step' : 'steps';
+  const durationSec = (totalDuration / 1000).toFixed(1);
   printRunner(
-    `${colors.green}Script completed${colors.reset} [${scriptLines.length}] steps in ${formatDuration(totalDuration)}`
+    `Completed run ${context.runId} (${completedSteps} ${stepWord}) in ${durationSec}s`
   );
-  context.logger.log(
-    `\nSCRIPT COMPLETE, ${scriptLines.length} commands, ${Math.round(totalDuration / 1000)}s total`
-  );
-  context.logger.close();
-  await flushDeadDrop();
-  process.exit(0);
+  return true;
 }
 
 // Run main

@@ -2,6 +2,12 @@
  * Runner configuration and state types
  */
 
+import {
+  DEFAULT_ITERATION_PAUSE_MS,
+  DEFAULT_MAX_ITERATIONS,
+  DEFAULT_PARALLEL_THRESHOLD_MS,
+} from '../utils/constants.js';
+
 export type Verbosity = 'quiet' | 'normal' | 'verbose';
 
 export type Subcommand = 'prompt' | 'command' | 'script';
@@ -33,6 +39,14 @@ export interface RunResult {
 export type SignalResult = 'ok' | 'blocked' | 'error';
 
 /**
+ * Extended result from runWithSignals including output text
+ */
+export interface SignalRunResult {
+  status: SignalResult;
+  claudeText: string;
+}
+
+/**
  * Runner configuration
  */
 export interface RunnerConfig {
@@ -53,9 +67,9 @@ export const DEFAULT_CONFIG: RunnerConfig = {
   verbosity: 'normal',
   enableLog: true,
   logDir: 'logs',
-  maxIterations: 10,
-  parallelThresholdMs: 100,
-  iterationPauseMs: 2000,
+  maxIterations: DEFAULT_MAX_ITERATIONS,
+  parallelThresholdMs: DEFAULT_PARALLEL_THRESHOLD_MS,
+  iterationPauseMs: DEFAULT_ITERATION_PAUSE_MS,
   model: null,
   deaddrop: false,
 };
@@ -67,9 +81,14 @@ export interface ParsedArgs {
   subcommand: Subcommand;
   prompt: string;
   displayCommand: string; // Original command for display (e.g., "command increment /tmp/counter.txt 3")
+  /** Display strings for script lines (for logging) */
   scriptLines: string[];
   scriptMode: boolean;
   config: Partial<RunnerConfig>;
+  /** Script file path (when scriptMode is true) */
+  scriptFile: string | null;
+  /** Script arguments (passed to script file for variable substitution) */
+  scriptArgs: string[];
 }
 
 /**

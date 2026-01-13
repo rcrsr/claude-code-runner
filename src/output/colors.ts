@@ -2,6 +2,15 @@
  * ANSI color codes for terminal output
  */
 
+import {
+  configureDeadDrop,
+  flushDeadDrop,
+  sendToDeadDrop,
+} from './deaddrop-queue.js';
+
+// Re-export deaddrop functions for backward compatibility
+export { configureDeadDrop, flushDeadDrop };
+
 export const colors = {
   reset: '\x1b[0m',
   dim: '\x1b[2m',
@@ -108,78 +117,6 @@ export type DeadDropSender = (
 ) => Promise<void>;
 
 /**
- * Module-level deaddrop sender, configured once at startup
- */
-let deadDropSender: DeadDropSender | null = null;
-
-/**
- * Serial queue for deaddrop messages
- */
-interface QueuedMessage {
-  content: string;
-  user: DeadDropUser;
-}
-const messageQueue: QueuedMessage[] = [];
-let isProcessing = false;
-let flushResolve: (() => void) | null = null;
-
-/**
- * Configure the deaddrop sender for all output functions
- * Call once at startup when --deaddrop is enabled
- */
-export function configureDeadDrop(sender: DeadDropSender | null): void {
-  deadDropSender = sender;
-}
-
-/**
- * Process queued messages one at a time
- */
-async function processQueue(): Promise<void> {
-  if (isProcessing || !deadDropSender) return;
-  isProcessing = true;
-
-  let msg = messageQueue.shift();
-  while (msg) {
-    await deadDropSender(msg.content, msg.user);
-    msg = messageQueue.shift();
-  }
-
-  isProcessing = false;
-
-  // Resolve flush promise if waiting
-  if (flushResolve && messageQueue.length === 0) {
-    flushResolve();
-    flushResolve = null;
-  }
-}
-
-/**
- * Flush all pending deaddrop sends
- * Call before process.exit to ensure all messages are sent
- */
-export async function flushDeadDrop(): Promise<void> {
-  if (messageQueue.length === 0 && !isProcessing) return;
-
-  return new Promise<void>((resolve) => {
-    flushResolve = resolve;
-    // If not already processing, start
-    if (!isProcessing) {
-      void processQueue();
-    }
-  });
-}
-
-/**
- * Send a message to deaddrop if configured
- */
-function sendToDeadDrop(message: string, user: DeadDropUser): void {
-  if (deadDropSender) {
-    messageQueue.push({ content: message, user });
-    void processQueue();
-  }
-}
-
-/**
  * Print a [RUNNER] operational message with timestamp
  * Automatically sends to Deaddrop if configured (without prefix)
  */
@@ -203,10 +140,12 @@ export function printRunnerInfo(message: string): void {
 /**
  * Print a [CLAUDE] message with timestamp
  * Automatically sends to Deaddrop if configured (without prefix)
+ * @param message - Display message (may be truncated/formatted for console)
+ * @param rawForDeaddrop - Original unmodified text to send to deaddrop (preserves newlines)
  */
-export function printClaude(message: string): void {
+export function printClaude(message: string, rawForDeaddrop?: string): void {
   console.log(
     `${timestampPrefix()}${colors.green}[CLAUDE]${colors.reset} ${message}`
   );
-  sendToDeadDrop(stripAnsi(message), 'Claude Code');
+  sendToDeadDrop(stripAnsi(rawForDeaddrop ?? message), 'Claude Code');
 }

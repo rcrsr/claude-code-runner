@@ -1,19 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock fs module
-vi.mock('fs', () => ({
-  existsSync: vi.fn(),
-  readFileSync: vi.fn(),
-}));
-
-// Mock command template loader
+// Mock template loaders
 vi.mock('../../src/templates/command.js', () => ({
   loadCommandTemplate: vi.fn(),
 }));
 
-import * as fs from 'fs';
+// Mock script loader
+vi.mock('../../src/script/index.js', () => ({
+  loadScript: vi.fn(),
+}));
 
 import { parseArgs, parseCommandLine, printUsage } from '../../src/cli/args.js';
+import { loadScript } from '../../src/script/index.js';
 import { loadCommandTemplate } from '../../src/templates/command.js';
 
 describe('parseArgs', () => {
@@ -37,10 +35,16 @@ describe('parseArgs', () => {
   });
 
   describe('subcommand parsing', () => {
-    it('defaults to prompt when no subcommand given', () => {
-      const result = parseArgs([]);
+    it('exits with error when no subcommand given', () => {
+      expect(() => parseArgs([])).toThrow('process.exit(1)');
+      expect(errorSpy).toHaveBeenCalledWith('Error: subcommand required');
+    });
 
-      expect(result.subcommand).toBe('prompt');
+    it('exits with error for unknown subcommand', () => {
+      expect(() => parseArgs(['--invalid'])).toThrow('process.exit(1)');
+      expect(errorSpy).toHaveBeenCalledWith(
+        "Error: unknown subcommand '--invalid'"
+      );
     });
 
     it('parses prompt subcommand', () => {
@@ -63,8 +67,13 @@ describe('parseArgs', () => {
     });
 
     it('parses script subcommand', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockReturnValue('prompt hello\nprompt world');
+      vi.mocked(loadScript).mockReturnValue({
+        lines: [
+          { type: 'prompt', text: 'hello' },
+          { type: 'prompt', text: 'world' },
+        ],
+        frontmatter: {},
+      });
 
       const result = parseArgs(['script', 'test.script']);
 
@@ -80,16 +89,9 @@ describe('parseArgs', () => {
       expect(result.prompt).toBe('hello world test');
     });
 
-    it('uses default prompt when no text provided', () => {
-      const result = parseArgs(['prompt']);
-
-      expect(result.prompt).toBe('Tell me about this project');
-    });
-
-    it('uses default prompt when only options given', () => {
-      const result = parseArgs(['--quiet']);
-
-      expect(result.prompt).toBe('Tell me about this project');
+    it('exits with error when no text provided', () => {
+      expect(() => parseArgs(['prompt'])).toThrow('process.exit(1)');
+      expect(errorSpy).toHaveBeenCalledWith('Error: prompt text required');
     });
   });
 
@@ -127,36 +129,43 @@ describe('parseArgs', () => {
   });
 
   describe('script subcommand', () => {
-    it('reads script file and parses lines', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockReturnValue('prompt line1\nprompt line2');
+    it('loads script with file path', () => {
+      vi.mocked(loadScript).mockReturnValue({
+        lines: [
+          { type: 'prompt', text: 'line1' },
+          { type: 'prompt', text: 'line2' },
+        ],
+        frontmatter: {},
+      });
 
       const result = parseArgs(['script', 'test.script']);
 
-      expect(result.scriptLines).toEqual(['prompt line1', 'prompt line2']);
+      expect(loadScript).toHaveBeenCalledWith('test.script', []);
       expect(result.scriptMode).toBe(true);
+      expect(result.scriptFile).toBe('test.script');
     });
 
-    it('filters empty lines', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockReturnValue(
-        'prompt line1\n\nprompt line2\n'
-      );
+    it('passes arguments to script loader', () => {
+      vi.mocked(loadScript).mockReturnValue({
+        lines: [{ type: 'prompt', text: 'with arg1' }],
+        frontmatter: {},
+      });
+
+      const result = parseArgs(['script', 'test.script', 'arg1', 'arg2']);
+
+      expect(loadScript).toHaveBeenCalledWith('test.script', ['arg1', 'arg2']);
+      expect(result.scriptArgs).toEqual(['arg1', 'arg2']);
+    });
+
+    it('uses frontmatter model from script', () => {
+      vi.mocked(loadScript).mockReturnValue({
+        lines: [{ type: 'prompt', text: 'test' }],
+        frontmatter: { model: 'opus' },
+      });
 
       const result = parseArgs(['script', 'test.script']);
 
-      expect(result.scriptLines).toEqual(['prompt line1', 'prompt line2']);
-    });
-
-    it('filters comments', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockReturnValue(
-        '# comment\nprompt line1\n# another comment\nprompt line2'
-      );
-
-      const result = parseArgs(['script', 'test.script']);
-
-      expect(result.scriptLines).toEqual(['prompt line1', 'prompt line2']);
+      expect(result.config.model).toBe('opus');
     });
 
     it('exits with error when file missing', () => {
@@ -164,20 +173,21 @@ describe('parseArgs', () => {
       expect(errorSpy).toHaveBeenCalledWith('Error: script file required');
     });
 
-    it('exits with error when file not found', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(false);
+    it('propagates error when script not found', () => {
+      vi.mocked(loadScript).mockImplementation(() => {
+        throw new Error('Script not found: missing.script');
+      });
 
       expect(() => parseArgs(['script', 'missing.script'])).toThrow(
-        'process.exit(1)'
-      );
-      expect(errorSpy).toHaveBeenCalledWith(
-        'Error: script file not found: missing.script'
+        'Script not found: missing.script'
       );
     });
 
     it('sets scriptMode to true', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockReturnValue('prompt test');
+      vi.mocked(loadScript).mockReturnValue({
+        lines: [{ type: 'prompt', text: 'test' }],
+        frontmatter: {},
+      });
 
       const result = parseArgs(['script', 'test.script']);
 
@@ -228,18 +238,18 @@ describe('parseArgs', () => {
 
   describe('config output', () => {
     it('returns verbosity in config', () => {
-      const result = parseArgs(['--verbose']);
+      const result = parseArgs(['--verbose', 'prompt', 'test']);
 
       expect(result.config).toHaveProperty('verbosity', 'verbose');
     });
 
     it('returns enableLog in config', () => {
-      const result = parseArgs(['--no-log']);
+      const result = parseArgs(['--no-log', 'prompt', 'test']);
 
       expect(result.config).toHaveProperty('enableLog', false);
     });
 
-    it('defaults enableLog to undefined when not specified', () => {
+    it('defaults enableLog to true when not specified', () => {
       const result = parseArgs(['prompt', 'test']);
 
       expect(result.config.enableLog).toBe(true);

@@ -14,6 +14,7 @@ import {
 import type { Logger } from '../output/logger.js';
 import { createStreamParser } from '../parsers/stream.js';
 import type { RunResult, Verbosity } from '../types/runner.js';
+import { PTY_COLS, PTY_ROWS } from '../utils/constants.js';
 
 export interface ClaudeProcessOptions {
   prompt: string;
@@ -62,8 +63,8 @@ export function spawnClaude(options: ClaudeProcessOptions): Promise<RunResult> {
 
     const ptyProcess: IPty = pty.spawn('claude', args, {
       name: 'xterm-256color',
-      cols: 200,
-      rows: 50,
+      cols: PTY_COLS,
+      rows: PTY_ROWS,
       cwd,
       env: { ...process.env },
     });

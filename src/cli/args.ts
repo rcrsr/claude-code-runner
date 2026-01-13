@@ -2,9 +2,9 @@
  * CLI argument parsing
  */
 
-import * as fs from 'fs';
 import { createRequire } from 'module';
 
+import { loadScript } from '../script/index.js';
 import { loadCommandTemplate } from '../templates/command.js';
 
 const require = createRequire(import.meta.url);
@@ -92,15 +92,43 @@ export function parseCommandLine(line: string): { prompt: string } {
 /**
  * Parse CLI arguments
  */
+const VALID_SUBCOMMANDS = ['prompt', 'command', 'script'] as const;
+
+function isValidSubcommand(value: string): value is Subcommand {
+  return VALID_SUBCOMMANDS.includes(value as Subcommand);
+}
+
 export function parseArgs(args: string[]): ParsedArgs {
   const { positionalArgs, verbosity, enableLog, model, deaddrop } =
     extractOptions(args);
 
-  const subcommand = (positionalArgs[0] ?? 'prompt') as Subcommand;
+  const firstArg = positionalArgs[0];
+
+  // Validate subcommand
+  if (!firstArg) {
+    console.error('Error: subcommand required');
+    console.error(
+      'Usage: claude-code-runner <prompt|command|script> [args...]'
+    );
+    process.exit(1);
+  }
+
+  if (!isValidSubcommand(firstArg)) {
+    console.error(`Error: unknown subcommand '${firstArg}'`);
+    console.error('Valid subcommands: prompt, command, script');
+    console.error(
+      'Usage: claude-code-runner <prompt|command|script> [args...]'
+    );
+    process.exit(1);
+  }
+
+  const subcommand = firstArg;
   let prompt = '';
   let displayCommand = '';
   let scriptMode = false;
   let scriptLines: string[] = [];
+  let scriptFile: string | null = null;
+  let scriptArgs: string[] = [];
   let frontmatterModel: string | null = null;
 
   switch (subcommand) {
@@ -121,30 +149,40 @@ export function parseArgs(args: string[]): ParsedArgs {
       break;
     }
     case 'script': {
-      const scriptFile = positionalArgs[1];
-      if (!scriptFile) {
+      const file = positionalArgs[1];
+      if (!file) {
         console.error('Error: script file required');
-        console.error('Usage: claude-code-runner script <file>');
+        console.error('Usage: claude-code-runner script <file> [args...]');
         process.exit(1);
       }
-      if (!fs.existsSync(scriptFile)) {
-        console.error(`Error: script file not found: ${scriptFile}`);
-        process.exit(1);
-      }
-      scriptLines = fs
-        .readFileSync(scriptFile, 'utf-8')
-        .split('\n')
-        .map((l) => l.trim())
-        .filter((l) => l && !l.startsWith('#')); // Skip empty lines and comments
+      scriptFile = file;
+      scriptArgs = positionalArgs.slice(2);
+      const parsed = loadScript(file, scriptArgs);
+      // Convert parsed lines to display strings for backward compat
+      scriptLines = parsed.lines.map((line) => {
+        if (line.type === 'prompt') {
+          const text =
+            line.text.length > 50 ? line.text.slice(0, 50) + '...' : line.text;
+          return `prompt("${text}")${line.capture ? ` -> $${line.capture}` : ''}`;
+        } else {
+          return `command("${line.name}")${line.capture ? ` -> $${line.capture}` : ''}`;
+        }
+      });
+      frontmatterModel = parsed.frontmatter.model ?? null;
       scriptMode = true;
-      displayCommand = `script ${scriptFile}`;
+      displayCommand = positionalArgs.slice(1).join(' ');
       break;
     }
-    case 'prompt':
-      prompt =
-        positionalArgs.slice(1).join(' ') || 'Tell me about this project';
+    case 'prompt': {
+      prompt = positionalArgs.slice(1).join(' ');
+      if (!prompt) {
+        console.error('Error: prompt text required');
+        console.error('Usage: claude-code-runner prompt <text>');
+        process.exit(1);
+      }
       displayCommand = `"${prompt}"`;
       break;
+    }
   }
 
   const config: Partial<RunnerConfig> = {
@@ -161,6 +199,8 @@ export function parseArgs(args: string[]): ParsedArgs {
     scriptLines,
     scriptMode,
     config,
+    scriptFile,
+    scriptArgs,
   };
 }
 
@@ -174,12 +214,12 @@ Claude Code Runner - executes claude CLI with proper TTY handling
 Usage:
   claude-code-runner [options] prompt <prompt>
   claude-code-runner [options] command <name> [args...]
-  claude-code-runner [options] script <file>
+  claude-code-runner [options] script <file> [args...]
 
 Subcommands:
   prompt <text>              Run with the given prompt (supports RUNNER signals)
   command <name> [args]      Load .claude/commands/<name>.md (supports RUNNER signals)
-  script <file>              Run commands from file, stop on ERROR/BLOCKED
+  script <file> [args]       Run commands from file, stop on ERROR/BLOCKED
 
 Iteration Signals (control runner execution):
   :::RUNNER::REPEAT_STEP:::  Run the same step again

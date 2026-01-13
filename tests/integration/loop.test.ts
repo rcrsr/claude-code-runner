@@ -71,7 +71,7 @@ describe('loop integration', () => {
 
     const result = await resultPromise;
 
-    expect(result).toBe('ok');
+    expect(result.status).toBe('ok');
     expect(mockSpawn).toHaveBeenCalledTimes(3);
   });
 
@@ -104,7 +104,7 @@ describe('loop integration', () => {
     await vi.runAllTimersAsync();
     const result = await resultPromise;
 
-    expect(result).toBe('error');
+    expect(result.status).toBe('error');
     expect(mockSpawn).toHaveBeenCalledTimes(3);
 
     // Check that max iterations message was logged
@@ -173,7 +173,7 @@ describe('loop integration', () => {
       context
     );
 
-    expect(result).toBe('blocked');
+    expect(result.status).toBe('blocked');
     expect(mockSpawn).toHaveBeenCalledTimes(1);
   });
 
@@ -203,7 +203,7 @@ describe('loop integration', () => {
       context
     );
 
-    expect(result).toBe('error');
+    expect(result.status).toBe('error');
     expect(mockSpawn).toHaveBeenCalledTimes(1);
   });
 });

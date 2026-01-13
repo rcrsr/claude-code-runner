@@ -19,8 +19,8 @@ vi.mock('../../src/parsers/signals.js', () => ({
   detectRunnerSignal: vi.fn(),
 }));
 
-import { spawnClaude } from '../../src/process/pty.js';
 import { detectRunnerSignal } from '../../src/parsers/signals.js';
+import { spawnClaude } from '../../src/process/pty.js';
 
 describe('runWithSignals', () => {
   let context: RunnerContext;
@@ -56,7 +56,7 @@ describe('runWithSignals', () => {
 
       const result = await runWithSignals('test', 'test', Date.now(), context);
 
-      expect(result).toBe('ok');
+      expect(result.status).toBe('ok');
     });
 
     it('returns blocked when Claude outputs BLOCKED signal', async () => {
@@ -64,7 +64,7 @@ describe('runWithSignals', () => {
 
       const result = await runWithSignals('test', 'test', Date.now(), context);
 
-      expect(result).toBe('blocked');
+      expect(result.status).toBe('blocked');
     });
 
     it('returns error when Claude outputs ERROR signal', async () => {
@@ -72,7 +72,7 @@ describe('runWithSignals', () => {
 
       const result = await runWithSignals('test', 'test', Date.now(), context);
 
-      expect(result).toBe('error');
+      expect(result.status).toBe('error');
     });
 
     it('continues iteration when Claude outputs REPEAT_STEP signal', async () => {
@@ -85,7 +85,7 @@ describe('runWithSignals', () => {
 
       const result = await promise;
 
-      expect(result).toBe('ok');
+      expect(result.status).toBe('ok');
       expect(spawnClaude).toHaveBeenCalledTimes(2);
     });
 
@@ -97,7 +97,7 @@ describe('runWithSignals', () => {
 
       const result = await runWithSignals('test', 'test', Date.now(), context);
 
-      expect(result).toBe('ok');
+      expect(result.status).toBe('ok');
     });
 
     it('returns error on non-zero exitCode without signal', async () => {
@@ -108,7 +108,7 @@ describe('runWithSignals', () => {
 
       const result = await runWithSignals('test', 'test', Date.now(), context);
 
-      expect(result).toBe('error');
+      expect(result.status).toBe('error');
     });
   });
 
@@ -125,11 +125,11 @@ describe('runWithSignals', () => {
 
       const result = await promise;
 
-      expect(result).toBe('error');
+      expect(result.status).toBe('error');
       expect(spawnClaude).toHaveBeenCalledTimes(2);
     });
 
-    it('prints iteration header for iterations > 1', async () => {
+    it('prints repeating message for repeat_step signal', async () => {
       vi.mocked(detectRunnerSignal)
         .mockReturnValueOnce('repeat_step')
         .mockReturnValueOnce(null);
@@ -139,24 +139,20 @@ describe('runWithSignals', () => {
       await promise;
 
       const calls = consoleSpy.mock.calls.map((c) => c[0] as string);
-      const hasIterationMsg = calls.some((c) =>
-        c.includes('Claude requested to repeat the step')
-      );
+      const hasRepeatMsg = calls.some((c) => c.includes('Repeating step'));
 
-      expect(hasIterationMsg).toBe(true);
+      expect(hasRepeatMsg).toBe(true);
     });
 
-    it('does not print iteration message for first iteration', async () => {
+    it('does not print repeating message when no repeat signal', async () => {
       vi.mocked(detectRunnerSignal).mockReturnValue(null);
 
       await runWithSignals('test', 'test', Date.now(), context);
 
       const calls = consoleSpy.mock.calls.map((c) => c[0] as string);
-      const hasIterationMsg = calls.some((c) =>
-        c.includes('Claude requested to repeat the step')
-      );
+      const hasRepeatMsg = calls.some((c) => c.includes('Repeating step'));
 
-      expect(hasIterationMsg).toBe(false);
+      expect(hasRepeatMsg).toBe(false);
     });
 
     it('pauses between iterations using iterationPauseMs', async () => {
@@ -253,35 +249,32 @@ describe('runWithSignals', () => {
   });
 
   describe('output formatting', () => {
-    it('prints Completed run on done signal', async () => {
+    it('completes silently for single step (caller handles completion)', async () => {
       vi.mocked(detectRunnerSignal).mockReturnValue(null);
 
-      await runWithSignals('test', 'test', Date.now(), context);
+      const result = await runWithSignals('test', 'test', Date.now(), context);
 
-      const calls = consoleSpy.mock.calls.map((c) => c[0] as string);
-      const hasComplete = calls.some((c) => c.includes('Completed run'));
-
-      expect(hasComplete).toBe(true);
+      expect(result.status).toBe('ok');
     });
 
-    it('prints Blocked run on blocked signal', async () => {
+    it('prints Blocked step on blocked signal', async () => {
       vi.mocked(detectRunnerSignal).mockReturnValue('blocked');
 
       await runWithSignals('test', 'test', Date.now(), context);
 
       const calls = consoleSpy.mock.calls.map((c) => c[0] as string);
-      const hasBlocked = calls.some((c) => c.includes('Blocked run'));
+      const hasBlocked = calls.some((c) => c.includes('Blocked'));
 
       expect(hasBlocked).toBe(true);
     });
 
-    it('prints Failed run on error signal', async () => {
+    it('prints Failed step on error signal', async () => {
       vi.mocked(detectRunnerSignal).mockReturnValue('error');
 
       await runWithSignals('test', 'test', Date.now(), context);
 
       const calls = consoleSpy.mock.calls.map((c) => c[0] as string);
-      const hasError = calls.some((c) => c.includes('Failed run'));
+      const hasError = calls.some((c) => c.includes('Failed'));
 
       expect(hasError).toBe(true);
     });
@@ -315,7 +308,7 @@ describe('runWithSignals', () => {
 
       const result = await runWithSignals('test', 'test', Date.now(), context);
 
-      expect(result).toBe('ok');
+      expect(result.status).toBe('ok');
       expect(spawnClaude).toHaveBeenCalledTimes(1);
     });
 
@@ -331,7 +324,7 @@ describe('runWithSignals', () => {
 
       const result = await promise;
 
-      expect(result).toBe('ok');
+      expect(result.status).toBe('ok');
       expect(spawnClaude).toHaveBeenCalledTimes(3);
     });
 
@@ -345,7 +338,7 @@ describe('runWithSignals', () => {
 
       const result = await promise;
 
-      expect(result).toBe('blocked');
+      expect(result.status).toBe('blocked');
       expect(spawnClaude).toHaveBeenCalledTimes(2);
     });
 
@@ -358,7 +351,7 @@ describe('runWithSignals', () => {
 
       const result = await promise;
 
-      expect(result).toBe('error');
+      expect(result.status).toBe('error');
       expect(spawnClaude).toHaveBeenCalledTimes(1);
     });
 

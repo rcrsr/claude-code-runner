@@ -4,12 +4,12 @@ Deterministic, scripted, unattended Claude Code execution.
 
 ## Why Use This?
 
-- **Run unattended** — Execute Claude commands in CI/CD pipelines and automation scripts
-- **Script multiple commands** — Chain prompts together in a single run
-- **Iterative runs with fresh context per phase** — Each command starts with a clean slate, ideal for phase-based implementation plans
-- **Self-correcting loops** — Users can configure prompts with [runner signals](#runner-signals) to control execution, like retry, complete, or escalation to a human
-- **Full visibility** — Watch tool calls stream in real-time
-- **Complete logs** — Every session captured for debugging and review
+- **Walk away** — Workflows run unattended in CI/CD pipelines
+- **Chain results** — Capture output from one step, inject it into the next
+- **Claude decides** — Signals control when to retry, escalate, or finish
+- **No hitting context limits** — Fresh context per step keeps long workflows running
+- **Watch live** — See tool calls stream as they execute
+- **Replay later** — Full session logs for debugging
 
 ## Prerequisites
 
@@ -28,12 +28,6 @@ npm install -g @rcrsr/claude-code-runner
 
 ```bash
 claude-code-runner prompt "Refactor the auth module to use async/await"
-```
-
-The `prompt` keyword is optional — bare strings work the same way:
-
-```bash
-claude-code-runner "Fix the failing tests in src/utils"
 ```
 
 ### command — Run a slash command file
@@ -69,7 +63,7 @@ Output findings as a numbered list.
 ---
 description: Review code for issues
 argument-hint: <file> [severity]
-model: claude-sonnet-4-20250514
+model: sonnet
 ---
 
 Review $1 with severity level $2...
@@ -79,24 +73,64 @@ Review $1 with severity level $2...
 - `model` — Default model for this command (CLI `--model` takes precedence)
 - `description` — Command description
 
-### script — Run multiple commands in sequence
+### script — Run multi-phase workflows
 
-Create a script file with one command per line:
+Scripts chain commands where each phase builds on the previous. Output from one step can be captured and reused in subsequent steps via variable substitution.
 
 ```bash
-claude-code-runner script deploy-tasks.txt
+claude-code-runner script refactor-workflow.txt src/api/
 ```
 
-**Example script** (`deploy-tasks.txt`):
+**Script syntax:**
+
+| Syntax                              | Description                               |
+| ----------------------------------- | ----------------------------------------- |
+| `prompt("text")`                    | Run a prompt (supports `\n` for newlines) |
+| `prompt(<<EOF...EOF)`               | Multi-line prompt using heredoc           |
+| `command("name")`                   | Run a command template                    |
+| `command("name", ["arg1", "arg2"])` | Run command with arguments                |
+| `-> $varname`                       | Capture output into a variable            |
+| `$_`                                | Previous step's output (auto-captured)    |
+| `$varname`                          | Named captured variable                   |
+| `$1`, `$2`, `$ARGUMENTS`            | Script arguments                          |
+| `# comment`                         | Comments (ignored)                        |
+
+**Example: Variable capture and chaining** (`refactor-workflow.txt`):
 
 ```text
-# Comments start with #
-prompt Run the test suite and fix any failures
-command review-code src/api/handlers.ts
-prompt Update the changelog for version 2.1.0
+---
+argument-hint: <directory>
+---
+# Phase 1: Analyze - capture issues list
+prompt("Review $1 for error handling issues. List each issue with file:line.") -> $issues
+
+# Phase 2: Fix - use captured issues (no temp file needed)
+prompt(<<EOF
+Fix these issues:
+$issues
+
+For each fix, make minimal changes.
+EOF
+)
+
+# Phase 3: Verify - $_ contains previous output
+prompt("Run tests. Confirm fixes are correct. Previous output: $_")
 ```
 
-Scripts stop on `BLOCKED` or `ERROR` signals, letting you catch issues before continuing.
+**Example: Command with capture** (`test-and-fix.txt`):
+
+```text
+# Run tests, capture failures
+command("run-tests", [$1]) -> $failures
+
+# Fix any failures
+prompt("Fix these test failures:\n$failures")
+
+# Verify
+command("run-tests", [$1])
+```
+
+Scripts stop on `BLOCKED` or `ERROR` signals, catching issues before continuing to the next phase.
 
 ### Options
 
@@ -113,7 +147,7 @@ Scripts stop on `BLOCKED` or `ERROR` signals, letting you catch issues before co
 **Example with model selection:**
 
 ```bash
-claude-code-runner -m sonnet "Explain this codebase"
+claude-code-runner -m sonnet prompt "Explain this codebase"
 ```
 
 ## Runner Signals
@@ -128,22 +162,61 @@ Signals give Claude a way to control execution flow. Instruct Claude to output t
 
 No signal means success—the runner exits when Claude finishes without outputting a signal.
 
-**Example prompt using signals:**
+### Document-Driven Workflows
 
-```bash
-claude-code-runner "Fix all lint errors in src/. Output :::RUNNER::BLOCKED::: if you need human input."
+The real power of runner signals is **checklist-based execution**. Create a document with implementation steps, and Claude works through them one at a time across multiple invocations.
+
+**Implementation plan** (`PLAN.md`):
+
+```markdown
+# Feature: User Authentication
+
+- [ ] Create `src/auth/types.ts` with User and Session interfaces
+- [ ] Implement `src/auth/session.ts` with createSession and validateSession
+- [ ] Add JWT signing in `src/auth/jwt.ts`
+- [ ] Write tests in `src/auth/__tests__/session.test.ts`
+- [ ] Update `src/index.ts` to export auth module
 ```
 
-**Example template with signals** (`.claude/commands/fix-tests.md`):
+**Command template** (`.claude/commands/work-plan.md`):
+
+```markdown
+Read $1 and find the first unchecked item (- [ ]).
+
+1. Implement that single item
+2. Mark it complete by changing `- [ ]` to `- [x]`
+3. Check if any unchecked items remain:
+   - If YES: output :::RUNNER::REPEAT_STEP:::
+   - If NO: output "All tasks complete"
+
+If blocked, output :::RUNNER::BLOCKED::: with what you need.
+```
+
+**Run it:**
+
+```bash
+claude-code-runner command work-plan PLAN.md
+```
+
+Each invocation: Claude finds the next unchecked step → implements it → marks it done → signals `REPEAT_STEP`. The loop continues until all boxes are checked. The document itself becomes persistent state across runs.
+
+### Self-Correcting Loops
+
+For retry-based patterns where Claude validates its own work:
+
+```bash
+claude-code-runner "Fix all lint errors. Run the linter after each fix. Output :::RUNNER::REPEAT_STEP::: if errors remain, nothing if clean."
+```
+
+Or as a template (`.claude/commands/fix-tests.md`):
 
 ```markdown
 Run the test suite for $1.
 
-- If tests fail and you can fix them, fix them and output :::RUNNER::REPEAT_STEP::: to re-run
-- If tests fail and you need help, output :::RUNNER::BLOCKED::: with an explanation
+- If tests pass: done
+- If tests fail and fixable: fix them, output :::RUNNER::REPEAT_STEP:::
+- If tests fail and stuck: output :::RUNNER::BLOCKED::: with explanation
 ```
-
-This pattern enables self-correcting loops: Claude attempts a fix, signals `REPEAT_STEP` to retry, and exits when done or stuck.
 
 **Defaults:**
 

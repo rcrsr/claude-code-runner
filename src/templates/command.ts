@@ -1,17 +1,27 @@
 /**
- * Command template loading and variable substitution
+ * Template loading and variable substitution for commands and scripts
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { parseArgumentHint } from '../utils/arguments.js';
+
 /**
- * Frontmatter metadata from command template
+ * Frontmatter metadata from template files
  */
-export interface CommandFrontmatter {
+export interface TemplateFrontmatter {
   model?: string;
   description?: string;
   argumentHint?: string;
+}
+
+/**
+ * Result of processing a template
+ */
+interface ProcessedTemplate {
+  body: string;
+  frontmatter: TemplateFrontmatter;
 }
 
 /**
@@ -19,47 +29,25 @@ export interface CommandFrontmatter {
  */
 export interface CommandTemplate {
   prompt: string;
-  frontmatter: CommandFrontmatter;
+  frontmatter: TemplateFrontmatter;
 }
 
 /**
- * Parse argument-hint to determine required vs optional args
- * Convention: <arg> = required, [arg] = optional
- * Returns set of optional argument positions (1-indexed)
+ * Result of loading a script template
  */
-function parseArgumentHint(hint: string | undefined): {
-  requiredCount: number;
-  optionalPositions: Set<number>;
-} {
-  if (!hint) {
-    return { requiredCount: 0, optionalPositions: new Set() };
-  }
-
-  const optionalPositions = new Set<number>();
-  let position = 0;
-  let requiredCount = 0;
-
-  // Match <required> or [optional] patterns
-  const argPattern = /<[^>]+>|\[[^\]]+\]/g;
-  let match;
-  while ((match = argPattern.exec(hint)) !== null) {
-    position++;
-    if (match[0].startsWith('[')) {
-      optionalPositions.add(position);
-    } else {
-      requiredCount = position;
-    }
-  }
-
-  return { requiredCount, optionalPositions };
+export interface ScriptTemplate {
+  lines: string[];
+  frontmatter: TemplateFrontmatter;
 }
+
+// Legacy alias for backwards compatibility
+export type CommandFrontmatter = TemplateFrontmatter;
 
 /**
  * Parse YAML frontmatter from markdown content
- * Returns the frontmatter object and remaining content
  */
 export function parseFrontmatter(content: string): {
-  frontmatter: CommandFrontmatter;
+  frontmatter: TemplateFrontmatter;
   body: string;
 } {
   if (!content.startsWith('---')) {
@@ -73,8 +61,7 @@ export function parseFrontmatter(content: string): {
   const yamlContent = content.slice(4, endIndex);
   const body = content.slice(endIndex + 4).trimStart();
 
-  // Simple YAML parsing for known fields
-  const frontmatter: CommandFrontmatter = {};
+  const frontmatter: TemplateFrontmatter = {};
   const keyValueRegex = /^(\S+):\s*(.*)$/;
   for (const line of yamlContent.split('\n')) {
     const match = keyValueRegex.exec(line);
@@ -102,20 +89,45 @@ export function stripFrontmatter(content: string): string {
 }
 
 /**
- * Load a command template and substitute positional arguments
- * Templates are loaded from .claude/commands/<name>.md
- *
- * Supports:
- * - $ARGUMENTS: all arguments joined with spaces
- * - $1, $2, $3...: positional arguments
- *
- * Frontmatter fields:
- * - model: default model for this command (CLI arg takes precedence)
- * - description: command description
- * - argument-hint: defines required <arg> and optional [arg] arguments
- *
- * @param commandName - Name of the command (without .md extension)
- * @param cmdArgs - Positional arguments to substitute
+ * Process template content: parse frontmatter, validate and substitute arguments
+ */
+function processTemplate(content: string, args: string[]): ProcessedTemplate {
+  const { frontmatter, body } = parseFrontmatter(content);
+
+  // Validate required arguments
+  const { requiredCount, optionalPositions } = parseArgumentHint(
+    frontmatter.argumentHint
+  );
+
+  if (args.length < requiredCount) {
+    const missing = [];
+    for (let i = args.length + 1; i <= requiredCount; i++) {
+      if (!optionalPositions.has(i)) {
+        missing.push(`$${i}`);
+      }
+    }
+    if (missing.length > 0) {
+      const hint = frontmatter.argumentHint
+        ? ` (usage: ${frontmatter.argumentHint})`
+        : '';
+      throw new Error(
+        `Missing required arguments: ${missing.join(', ')}${hint}`
+      );
+    }
+  }
+
+  // Substitute arguments
+  let result = body.replace(/\$ARGUMENTS/g, args.join(' '));
+  for (const [i, arg] of args.entries()) {
+    result = result.replace(new RegExp(`\\$${i + 1}`, 'g'), arg);
+  }
+  result = result.replace(/\$\d+/g, '');
+
+  return { body: result, frontmatter };
+}
+
+/**
+ * Load a command template from .claude/commands/<name>.md
  */
 export function loadCommandTemplate(
   commandName: string,
@@ -133,41 +145,29 @@ export function loadCommandTemplate(
   }
 
   const content = fs.readFileSync(commandFile, 'utf-8');
-  const { frontmatter, body } = parseFrontmatter(content);
+  const { body, frontmatter } = processTemplate(content, cmdArgs);
 
-  // Parse argument hints to determine required vs optional
-  const { requiredCount, optionalPositions } = parseArgumentHint(
-    frontmatter.argumentHint
-  );
+  return { prompt: body, frontmatter };
+}
 
-  // Check for missing required arguments
-  if (cmdArgs.length < requiredCount) {
-    const missing = [];
-    for (let i = cmdArgs.length + 1; i <= requiredCount; i++) {
-      if (!optionalPositions.has(i)) {
-        missing.push(`$${i}`);
-      }
-    }
-    if (missing.length > 0) {
-      const hint = frontmatter.argumentHint
-        ? ` (usage: ${frontmatter.argumentHint})`
-        : '';
-      throw new Error(
-        `Missing required arguments: ${missing.join(', ')}${hint}`
-      );
-    }
+/**
+ * Load a script template and substitute arguments
+ */
+export function loadScriptTemplate(
+  scriptFile: string,
+  scriptArgs: string[]
+): ScriptTemplate {
+  if (!fs.existsSync(scriptFile)) {
+    throw new Error(`Script not found: ${scriptFile}`);
   }
 
-  // Substitute $ARGUMENTS with all args joined
-  let prompt = body.replace(/\$ARGUMENTS/g, cmdArgs.join(' '));
+  const content = fs.readFileSync(scriptFile, 'utf-8');
+  const { body, frontmatter } = processTemplate(content, scriptArgs);
 
-  // Substitute $1, $2, $3, ... with positional args
-  for (const [i, arg] of cmdArgs.entries()) {
-    prompt = prompt.replace(new RegExp(`\\$${i + 1}`, 'g'), arg);
-  }
+  const lines = body
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('#'));
 
-  // Replace any remaining $N with empty string (optional args)
-  prompt = prompt.replace(/\$\d+/g, '');
-
-  return { prompt, frontmatter };
+  return { lines, frontmatter };
 }

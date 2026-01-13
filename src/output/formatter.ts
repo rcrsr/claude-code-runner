@@ -20,6 +20,19 @@ import {
   type Verbosity,
 } from '../types/runner.js';
 import {
+  MAX_RESULT_LINES,
+  TRUNCATE_ANSWER,
+  TRUNCATE_BASH_CMD,
+  TRUNCATE_ERROR,
+  TRUNCATE_GREP_PATTERN,
+  TRUNCATE_MESSAGE,
+  TRUNCATE_TASK_DESC,
+  TRUNCATE_TASK_SUMMARY,
+  TRUNCATE_TASK_VERBOSE,
+  TRUNCATE_TOOL_JSON,
+  TRUNCATE_VERBOSE_LINE,
+} from '../utils/constants.js';
+import {
   colors,
   formatDuration,
   printClaude,
@@ -39,6 +52,10 @@ export interface FormatterState {
   activeTask: ActiveTask | null;
   toolStartTimes: Map<string, number>;
   currentStep: number;
+  /** When true, step completion is not printed (caller handles it) */
+  suppressStepCompletion: boolean;
+  /** Duration from last result message (for caller to use) */
+  lastStepDurationMs: number | null;
 }
 
 export function createFormatterState(): FormatterState {
@@ -48,6 +65,8 @@ export function createFormatterState(): FormatterState {
     activeTask: null,
     toolStartTimes: new Map(),
     currentStep: 1,
+    suppressStepCompletion: true,
+    lastStepDurationMs: null,
   };
 }
 
@@ -97,16 +116,19 @@ function formatToolUse(
   } else if (name === 'Glob') {
     summary = (input['pattern'] as string | undefined) ?? '';
   } else if (name === 'Grep') {
-    summary = `"${truncate((input['pattern'] as string | undefined) ?? '', 30)}"`;
+    summary = `"${truncate((input['pattern'] as string | undefined) ?? '', TRUNCATE_GREP_PATTERN)}"`;
   } else if (name === 'Bash') {
-    summary = truncate((input['command'] as string | undefined) ?? '', 50);
+    summary = truncate(
+      (input['command'] as string | undefined) ?? '',
+      TRUNCATE_BASH_CMD
+    );
   } else if (name === 'Task') {
     const taskType = (input['subagent_type'] as string | undefined) ?? 'agent';
     const taskDesc = truncate(
       (input['description'] as string | undefined) ??
         (input['prompt'] as string | undefined) ??
         '',
-      40
+      TRUNCATE_TASK_DESC
     );
     summary = `${colors.magenta}${taskType}${colors.reset}: ${taskDesc}`;
 
@@ -122,7 +144,7 @@ function formatToolUse(
   } else if (name === 'Write' || name === 'Edit') {
     summary = shortenPath((input['file_path'] as string | undefined) ?? '');
   } else {
-    summary = truncate(JSON.stringify(input), 60);
+    summary = truncate(JSON.stringify(input), TRUNCATE_TOOL_JSON);
   }
 
   console.log(`${prefix}${colors.cyan}${name}${colors.reset} ${summary}`);
@@ -188,16 +210,15 @@ function printToolResult(
   const filtered = filterNoiseLines(content);
   const lines = filtered.split('\n').filter((l) => l.trim());
 
-  const maxLines = 10;
-  const showLines = lines.slice(0, maxLines);
+  const showLines = lines.slice(0, MAX_RESULT_LINES);
   for (const line of showLines) {
     console.log(
-      `${timestampPrefix()}${indent}  ${colors.dim}${truncate(line, 150)}${colors.reset}`
+      `${timestampPrefix()}${indent}  ${colors.dim}${truncate(line, TRUNCATE_VERBOSE_LINE)}${colors.reset}`
     );
   }
-  if (lines.length > maxLines) {
+  if (lines.length > MAX_RESULT_LINES) {
     console.log(
-      `${timestampPrefix()}${indent}  ${colors.dim}... (${lines.length - maxLines} more lines)${colors.reset}${durationStr}`
+      `${timestampPrefix()}${indent}  ${colors.dim}... (${lines.length - MAX_RESULT_LINES} more lines)${colors.reset}${durationStr}`
     );
   } else if (durationStr) {
     console.log(`${timestampPrefix()}${indent}  ${durationStr}`);
@@ -230,7 +251,8 @@ function printTaskResult(
 
   // Show task result summary
   if (lines.length > 0) {
-    const maxLen = verbosity === 'verbose' ? 500 : 200;
+    const maxLen =
+      verbosity === 'verbose' ? TRUNCATE_TASK_VERBOSE : TRUNCATE_TASK_SUMMARY;
     const summary = lines.join(' ').replace(/\s+/g, ' ');
     console.log(
       `${timestampPrefix()}  ${colors.green}→ ${truncate(summary, maxLen)}${colors.reset}`
@@ -269,14 +291,14 @@ export function formatMessage(
             !block.text.startsWith("I'll ") &&
             !block.text.startsWith('Let me ')
           ) {
-            const text = block.text.replace(/[\r\n]+/g, ' ').trim();
+            const displayText = block.text.replace(/[\r\n]+/g, ' ').trim();
             console.log(
-              `${timestampPrefix()}${colors.green}[ANSWER]${colors.reset} ${truncate(text, 500)}`
+              `${timestampPrefix()}${colors.green}[ANSWER]${colors.reset} ${truncate(displayText, TRUNCATE_ANSWER)}`
             );
           }
         } else {
-          const text = block.text.replace(/[\r\n]+/g, ' ').trim();
-          printClaude(text);
+          const displayText = block.text.replace(/[\r\n]+/g, ' ').trim();
+          printClaude(displayText, block.text);
         }
       } else if (isToolUseBlock(block)) {
         const now = Date.now();
@@ -333,7 +355,7 @@ export function formatMessage(
 
         if (isError) {
           console.log(
-            `${timestampPrefix()}  ${colors.red}ERROR: ${truncate(content, 100)}${colors.reset}${durationStr}`
+            `${timestampPrefix()}  ${colors.red}ERROR: ${truncate(content, TRUNCATE_ERROR)}${colors.reset}${durationStr}`
           );
         } else if (state.activeTask?.id === toolUseId) {
           // Task completing
@@ -345,14 +367,15 @@ export function formatMessage(
     }
   } else if (isResultMessage(msg)) {
     flushPendingTools(state, verbosity);
-    if (verbosity !== 'quiet') {
+    state.lastStepDurationMs = msg.duration_ms ?? null;
+    if (!state.suppressStepCompletion && verbosity !== 'quiet') {
       const duration = msg.duration_ms ? formatDuration(msg.duration_ms) : '?';
       printRunner(`Completed step ${state.currentStep} in ${duration}`);
     }
   } else {
     if (verbosity === 'verbose') {
       console.log(
-        `${timestampPrefix()}${colors.dim}[${msg.type.toUpperCase()}] ${truncate(JSON.stringify(msg), 100)}${colors.reset}`
+        `${timestampPrefix()}${colors.dim}[${msg.type.toUpperCase()}] ${truncate(JSON.stringify(msg), TRUNCATE_MESSAGE)}${colors.reset}`
       );
     }
   }

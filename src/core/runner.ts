@@ -7,7 +7,11 @@ import type { FormatterState } from '../output/formatter.js';
 import type { Logger } from '../output/logger.js';
 import { detectRunnerSignal } from '../parsers/signals.js';
 import { spawnClaude } from '../process/pty.js';
-import type { RunnerConfig, SignalResult } from '../types/runner.js';
+import type {
+  RunnerConfig,
+  SignalResult,
+  SignalRunResult,
+} from '../types/runner.js';
 
 export interface RunnerContext {
   config: RunnerConfig;
@@ -15,6 +19,10 @@ export interface RunnerContext {
   formatterState: FormatterState;
   cwd: string;
   runId: string | null;
+}
+
+export interface StepContext {
+  stepNum: number;
 }
 
 /**
@@ -25,9 +33,10 @@ export async function runWithSignals(
   promptText: string,
   displayCommand: string,
   startTime: number,
-  context: RunnerContext
-): Promise<SignalResult> {
-  const { config, logger, formatterState, cwd, runId } = context;
+  context: RunnerContext,
+  step: StepContext = { stepNum: 1 }
+): Promise<SignalRunResult> {
+  const { config, logger, formatterState, cwd } = context;
   const {
     verbosity,
     maxIterations,
@@ -37,6 +46,7 @@ export async function runWithSignals(
   } = config;
 
   let iteration = 0;
+  let lastClaudeText = '';
 
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- intentional infinite loop with internal exits
   while (true) {
@@ -49,7 +59,7 @@ export async function runWithSignals(
         `${colors.red}Run stopped${colors.reset} max iterations (${maxIterations}) in ${formatDuration(totalDuration)}`
       );
       logger.log(`\nMAX ITERATIONS reached after ${maxIterations}`);
-      return 'error';
+      return { status: 'error', claudeText: lastClaudeText };
     }
 
     // Log iteration for subsequent iterations
@@ -59,7 +69,11 @@ export async function runWithSignals(
 
     // Print running message
     if (verbosity !== 'quiet') {
-      printRunner(`Running step ${iteration}: ${displayCommand}`);
+      const iterLabel = iteration > 1 ? ` (iter ${iteration})` : '';
+      const separator = displayCommand.startsWith('with ') ? ' ' : ': ';
+      printRunner(
+        `Running step ${step.stepNum}${iterLabel}${separator}${displayCommand}`
+      );
     }
 
     // Update formatter with current step
@@ -76,42 +90,36 @@ export async function runWithSignals(
       model,
     });
 
-    const status = detectRunnerSignal(claudeText);
-    const totalDuration = Date.now() - startTime;
-    const totalSeconds = Math.round(totalDuration / 1000);
+    lastClaudeText = claudeText;
+    const signal = detectRunnerSignal(claudeText);
+    const stepDuration = Date.now() - startTime;
 
-    const runLabel = runId ? ` ${runId}` : '';
-    const stepLabel = ` (${iteration} step${iteration > 1 ? 's' : ''})`;
-    if (status === 'blocked') {
+    if (signal === 'blocked') {
       printRunner(
-        `${colors.red}Blocked run${runLabel}${colors.reset}${stepLabel} in ${formatDuration(totalDuration)}`
+        `${colors.red}Blocked${colors.reset} step ${step.stepNum} in ${formatDuration(stepDuration)}`
       );
-      logger.log(
-        `\nBLOCKED after ${iteration} iterations, ${totalSeconds}s total`
-      );
-      return 'blocked';
-    } else if (status === 'error') {
+      logger.log(`\nBLOCKED at step ${step.stepNum}`);
+      return { status: 'blocked', claudeText };
+    } else if (signal === 'error') {
       printRunner(
-        `${colors.red}Failed run${runLabel}${colors.reset}${stepLabel} in ${formatDuration(totalDuration)}`
+        `${colors.red}Failed${colors.reset} step ${step.stepNum} in ${formatDuration(stepDuration)}`
       );
-      logger.log(
-        `\nERROR after ${iteration} iterations, ${totalSeconds}s total`
-      );
-      return 'error';
-    } else if (status === 'repeat_step') {
-      printRunner(`Claude requested to repeat the step`);
-      logger.log(`Iteration ${iteration} complete, continuing...`);
+      logger.log(`\nERROR at step ${step.stepNum}`);
+      return { status: 'error', claudeText };
+    } else if (signal === 'repeat_step') {
+      printRunner(`Repeating step ${step.stepNum}`);
+      logger.log(`Iteration ${iteration} complete, repeating...`);
       await sleep(iterationPauseMs);
     } else {
-      // No status signal - treat as successful single run
+      // No signal - step completed
       const exitStatus: SignalResult = exitCode === 0 ? 'ok' : 'error';
-      printRunner(
-        `${exitCode === 0 ? colors.green + 'Completed run' : colors.red + 'Failed run'}${runLabel}${colors.reset}${stepLabel} in ${formatDuration(totalDuration)}`
-      );
-      logger.log(
-        `\nCompleted after ${iteration} iteration(s), exit=${exitCode}`
-      );
-      return exitStatus;
+      if (exitCode !== 0) {
+        printRunner(
+          `${colors.red}Failed${colors.reset} step ${step.stepNum} in ${formatDuration(stepDuration)}`
+        );
+      }
+      logger.log(`\nStep ${step.stepNum} complete, exit=${exitCode}`);
+      return { status: exitStatus, claudeText };
     }
   }
 }

@@ -3,7 +3,7 @@
     {
       "name": "root",
       "paths": ["."],
-      "exclude": ["dist/**", "tests/**"],
+      "exclude": ["dist/**"],
       "checks": {
         ".ts": [
           { "name": "prettier", "command": "npx", "args": ["prettier", "--check", "$FILE"], "parser": "prettier", "_auto": true },
