@@ -36,6 +36,22 @@ export function stripAnsi(str: string): string {
 }
 
 /**
+ * Strip carriage returns for cleaner terminal display
+ * Tool outputs sometimes contain CRs that cause display issues
+ */
+export function stripCR(str: string): string {
+  return str.replace(/\r/g, '');
+}
+
+/**
+ * Log to terminal with CR stripping for clean display
+ * Use this for all terminal output in the formatter
+ */
+export function terminalLog(line: string): void {
+  console.log(stripCR(line));
+}
+
+/**
  * Apply color to a string
  */
 export function colorize(text: string, color: ColorName): string {
@@ -54,7 +70,7 @@ export function truncate(str: string, len: number): string {
 
 /**
  * Format duration in human-readable form
- * Examples: 450ms, 2.5s, 1m30s, 1h2m3s
+ * Examples: 450ms, 2.5s, 1m 30s, 1h 2m 3s
  */
 export function formatDuration(ms: number): string {
   if (ms < 1000) {
@@ -68,9 +84,9 @@ export function formatDuration(ms: number): string {
   const mins = Math.floor((totalSeconds % 3600) / 60);
   const secs = Math.round(totalSeconds % 60);
   if (hours > 0) {
-    return `${hours}h${mins}m${secs}s`;
+    return `${hours}h ${mins}m ${secs}s`;
   }
-  return `${mins}m${secs}s`;
+  return `${mins}m ${secs}s`;
 }
 
 /**
@@ -121,7 +137,7 @@ export type DeadDropSender = (
  * Automatically sends to Deaddrop if configured (without prefix)
  */
 export function printRunner(message: string): void {
-  console.log(
+  terminalLog(
     `${timestampPrefix()}${colors.magenta}[RUNNER]${colors.reset} ${message}`
   );
   sendToDeadDrop(stripAnsi(message), 'Runner');
@@ -132,7 +148,7 @@ export function printRunner(message: string): void {
  * Does NOT send to Deaddrop (used for startup config, debug info)
  */
 export function printRunnerInfo(message: string): void {
-  console.log(
+  terminalLog(
     `${timestampPrefix()}${colors.magenta}[RUNNER]${colors.reset} ${message}`
   );
 }
@@ -144,7 +160,7 @@ export function printRunnerInfo(message: string): void {
  * @param rawForDeaddrop - Original unmodified text to send to deaddrop (preserves newlines)
  */
 export function printClaude(message: string, rawForDeaddrop?: string): void {
-  console.log(
+  terminalLog(
     `${timestampPrefix()}${colors.green}[CLAUDE]${colors.reset} ${message}`
   );
   sendToDeadDrop(stripAnsi(rawForDeaddrop ?? message), 'Claude Code');

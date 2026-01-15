@@ -205,7 +205,7 @@ Each invocation: Claude finds the next unchecked step → implements it → mark
 For retry-based patterns where Claude validates its own work:
 
 ```bash
-claude-code-runner "Fix all lint errors. Run the linter after each fix. Output :::RUNNER::REPEAT_STEP::: if errors remain, nothing if clean."
+claude-code-runner prompt "Fix all lint errors. Run the linter after each fix. Output :::RUNNER::REPEAT_STEP::: if errors remain, nothing if clean."
 ```
 
 Or as a template (`.claude/commands/fix-tests.md`):
@@ -229,7 +229,7 @@ For CI/CD integration:
 
 | Code | Meaning                                      |
 | ---- | -------------------------------------------- |
-| 0    | Success (`DONE` signal or clean exit)        |
+| 0    | Success (no signal or clean exit)            |
 | 1    | Error (`ERROR`, `BLOCKED`, or non-zero exit) |
 
 ## Logs

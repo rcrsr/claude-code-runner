@@ -379,6 +379,7 @@ describe('formatMessage', () => {
 
     it('prints duration with [RUNNER] prefix', () => {
       const state = createMockFormatterState();
+      state.suppressStepCompletion = false;
       const logger = createMockLogger();
       const msg = createResultMessage(5000);
 
@@ -507,10 +508,8 @@ describe('formatMessage', () => {
 
       const calls = consoleSpy.mock.calls.map((c) => c[0] as string);
       const hasTaskHeader = calls.some((c) => c.includes('[TASK]'));
-      const hasBoxLine = calls.some((c) => c.includes('┌'));
 
       expect(hasTaskHeader).toBe(true);
-      expect(hasBoxLine).toBe(true);
     });
   });
 });

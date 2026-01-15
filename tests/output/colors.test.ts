@@ -50,7 +50,7 @@ describe('formatDuration', () => {
   });
 
   it('formats minutes and seconds', () => {
-    expect(formatDuration(125000)).toBe('2m5s');
+    expect(formatDuration(125000)).toBe('2m 5s');
   });
 });
 

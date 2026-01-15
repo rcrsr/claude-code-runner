@@ -19,7 +19,12 @@ import {
   printRunner,
   printRunnerInfo,
 } from './output/colors.js';
-import { createFormatterState } from './output/formatter.js';
+import {
+  createFormatterState,
+  finalizeStepStats,
+  getRunStatsSummary,
+  resetFormatterState,
+} from './output/formatter.js';
 import { createLogger } from './output/logger.js';
 import {
   captureOutput,
@@ -31,7 +36,6 @@ import {
 import type { ScriptLine } from './script/types.js';
 import { loadCommandTemplate } from './templates/command.js';
 import { DEFAULT_CONFIG, type RunnerConfig } from './types/runner.js';
-import { formatSize } from './utils/formatting.js';
 
 /**
  * Generate a short unique run ID (8 chars, uppercase)
@@ -139,8 +143,10 @@ async function main(): Promise<void> {
  */
 function getDisplayLine(line: ScriptLine): string {
   if (line.type === 'prompt') {
+    // Replace newlines with spaces for single-line display
+    const cleaned = line.text.replace(/[\r\n]+/g, ' ').trim();
     const preview =
-      line.text.length > 50 ? line.text.slice(0, 50) + '...' : line.text;
+      cleaned.length > 50 ? cleaned.slice(0, 50) + '...' : cleaned;
     return `"${preview}"`;
   }
   return `command("${line.name}")`;
@@ -156,7 +162,6 @@ async function runScript(
   startTime: number
 ): Promise<boolean> {
   const store = createVariableStore();
-  let completedSteps = 0;
 
   for (const [i, line] of lines.entries()) {
     const stepNum = i + 1;
@@ -184,8 +189,9 @@ async function runScript(
     });
     const withClause = formatVarsUsed(varsUsed);
 
-    // Set step number for formatter output
+    // Set step number and start time for formatter output
     context.formatterState.currentStep = stepNum;
+    context.formatterState.stepStartTime = Date.now();
 
     // Run via runWithSignals (handles iterations, signals, output)
     const stepContext: StepContext = { stepNum };
@@ -200,30 +206,29 @@ async function runScript(
     // Capture output for variable store
     captureOutput(store, result.claudeText, line.capture);
 
-    // Print step completion with result size
-    const durationMs = context.formatterState.lastStepDurationMs;
-    const duration = durationMs ? `${(durationMs / 1000).toFixed(1)}s` : '?';
-    const size = formatSize(result.claudeText.length);
-    const captureLabel = line.capture ? `$${line.capture}` : 'result';
-    printRunner(
-      `Completed step ${stepNum} in ${duration}, ${captureLabel} = ${size}`
+    // Finalize step stats and print completion
+    const stepDurationMs = context.formatterState.stepStartTime
+      ? Date.now() - context.formatterState.stepStartTime
+      : (context.formatterState.lastStepDurationMs ?? 0);
+    const stepSummary = finalizeStepStats(
+      context.formatterState,
+      stepDurationMs
     );
+    printRunner(`Step ${stepNum} complete: ${stepSummary}`);
 
     // Handle failure (runWithSignals already printed the error)
     if (result.status !== 'ok') {
       return false;
     }
 
-    completedSteps++;
+    // Reset step stats for next step (preserves runStats)
+    resetFormatterState(context.formatterState);
   }
 
-  // Print completion with run ID, step count, and duration
+  // Print run completion with overall stats
   const totalDuration = Date.now() - startTime;
-  const stepWord = completedSteps === 1 ? 'step' : 'steps';
-  const durationSec = (totalDuration / 1000).toFixed(1);
-  printRunner(
-    `Completed run ${context.runId} (${completedSteps} ${stepWord}) in ${durationSec}s`
-  );
+  const runSummary = getRunStatsSummary(context.formatterState, totalDuration);
+  printRunner(`Run ${context.runId} complete: ${runSummary}`);
   return true;
 }
 

@@ -42,8 +42,8 @@ export function createLogger(
 
   return {
     log(msg: string): void {
-      // Strip ANSI codes and CR for clean log file
-      const clean = stripAnsi(msg).replace(/\r/g, '');
+      // Strip ANSI codes but preserve CRs for full fidelity
+      const clean = stripAnsi(msg);
       logStream.write(clean + '\n');
     },
     close(): void {

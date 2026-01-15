@@ -28,6 +28,8 @@ export const TRUNCATE_ERROR = 100;
 export const TRUNCATE_MESSAGE = 100;
 /** Truncation length for verbose tool result lines */
 export const TRUNCATE_VERBOSE_LINE = 150;
+/** Truncation length for terminal output lines (Claude messages, runner messages) */
+export const TRUNCATE_TERMINAL_LINE = 150;
 /** Truncation length for normal task result summary */
 export const TRUNCATE_TASK_SUMMARY = 200;
 /** Truncation length for quiet mode answer display */

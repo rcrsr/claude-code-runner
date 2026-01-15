@@ -4,14 +4,15 @@
 
 import { vi } from 'vitest';
 
+import type { FormatterState } from '../../src/output/formatter.js';
+import type { Logger } from '../../src/output/logger.js';
+import { createRunStats } from '../../src/output/stats.js';
 import type {
   AssistantMessage,
   ResultMessage,
   SystemInitMessage,
   UserMessage,
 } from '../../src/types/claude.js';
-import type { FormatterState } from '../../src/output/formatter.js';
-import type { Logger } from '../../src/output/logger.js';
 import type {
   RunnerConfig,
   RunResult,
@@ -39,6 +40,13 @@ export function createMockFormatterState(): FormatterState {
     activeTask: null,
     toolStartTimes: new Map(),
     currentStep: 1,
+    suppressStepCompletion: true,
+    lastStepDurationMs: null,
+    stats: createRunStats(),
+    runStats: createRunStats(),
+    stepStartTime: null,
+    taskStats: null,
+    taskStartTime: null,
   };
 }
 
@@ -155,7 +163,7 @@ export function createResultMessage(durationMs = 5000): ResultMessage {
  * Create an AssistantMessage with multiple tool use blocks
  */
 export function createMultiToolMessage(
-  tools: Array<{ name: string; input: Record<string, unknown>; id: string }>
+  tools: { name: string; input: Record<string, unknown>; id: string }[]
 ): AssistantMessage {
   return {
     type: 'assistant',

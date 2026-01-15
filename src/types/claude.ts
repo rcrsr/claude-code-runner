@@ -30,10 +30,25 @@ export interface McpServer {
   status: 'connected' | 'failed' | 'connecting';
 }
 
+// Token usage from API
+export interface CacheCreation {
+  ephemeral_5m_input_tokens?: number;
+  ephemeral_1h_input_tokens?: number;
+}
+
+export interface TokenUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
+  cache_creation?: CacheCreation;
+}
+
 // Message envelope
 export interface MessageEnvelope {
   role: 'assistant' | 'user';
   content: ContentBlock[];
+  usage?: TokenUsage;
 }
 
 // System init message

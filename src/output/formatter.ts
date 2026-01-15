@@ -27,8 +27,7 @@ import {
   TRUNCATE_GREP_PATTERN,
   TRUNCATE_MESSAGE,
   TRUNCATE_TASK_DESC,
-  TRUNCATE_TASK_SUMMARY,
-  TRUNCATE_TASK_VERBOSE,
+  TRUNCATE_TERMINAL_LINE,
   TRUNCATE_TOOL_JSON,
   TRUNCATE_VERBOSE_LINE,
 } from '../utils/constants.js';
@@ -38,10 +37,22 @@ import {
   printClaude,
   printRunner,
   shortenPath,
+  terminalLog,
   timestampPrefix,
   truncate,
 } from './colors.js';
 import type { Logger } from './logger.js';
+import {
+  createRunStats,
+  formatStatsSummary,
+  incrementMessageCount,
+  mergeStats,
+  recordOutput,
+  recordToolUse,
+  resetRunStats,
+  type RunStats,
+  updateTokenStats,
+} from './stats.js';
 
 /**
  * State for tracking parallel tool calls and active tasks
@@ -56,6 +67,16 @@ export interface FormatterState {
   suppressStepCompletion: boolean;
   /** Duration from last result message (for caller to use) */
   lastStepDurationMs: number | null;
+  /** Run statistics for current step */
+  stats: RunStats;
+  /** Overall run statistics (accumulated across steps) */
+  runStats: RunStats;
+  /** Step start time */
+  stepStartTime: number | null;
+  /** Task statistics (for nested task tracking) */
+  taskStats: RunStats | null;
+  /** Task start time */
+  taskStartTime: number | null;
 }
 
 export function createFormatterState(): FormatterState {
@@ -67,6 +88,11 @@ export function createFormatterState(): FormatterState {
     currentStep: 1,
     suppressStepCompletion: true,
     lastStepDurationMs: null,
+    stats: createRunStats(),
+    runStats: createRunStats(),
+    stepStartTime: null,
+    taskStats: null,
+    taskStartTime: null,
   };
 }
 
@@ -75,6 +101,34 @@ export function resetFormatterState(state: FormatterState): void {
   state.lastToolTime = null;
   state.activeTask = null;
   state.toolStartTimes.clear();
+  resetRunStats(state.stats);
+  state.stepStartTime = null;
+  state.taskStats = null;
+  state.taskStartTime = null;
+  // Note: runStats is NOT reset - it accumulates across steps
+}
+
+/**
+ * Finalize step stats: merge into runStats and return step summary
+ */
+export function finalizeStepStats(
+  state: FormatterState,
+  stepDurationMs: number
+): string {
+  // Merge step stats into run stats
+  mergeStats(state.runStats, state.stats);
+  // Format and return the step summary
+  return formatStatsSummary(state.stats, stepDurationMs);
+}
+
+/**
+ * Get the overall run stats summary
+ */
+export function getRunStatsSummary(
+  state: FormatterState,
+  runDurationMs: number
+): string {
+  return formatStatsSummary(state.runStats, runDurationMs);
 }
 
 /**
@@ -103,7 +157,7 @@ function formatToolUse(
   state: FormatterState
 ): void {
   const inTask = state.activeTask !== null;
-  const indent = inTask ? '  │ ' : '';
+  const indent = inTask ? '│' : '';
   const prefix = indented
     ? `${timestampPrefix()}${indent}  → `
     : `${timestampPrefix()}${indent}${colors.yellow}[TOOL]${colors.reset} `;
@@ -132,13 +186,13 @@ function formatToolUse(
     );
     summary = `${colors.magenta}${taskType}${colors.reset}: ${taskDesc}`;
 
-    // Mark task as active and print task header
+    // Mark task as active and print task header (no divider)
     state.activeTask = { name: taskType, description: taskDesc, id: tool.id };
-    console.log(
+    // Initialize task stats tracking
+    state.taskStats = createRunStats();
+    state.taskStartTime = Date.now();
+    terminalLog(
       `${timestampPrefix()}${colors.yellow}[TASK]${colors.reset} ${colors.magenta}${taskType}${colors.reset} ${taskDesc}`
-    );
-    console.log(
-      `${timestampPrefix()}  ${colors.dim}┌─────────────────────────────────────────────────${colors.reset}`
     );
     return;
   } else if (name === 'Write' || name === 'Edit') {
@@ -147,7 +201,7 @@ function formatToolUse(
     summary = truncate(JSON.stringify(input), TRUNCATE_TOOL_JSON);
   }
 
-  console.log(`${prefix}${colors.cyan}${name}${colors.reset} ${summary}`);
+  terminalLog(`${prefix}${colors.cyan}${name}${colors.reset} ${summary}`);
 }
 
 /**
@@ -171,7 +225,7 @@ export function flushPendingTools(
     formatToolUse(firstTool, false, state);
   } else {
     // Group parallel tools
-    console.log(
+    terminalLog(
       `${timestampPrefix()}${colors.yellow}[TOOL ×${state.pendingTools.length}]${colors.reset} ${colors.dim}(parallel)${colors.reset}`
     );
     for (const tool of state.pendingTools) {
@@ -195,7 +249,7 @@ function printToolResult(
   }
 
   const inTask = state.activeTask !== null;
-  const indent = inTask ? '  │ ' : '';
+  const indent = inTask ? '│' : '';
 
   if (verbosity === 'normal') {
     // In normal mode, suppress per-tool timing
@@ -212,16 +266,16 @@ function printToolResult(
 
   const showLines = lines.slice(0, MAX_RESULT_LINES);
   for (const line of showLines) {
-    console.log(
-      `${timestampPrefix()}${indent}  ${colors.dim}${truncate(line, TRUNCATE_VERBOSE_LINE)}${colors.reset}`
+    terminalLog(
+      `${timestampPrefix()}${indent} ${colors.dim}${truncate(line, TRUNCATE_VERBOSE_LINE)}${colors.reset}`
     );
   }
   if (lines.length > MAX_RESULT_LINES) {
-    console.log(
-      `${timestampPrefix()}${indent}  ${colors.dim}... (${lines.length - MAX_RESULT_LINES} more lines)${colors.reset}${durationStr}`
+    terminalLog(
+      `${timestampPrefix()}${indent} ${colors.dim}... (${lines.length - MAX_RESULT_LINES} more lines)${colors.reset}${durationStr}`
     );
   } else if (durationStr) {
-    console.log(`${timestampPrefix()}${indent}  ${durationStr}`);
+    terminalLog(`${timestampPrefix()}${indent} ${durationStr}`);
   }
 }
 
@@ -229,38 +283,28 @@ function printToolResult(
  * Print a task result
  */
 function printTaskResult(
-  result: ToolResultBlock,
-  durationStr: string,
-  verbosity: Verbosity,
+  _result: ToolResultBlock,
+  _durationStr: string,
+  _verbosity: Verbosity,
   state: FormatterState
 ): void {
-  const content =
-    typeof result.content === 'string'
-      ? result.content
-      : JSON.stringify(result.content);
+  // Calculate task duration and format stats summary
+  const taskDuration = state.taskStartTime
+    ? Date.now() - state.taskStartTime
+    : 0;
+  const statsSummary = state.taskStats
+    ? formatStatsSummary(state.taskStats, taskDuration)
+    : formatDuration(taskDuration);
 
-  // Close the task visual box with duration
-  console.log(
-    `${timestampPrefix()}  ${colors.dim}└─────────────────────────────────────────────────${colors.reset}${durationStr}`
+  // Print task completion with stats
+  terminalLog(
+    `${timestampPrefix()}└─${colors.yellow}[TASK]${colors.reset} Complete: ${statsSummary}`
   );
 
-  // Extract the text part of task result, skip agentId line
-  const lines = content
-    .split('\n')
-    .filter((l) => l.trim() && !l.includes('agentId:'));
-
-  // Show task result summary
-  if (lines.length > 0) {
-    const maxLen =
-      verbosity === 'verbose' ? TRUNCATE_TASK_VERBOSE : TRUNCATE_TASK_SUMMARY;
-    const summary = lines.join(' ').replace(/\s+/g, ' ');
-    console.log(
-      `${timestampPrefix()}  ${colors.green}→ ${truncate(summary, maxLen)}${colors.reset}`
-    );
-  }
-
-  // Clear active task
+  // Clear active task and stats
   state.activeTask = null;
+  state.taskStats = null;
+  state.taskStartTime = null;
 }
 
 /**
@@ -281,9 +325,18 @@ export function formatMessage(
   } else if (isAssistantMessage(msg)) {
     flushPendingTools(state, verbosity);
 
+    // Track message and token usage in stats
+    const stats = state.taskStats ?? state.stats;
+    incrementMessageCount(stats);
+    if (msg.message.usage) {
+      updateTokenStats(stats, msg.message.usage);
+    }
+
     for (const block of msg.message.content) {
       if (isTextBlock(block)) {
         claudeText += block.text + '\n';
+        // Track output characters for token estimation
+        recordOutput(stats, block.text.length);
 
         if (verbosity === 'quiet') {
           // Show answers but not thinking/status updates
@@ -292,18 +345,23 @@ export function formatMessage(
             !block.text.startsWith('Let me ')
           ) {
             const displayText = block.text.replace(/[\r\n]+/g, ' ').trim();
-            console.log(
+            terminalLog(
               `${timestampPrefix()}${colors.green}[ANSWER]${colors.reset} ${truncate(displayText, TRUNCATE_ANSWER)}`
             );
           }
         } else {
           const displayText = block.text.replace(/[\r\n]+/g, ' ').trim();
-          printClaude(displayText, block.text);
+          printClaude(
+            truncate(displayText, TRUNCATE_TERMINAL_LINE),
+            block.text
+          );
         }
       } else if (isToolUseBlock(block)) {
         const now = Date.now();
         // Record start time
         state.toolStartTimes.set(block.id, now);
+        // Track tool use in stats
+        recordToolUse(stats, block.name);
 
         if (
           state.lastToolTime &&
@@ -354,8 +412,12 @@ export function formatMessage(
           content.startsWith('error:');
 
         if (isError) {
-          console.log(
-            `${timestampPrefix()}  ${colors.red}ERROR: ${truncate(content, TRUNCATE_ERROR)}${colors.reset}${durationStr}`
+          const inTask = state.activeTask !== null;
+          const indent = inTask ? '│' : '';
+          // Strip <tool_use_error> tags for cleaner display
+          const cleanError = content.replace(/<\/?tool_use_error>/g, '').trim();
+          terminalLog(
+            `${timestampPrefix()}${indent} ${colors.red}ERROR: ${truncate(cleanError, TRUNCATE_ERROR)}${colors.reset}${durationStr}`
           );
         } else if (state.activeTask?.id === toolUseId) {
           // Task completing
@@ -374,7 +436,7 @@ export function formatMessage(
     }
   } else {
     if (verbosity === 'verbose') {
-      console.log(
+      terminalLog(
         `${timestampPrefix()}${colors.dim}[${msg.type.toUpperCase()}] ${truncate(JSON.stringify(msg), TRUNCATE_MESSAGE)}${colors.reset}`
       );
     }

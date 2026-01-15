@@ -1,5 +1,29 @@
 # Release Notes
 
+## v0.6.0
+
+### Output Statistics
+
+- **Step stats summary**: Completion shows duration, messages, tokens, and tools used
+- **Token breakdown**: Input tokens split by prompt, cache write (5m/1h), and cache read
+- **Run totals**: Accumulated stats across all steps displayed on run completion
+- **Task stats**: Nested task output includes stats summary
+
+### Display Improvements
+
+- **Duration format**: Added spaces between units (`1m 30s` instead of `1m30s`)
+- **Terminal cleanup**: Carriage returns stripped, Claude messages truncated to 150 chars
+- **Task display**: Simplified borders, stats summary on task completion
+- **Error display**: Cleaner error formatting with `<tool_use_error>` tags stripped
+
+### Internal Improvements
+
+- Stats tracking module (`src/output/stats.ts`) with token aggregation
+- Token usage types (`TokenUsage`, `CacheCreation`) in Claude types
+- Terminal output via `terminalLog()` for consistent CR handling
+
+---
+
 ## v0.5.0
 
 ### Breaking Changes
