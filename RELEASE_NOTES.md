@@ -1,5 +1,13 @@
 # Release Notes
 
+## v0.6.2
+
+### Bug Fixes
+
+- **Script command args**: Variables (`$1`, `$spec_review`, etc.) in command args now substitute correctly
+
+---
+
 ## v0.6.1
 
 ### Terminal Output Polish

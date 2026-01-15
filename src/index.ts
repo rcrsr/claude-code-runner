@@ -178,7 +178,11 @@ async function runScript(
     if (line.type === 'prompt') {
       promptText = line.text;
     } else {
-      const template = loadCommandTemplate(line.name, line.args);
+      // Substitute variables in command args before loading template
+      const substitutedArgs = line.args.map((arg) =>
+        substituteVariables(arg, store, scriptArgs)
+      );
+      const template = loadCommandTemplate(line.name, substitutedArgs);
       promptText = template.prompt;
     }
 
