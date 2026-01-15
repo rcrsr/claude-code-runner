@@ -58,13 +58,21 @@ export async function runWithSignals(
       printRunner(
         `${colors.red}Run stopped${colors.reset} max iterations (${maxIterations}) in ${formatDuration(totalDuration)}`
       );
-      logger.log(`\nMAX ITERATIONS reached after ${maxIterations}`);
+      logger.logEvent({
+        event: 'max_iterations',
+        step: step.stepNum,
+        maxIterations,
+      });
       return { status: 'error', claudeText: lastClaudeText };
     }
 
     // Log iteration for subsequent iterations
     if (iteration > 1) {
-      logger.log(`\n--- Iteration ${iteration} ---\n`);
+      logger.logEvent({
+        event: 'iteration_start',
+        step: step.stepNum,
+        iteration,
+      });
     }
 
     // Print running message
@@ -98,17 +106,22 @@ export async function runWithSignals(
       printRunner(
         `${colors.red}Blocked${colors.reset} step ${step.stepNum} in ${formatDuration(stepDuration)}`
       );
-      logger.log(`\nBLOCKED at step ${step.stepNum}`);
+      logger.logEvent({ event: 'blocked', step: step.stepNum });
       return { status: 'blocked', claudeText };
     } else if (signal === 'error') {
       printRunner(
         `${colors.red}Failed${colors.reset} step ${step.stepNum} in ${formatDuration(stepDuration)}`
       );
-      logger.log(`\nERROR at step ${step.stepNum}`);
+      logger.logEvent({ event: 'error', step: step.stepNum });
       return { status: 'error', claudeText };
     } else if (signal === 'repeat_step') {
       printRunner(`Repeating step ${step.stepNum}`);
-      logger.log(`Iteration ${iteration} complete, repeating...`);
+      logger.logEvent({
+        event: 'iteration_complete',
+        step: step.stepNum,
+        iteration,
+        repeating: true,
+      });
       await sleep(iterationPauseMs);
     } else {
       // No signal - step completed
@@ -118,7 +131,11 @@ export async function runWithSignals(
           `${colors.red}Failed${colors.reset} step ${step.stepNum} in ${formatDuration(stepDuration)}`
         );
       }
-      logger.log(`\nStep ${step.stepNum} complete, exit=${exitCode}`);
+      logger.logEvent({
+        event: 'step_complete',
+        step: step.stepNum,
+        exit: exitCode,
+      });
       return { status: exitStatus, claudeText };
     }
   }

@@ -293,12 +293,12 @@ describe('runWithSignals', () => {
       expect(hasMaxIter).toBe(true);
     });
 
-    it('logs to logger', async () => {
+    it('logs events to logger', async () => {
       vi.mocked(detectRunnerSignal).mockReturnValue(null);
 
       await runWithSignals('test', 'test', Date.now(), context);
 
-      expect(context.logger.log).toHaveBeenCalled();
+      expect(context.logger.logEvent).toHaveBeenCalled();
     });
   });
 

@@ -25,6 +25,7 @@ import type {
 export function createMockLogger(): Logger {
   return {
     log: vi.fn(),
+    logEvent: vi.fn(),
     close: vi.fn(),
     filePath: null,
   };

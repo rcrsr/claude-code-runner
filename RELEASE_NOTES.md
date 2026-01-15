@@ -1,5 +1,36 @@
 # Release Notes
 
+## v0.6.1
+
+### Terminal Output Polish
+
+- **Lowercase tags**: `[runner]`, `[claude]`, `[answer]` for cleaner appearance
+- **Tool names in tags**: `[Read]`, `[Bash]`, `[Grep]` instead of generic `[TOOL]`
+- **Task names in tags**: `[Explore]`, `[Plan]` instead of generic `[TASK]`
+- **Blue tool tags**: Tools now use blue color instead of yellow
+- **Parallel indicator**: Simplified from `[TOOL ×2]` to `[×2]`
+- **Task indentation**: Added space after `│` for consistent alignment
+- **Bash command display**: Newlines/CRs replaced with space for single-line output
+
+### Log Format
+
+- **JSON runner events**: All runner lifecycle events now emitted as JSON with `type: "runner"`
+- **Structured events**: `run_start`, `step_start`, `step_complete`, `iteration_start`, `blocked`, `error`, `max_iterations`
+- **Consistent format**: Log events match terminal output terminology
+
+### Documentation
+
+- **SCRIPT_SPEC.md**: Script file format specification with syntax, variables, and EBNF grammar
+
+### Bug Fixes
+
+- **Task stats tracking**: Fixed bug where task token stats went to step instead of task
+- **Task tool counting**: Task tool no longer counts itself in its own stats
+- **Output token tracking**: Now captures actual output tokens from usage data (was only estimating from chars)
+- **Step totals**: Task stats now merge into step/run totals correctly
+
+---
+
 ## v0.6.0
 
 ### Output Statistics

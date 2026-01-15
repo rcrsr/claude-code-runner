@@ -79,6 +79,7 @@ export function resetRunStats(stats: RunStats): void {
  */
 export function updateTokenStats(stats: RunStats, usage: TokenUsage): void {
   stats.tokens.prompt += usage.input_tokens ?? 0;
+  stats.tokens.output += usage.output_tokens ?? 0;
   stats.tokens.cacheWrite5m +=
     usage.cache_creation?.ephemeral_5m_input_tokens ?? 0;
   stats.tokens.cacheWrite1h +=
@@ -197,9 +198,13 @@ export function formatStatsSummary(
     breakdownParts.length > 0 ? ` (${breakdownParts.join(' / ')})` : '';
   parts.push(`${formatNumber(totalIn)} in${breakdown}`);
 
-  // Output tokens (estimated)
-  const outputTokens = estimateOutputTokens(stats.outputChars);
-  parts.push(`~${formatNumber(outputTokens)} out`);
+  // Output tokens (actual if available, otherwise estimated from chars)
+  if (stats.tokens.output > 0) {
+    parts.push(`${formatNumber(stats.tokens.output)} out`);
+  } else {
+    const outputTokens = estimateOutputTokens(stats.outputChars);
+    parts.push(`~${formatNumber(outputTokens)} out`);
+  }
 
   // Tools
   if (stats.toolUseCount > 0) {

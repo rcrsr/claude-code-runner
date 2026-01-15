@@ -7,8 +7,19 @@ import * as path from 'path';
 
 import { stripAnsi } from './colors.js';
 
+/**
+ * Runner event for structured logging
+ */
+export interface RunnerEvent {
+  type: 'runner';
+  event: string;
+  timestamp: string;
+  [key: string]: unknown;
+}
+
 export interface Logger {
   log(msg: string): void;
+  logEvent(event: Omit<RunnerEvent, 'type' | 'timestamp'>): void;
   close(): void;
   filePath: string | null;
 }
@@ -24,6 +35,7 @@ export function createLogger(
   if (!enabled) {
     return {
       log: () => undefined,
+      logEvent: () => undefined,
       close: () => undefined,
       filePath: null,
     };
@@ -45,6 +57,14 @@ export function createLogger(
       // Strip ANSI codes but preserve CRs for full fidelity
       const clean = stripAnsi(msg);
       logStream.write(clean + '\n');
+    },
+    logEvent(eventData: Omit<RunnerEvent, 'type' | 'timestamp'>): void {
+      const fullEvent = {
+        type: 'runner' as const,
+        timestamp: new Date().toISOString(),
+        ...eventData,
+      };
+      logStream.write(JSON.stringify(fullEvent) + '\n');
     },
     close(): void {
       logStream.end();

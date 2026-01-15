@@ -116,7 +116,7 @@ async function main(): Promise<void> {
   if (logger.filePath) {
     printRunnerInfo(`Log: ${logger.filePath}`);
   }
-  logger.log(`Started: ${new Date().toISOString()}`);
+  logger.logEvent({ event: 'run_start', runId });
 
   // Build script lines - single prompt/command becomes a 1-step script
   let lines: ScriptLine[];
@@ -167,7 +167,11 @@ async function runScript(
     const stepNum = i + 1;
     const displayLine = getDisplayLine(line);
 
-    context.logger.log(`\n=== Step ${stepNum}: ${displayLine} ===\n`);
+    context.logger.logEvent({
+      event: 'step_start',
+      step: stepNum,
+      prompt: displayLine,
+    });
 
     // Get the prompt text
     let promptText: string;

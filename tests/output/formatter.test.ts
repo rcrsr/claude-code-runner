@@ -116,8 +116,7 @@ describe('flushPendingTools', () => {
 
     expect(consoleSpy).toHaveBeenCalled();
     const output = consoleSpy.mock.calls[0]?.[0] as string;
-    expect(output).toContain('[TOOL]');
-    expect(output).toContain('Read');
+    expect(output).toContain('[Read]');
   });
 
   it('formats Read tool with shortened path', () => {
@@ -182,7 +181,7 @@ describe('flushPendingTools', () => {
     flushPendingTools(state, 'normal');
 
     const output = consoleSpy.mock.calls[0]?.[0] as string;
-    expect(output).toContain('[TOOL ×2]');
+    expect(output).toContain('[×2]');
     expect(output).toContain('parallel');
   });
 
@@ -268,7 +267,7 @@ describe('formatMessage', () => {
       formatMessage(msg, state, 'normal', logger, 100);
 
       const output = consoleSpy.mock.calls[0]?.[0] as string;
-      expect(output).toContain('[CLAUDE]');
+      expect(output).toContain('[claude]');
       expect(output).toContain('Hello world');
     });
 
@@ -290,7 +289,7 @@ describe('formatMessage', () => {
       formatMessage(msg, state, 'quiet', logger, 100);
 
       const output = consoleSpy.mock.calls[0]?.[0] as string;
-      expect(output).toContain('[ANSWER]');
+      expect(output).toContain('[answer]');
       expect(output).toContain('The answer is 42');
     });
   });
@@ -386,7 +385,7 @@ describe('formatMessage', () => {
       formatMessage(msg, state, 'normal', logger, 100);
 
       const output = consoleSpy.mock.calls[0]?.[0] as string;
-      expect(output).toContain('[RUNNER]');
+      expect(output).toContain('[runner]');
       expect(output).toContain('Completed step 1 in 5.0s');
     });
 
@@ -507,7 +506,7 @@ describe('formatMessage', () => {
       flushPendingTools(state, 'normal');
 
       const calls = consoleSpy.mock.calls.map((c) => c[0] as string);
-      const hasTaskHeader = calls.some((c) => c.includes('[TASK]'));
+      const hasTaskHeader = calls.some((c) => c.includes('[Explore]'));
 
       expect(hasTaskHeader).toBe(true);
     });

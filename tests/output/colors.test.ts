@@ -126,12 +126,12 @@ describe('printRunner', () => {
     consoleSpy.mockRestore();
   });
 
-  it('prints message with [RUNNER] prefix and timestamp', () => {
+  it('prints message with [runner] prefix and timestamp', () => {
     printRunner('Test message');
 
     expect(consoleSpy).toHaveBeenCalledTimes(1);
     const output = consoleSpy.mock.calls[0]?.[0] as string;
-    expect(output).toContain('[RUNNER]');
+    expect(output).toContain('[runner]');
     expect(output).toContain('Test message');
     expect(output).toMatch(/\d{2}:\d{2}:\d{2}\.\d{3}/);
   });

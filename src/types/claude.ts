@@ -66,10 +66,17 @@ export interface AssistantMessage {
   message: MessageEnvelope;
 }
 
+// Tool use result (from task completions)
+export interface ToolUseResult {
+  usage?: TokenUsage;
+  [key: string]: unknown;
+}
+
 // User message (typically tool results)
 export interface UserMessage {
   type: 'user';
   message: MessageEnvelope;
+  tool_use_result?: ToolUseResult;
 }
 
 // Result message at end of run
@@ -78,6 +85,7 @@ export interface ResultMessage {
   duration_ms?: number;
   cost_usd?: number;
   is_error?: boolean;
+  usage?: TokenUsage;
 }
 
 // Generic message for unknown types

@@ -138,7 +138,7 @@ export type DeadDropSender = (
  */
 export function printRunner(message: string): void {
   terminalLog(
-    `${timestampPrefix()}${colors.magenta}[RUNNER]${colors.reset} ${message}`
+    `${timestampPrefix()}${colors.magenta}[runner]${colors.reset} ${message}`
   );
   sendToDeadDrop(stripAnsi(message), 'Runner');
 }
@@ -149,7 +149,7 @@ export function printRunner(message: string): void {
  */
 export function printRunnerInfo(message: string): void {
   terminalLog(
-    `${timestampPrefix()}${colors.magenta}[RUNNER]${colors.reset} ${message}`
+    `${timestampPrefix()}${colors.magenta}[runner]${colors.reset} ${message}`
   );
 }
 
@@ -161,7 +161,7 @@ export function printRunnerInfo(message: string): void {
  */
 export function printClaude(message: string, rawForDeaddrop?: string): void {
   terminalLog(
-    `${timestampPrefix()}${colors.green}[CLAUDE]${colors.reset} ${message}`
+    `${timestampPrefix()}${colors.green}[claude]${colors.reset} ${message}`
   );
   sendToDeadDrop(stripAnsi(rawForDeaddrop ?? message), 'Claude Code');
 }

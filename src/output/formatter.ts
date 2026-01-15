@@ -157,10 +157,9 @@ function formatToolUse(
   state: FormatterState
 ): void {
   const inTask = state.activeTask !== null;
-  const indent = inTask ? '│' : '';
   const prefix = indented
-    ? `${timestampPrefix()}${indent}  → `
-    : `${timestampPrefix()}${indent}${colors.yellow}[TOOL]${colors.reset} `;
+    ? `${timestampPrefix()}${inTask ? '│ ' : ' '} → `
+    : `${timestampPrefix()}${inTask ? '│ ' : ''}`;
   const name = tool.name;
   const input = tool.input;
 
@@ -172,28 +171,19 @@ function formatToolUse(
   } else if (name === 'Grep') {
     summary = `"${truncate((input['pattern'] as string | undefined) ?? '', TRUNCATE_GREP_PATTERN)}"`;
   } else if (name === 'Bash') {
-    summary = truncate(
-      (input['command'] as string | undefined) ?? '',
-      TRUNCATE_BASH_CMD
+    const cmd = ((input['command'] as string | undefined) ?? '').replace(
+      /[\r\n]+/g,
+      ' '
     );
+    summary = truncate(cmd, TRUNCATE_BASH_CMD);
   } else if (name === 'Task') {
-    const taskType = (input['subagent_type'] as string | undefined) ?? 'agent';
-    const taskDesc = truncate(
-      (input['description'] as string | undefined) ??
-        (input['prompt'] as string | undefined) ??
-        '',
-      TRUNCATE_TASK_DESC
-    );
-    summary = `${colors.magenta}${taskType}${colors.reset}: ${taskDesc}`;
-
-    // Mark task as active and print task header (no divider)
-    state.activeTask = { name: taskType, description: taskDesc, id: tool.id };
-    // Initialize task stats tracking
-    state.taskStats = createRunStats();
-    state.taskStartTime = Date.now();
-    terminalLog(
-      `${timestampPrefix()}${colors.yellow}[TASK]${colors.reset} ${colors.magenta}${taskType}${colors.reset} ${taskDesc}`
-    );
+    // Task state already initialized in pre-scan, just print header
+    const task = state.activeTask;
+    if (task) {
+      terminalLog(
+        `${timestampPrefix()}${colors.yellow}[${task.name}]${colors.reset} ${task.description}`
+      );
+    }
     return;
   } else if (name === 'Write' || name === 'Edit') {
     summary = shortenPath((input['file_path'] as string | undefined) ?? '');
@@ -201,7 +191,10 @@ function formatToolUse(
     summary = truncate(JSON.stringify(input), TRUNCATE_TOOL_JSON);
   }
 
-  terminalLog(`${prefix}${colors.cyan}${name}${colors.reset} ${summary}`);
+  const nameDisplay = indented
+    ? `${colors.cyan}${name}${colors.reset}`
+    : `${colors.blue}[${name}]${colors.reset}`;
+  terminalLog(`${prefix}${nameDisplay} ${summary}`);
 }
 
 /**
@@ -226,7 +219,7 @@ export function flushPendingTools(
   } else {
     // Group parallel tools
     terminalLog(
-      `${timestampPrefix()}${colors.yellow}[TOOL ×${state.pendingTools.length}]${colors.reset} ${colors.dim}(parallel)${colors.reset}`
+      `${timestampPrefix()}${colors.blue}[×${state.pendingTools.length}]${colors.reset} ${colors.dim}(parallel)${colors.reset}`
     );
     for (const tool of state.pendingTools) {
       formatToolUse(tool, true, state);
@@ -297,9 +290,15 @@ function printTaskResult(
     : formatDuration(taskDuration);
 
   // Print task completion with stats
+  const taskName = state.activeTask?.name ?? 'task';
   terminalLog(
-    `${timestampPrefix()}└─${colors.yellow}[TASK]${colors.reset} Complete: ${statsSummary}`
+    `${timestampPrefix()}└─${colors.yellow}[${taskName}]${colors.reset} Complete: ${statsSummary}`
   );
+
+  // Merge task stats into step stats before clearing
+  if (state.taskStats) {
+    mergeStats(state.stats, state.taskStats);
+  }
 
   // Clear active task and stats
   state.activeTask = null;
@@ -325,6 +324,29 @@ export function formatMessage(
   } else if (isAssistantMessage(msg)) {
     flushPendingTools(state, verbosity);
 
+    // Check for Task tool first to initialize taskStats before tracking
+    for (const block of msg.message.content) {
+      if (isToolUseBlock(block) && block.name === 'Task') {
+        const input = block.input;
+        const taskType =
+          (input['subagent_type'] as string | undefined) ?? 'agent';
+        const taskDesc = truncate(
+          (input['description'] as string | undefined) ??
+            (input['prompt'] as string | undefined) ??
+            '',
+          TRUNCATE_TASK_DESC
+        );
+        state.activeTask = {
+          name: taskType,
+          description: taskDesc,
+          id: block.id,
+        };
+        state.taskStats = createRunStats();
+        state.taskStartTime = Date.now();
+        break;
+      }
+    }
+
     // Track message and token usage in stats
     const stats = state.taskStats ?? state.stats;
     incrementMessageCount(stats);
@@ -346,7 +368,7 @@ export function formatMessage(
           ) {
             const displayText = block.text.replace(/[\r\n]+/g, ' ').trim();
             terminalLog(
-              `${timestampPrefix()}${colors.green}[ANSWER]${colors.reset} ${truncate(displayText, TRUNCATE_ANSWER)}`
+              `${timestampPrefix()}${colors.green}[answer]${colors.reset} ${truncate(displayText, TRUNCATE_ANSWER)}`
             );
           }
         } else {
@@ -360,8 +382,10 @@ export function formatMessage(
         const now = Date.now();
         // Record start time
         state.toolStartTimes.set(block.id, now);
-        // Track tool use in stats
-        recordToolUse(stats, block.name);
+        // Track tool use in stats (skip Task - it's the container, not a tool within)
+        if (block.name !== 'Task') {
+          recordToolUse(stats, block.name);
+        }
 
         if (
           state.lastToolTime &&
@@ -387,6 +411,12 @@ export function formatMessage(
     }
   } else if (isUserMessage(msg)) {
     flushPendingTools(state, verbosity);
+
+    // Track usage from task results (tool_use_result has aggregated stats)
+    if (msg.tool_use_result?.usage) {
+      const stats = state.taskStats ?? state.stats;
+      updateTokenStats(stats, msg.tool_use_result.usage);
+    }
 
     for (const block of msg.message.content) {
       if (isToolResultBlock(block)) {
@@ -429,6 +459,13 @@ export function formatMessage(
     }
   } else if (isResultMessage(msg)) {
     flushPendingTools(state, verbosity);
+
+    // Track usage from result message
+    if (msg.usage) {
+      const stats = state.taskStats ?? state.stats;
+      updateTokenStats(stats, msg.usage);
+    }
+
     state.lastStepDurationMs = msg.duration_ms ?? null;
     if (!state.suppressStepCompletion && verbosity !== 'quiet') {
       const duration = msg.duration_ms ? formatDuration(msg.duration_ms) : '?';
