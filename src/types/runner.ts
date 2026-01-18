@@ -65,7 +65,7 @@ export interface RunnerConfig {
  */
 export const DEFAULT_CONFIG: RunnerConfig = {
   verbosity: 'normal',
-  enableLog: true,
+  enableLog: false,
   logDir: 'logs',
   maxIterations: DEFAULT_MAX_ITERATIONS,
   parallelThresholdMs: DEFAULT_PARALLEL_THRESHOLD_MS,
@@ -84,6 +84,8 @@ export interface ParsedArgs {
   /** Display strings for script lines (for logging) */
   scriptLines: string[];
   scriptMode: boolean;
+  /** Whether this is a .rill script (uses Rill runtime) */
+  rillMode: boolean;
   config: Partial<RunnerConfig>;
   /** Script file path (when scriptMode is true) */
   scriptFile: string | null;

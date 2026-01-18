@@ -1,0 +1,34 @@
+---
+description: Demonstrates Rill features including variables, heredocs, arithmetic, and capture
+args: topic: string, detail_level: string = "medium"
+---
+
+# Simple prompt with inline text
+prompt("List 3 facts about {$topic}") -> $facts
+
+# Use heredoc for multi-line prompt
+prompt(<<EOF
+Given these facts:
+{$facts}
+
+Summarize them in one sentence.
+EOF
+) -> $summary
+
+# Reference the last output with $_
+prompt("Translate to Spanish: {$_}")
+
+# Arithmetic with ~()
+$facts.length() -> ~($_ / 10) -> $complexity
+
+# Use captured variables in later prompts
+prompt(<<EOF
+Original facts: {$facts}
+
+Summary: {$summary}
+
+Complexity score: {$complexity}
+
+Add one more interesting detail at {$detail_level} detail level.
+EOF
+)

@@ -214,24 +214,24 @@ describe('parseArgs', () => {
       expect(result.config.verbosity).toBe('verbose');
     });
 
-    it('parses --no-log flag', () => {
-      const result = parseArgs(['--no-log', 'prompt', 'test']);
+    it('parses --log flag', () => {
+      const result = parseArgs(['--log', 'prompt', 'test']);
 
-      expect(result.config.enableLog).toBe(false);
+      expect(result.config.enableLog).toBe(true);
     });
 
     it('handles multiple options', () => {
-      const result = parseArgs(['--quiet', '--no-log', 'prompt', 'test']);
+      const result = parseArgs(['--quiet', '--log', 'prompt', 'test']);
 
       expect(result.config.verbosity).toBe('quiet');
-      expect(result.config.enableLog).toBe(false);
+      expect(result.config.enableLog).toBe(true);
     });
 
     it('options can appear in any position', () => {
-      const result = parseArgs(['prompt', '--quiet', 'test', '--no-log']);
+      const result = parseArgs(['prompt', '--quiet', 'test', '--log']);
 
       expect(result.config.verbosity).toBe('quiet');
-      expect(result.config.enableLog).toBe(false);
+      expect(result.config.enableLog).toBe(true);
       expect(result.prompt).toBe('test');
     });
   });
@@ -244,15 +244,15 @@ describe('parseArgs', () => {
     });
 
     it('returns enableLog in config', () => {
-      const result = parseArgs(['--no-log', 'prompt', 'test']);
+      const result = parseArgs(['--log', 'prompt', 'test']);
 
-      expect(result.config).toHaveProperty('enableLog', false);
+      expect(result.config).toHaveProperty('enableLog', true);
     });
 
-    it('defaults enableLog to true when not specified', () => {
+    it('defaults enableLog to false when not specified', () => {
       const result = parseArgs(['prompt', 'test']);
 
-      expect(result.config.enableLog).toBe(true);
+      expect(result.config.enableLog).toBe(false);
     });
   });
 });
@@ -365,7 +365,7 @@ describe('printUsage', () => {
     const output = logSpy.mock.calls[0]?.[0] as string;
     expect(output).toContain('--quiet');
     expect(output).toContain('--verbose');
-    expect(output).toContain('--no-log');
+    expect(output).toContain('--log');
   });
 
   it('includes signal documentation', () => {

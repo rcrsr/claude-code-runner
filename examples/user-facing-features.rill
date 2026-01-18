@@ -1,0 +1,98 @@
+---
+args: initiative: string
+---
+
+# User-Facing Features Workflow
+# Requirements -> Spec -> Plan -> Implementation -> Retrospective
+#
+# All commands derive file paths from initiative name:
+#   docs/requirements/{name}.md
+#   docs/specifications/{name}-spec.md
+#   docs/plans/{name}-plan.md
+#
+# Signals:
+#   :::RUNNER::REPEAT_STEP::: - Continue iteration (implementation phases only)
+#   :::RUNNER::BLOCKED::: - Needs human intervention
+#   :::RUNNER::ERROR::: - Unrecoverable failure
+
+# =============================================================================
+# STEP 1: Create Specification
+# =============================================================================
+# Generates spec from reviewed requirements.
+# - Success: No signal, continues
+# - Precondition fail: Emits ERROR
+
+command("create-spec", $initiative)
+
+# =============================================================================
+# STEP 2: Review Specification
+# =============================================================================
+# Reviews spec architecture. Outputs verdict for improve-spec.
+
+command("review-spec", $initiative) -> $spec_review
+
+# =============================================================================
+# STEP 3: Improve Specification (Speculative)
+# =============================================================================
+# Runs speculatively. No-ops if already APPROVED.
+
+command("improve-spec", $initiative, $spec_review)
+
+# =============================================================================
+# STEP 4: Create Implementation Plan
+# =============================================================================
+# Generates plan from spec.
+# - Precondition fail: Emits ERROR
+
+command("create-plan", $initiative)
+
+# =============================================================================
+# STEP 5: Review Plan
+# =============================================================================
+# Reviews plan coverage. Outputs verdict for improve-plan.
+
+command("review-plan", $initiative) -> $plan_review
+
+# =============================================================================
+# STEP 6: Improve Plan (Speculative)
+# =============================================================================
+# Runs speculatively. No-ops if already COMPLETE/ADEQUATE.
+
+command("improve-plan", $initiative, $plan_review)
+
+# =============================================================================
+# STEP 7: Implement Plan (Phase Loop)
+# =============================================================================
+# Executes plan phase-by-phase.
+# - Phase complete, more phases: Emits REPEAT_STEP
+# - All phases complete: No signal, continues
+# - Blocker: Emits BLOCKED
+
+command("implement-plan", $initiative)
+
+# =============================================================================
+# STEP 8: Review Implementation
+# =============================================================================
+# Validates implementation against spec.
+# - COMPLETE: No signal, continues
+# - PARTIAL/INCOMPLETE: Emits BLOCKED
+
+command("review-implementation", $initiative)
+
+# =============================================================================
+# STEP 9: Review Implementation Notes (Retrospective)
+# =============================================================================
+# Final retrospective - creates feedback document.
+# No signal on completion (workflow ends).
+
+command("review-implementation-notes", $initiative)
+
+# =============================================================================
+# WORKFLOW COMPLETE
+# =============================================================================
+
+"The User-Facing Features workflow has completed.
+
+**Initiative**: {$initiative}
+
+Review the feedback document at docs/feedback/{$initiative}-feedback.md for follow-up items." -> prompt

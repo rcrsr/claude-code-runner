@@ -1,0 +1,26 @@
+---
+description: Code review workflow demonstrating variable capture and heredocs
+args: path: string
+---
+
+# Analyze the code
+prompt("Review the code in {$path} for bugs and issues") -> $issues
+
+# Get improvement suggestions based on issues found
+prompt(<<EOF
+Based on these issues:
+{$issues}
+
+Suggest specific fixes with code examples.
+EOF
+) -> $fixes
+
+# Summarize for the developer
+prompt(<<EOF
+Create a brief summary of the review:
+
+Issues: {$issues}
+
+Fixes: {$fixes}
+EOF
+)

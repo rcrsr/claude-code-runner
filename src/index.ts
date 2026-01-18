@@ -26,6 +26,7 @@ import {
   resetFormatterState,
 } from './output/formatter.js';
 import { createLogger } from './output/logger.js';
+import { runRillScript } from './rill/index.js';
 import {
   captureOutput,
   createVariableStore,
@@ -117,6 +118,28 @@ async function main(): Promise<void> {
     printRunnerInfo(`Log: ${logger.filePath}`);
   }
   logger.logEvent({ event: 'run_start', runId });
+
+  // Handle Rill scripts separately
+  if (parsed.rillMode && parsed.scriptFile) {
+    const result = await runRillScript({
+      scriptFile: parsed.scriptFile,
+      args: parsed.scriptArgs,
+      config,
+      logger,
+      formatterState,
+      cwd: process.cwd(),
+      runId,
+    });
+
+    // Print run completion
+    const totalDuration = Date.now() - totalStart;
+    const runSummary = getRunStatsSummary(formatterState, totalDuration);
+    printRunner(`Run ${runId} complete: ${runSummary}`);
+
+    context.logger.close();
+    await flushDeadDrop();
+    process.exit(result.success ? 0 : 1);
+  }
 
   // Build script lines - single prompt/command becomes a 1-step script
   let lines: ScriptLine[];

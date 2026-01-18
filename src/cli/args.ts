@@ -4,6 +4,7 @@
 
 import { createRequire } from 'module';
 
+import { isRillScript } from '../rill/index.js';
 import { loadScript } from '../script/index.js';
 import { loadCommandTemplate } from '../templates/command.js';
 
@@ -35,7 +36,7 @@ function extractOptions(args: string[]): RawArgs {
   }
 
   let verbosity: Verbosity = 'normal';
-  let enableLog = true;
+  let enableLog = false;
   let model: string | null = null;
   let deaddrop = false;
   const positionalArgs: string[] = [];
@@ -48,8 +49,8 @@ function extractOptions(args: string[]): RawArgs {
       verbosity = 'normal';
     } else if (arg === '--verbose') {
       verbosity = 'verbose';
-    } else if (arg === '--no-log') {
-      enableLog = false;
+    } else if (arg === '--log') {
+      enableLog = true;
     } else if (arg === '--deaddrop') {
       deaddrop = true;
     } else if (arg === '--model' || arg === '-m') {
@@ -126,6 +127,7 @@ export function parseArgs(args: string[]): ParsedArgs {
   let prompt = '';
   let displayCommand = '';
   let scriptMode = false;
+  let rillMode = false;
   let scriptLines: string[] = [];
   let scriptFile: string | null = null;
   let scriptArgs: string[] = [];
@@ -157,20 +159,30 @@ export function parseArgs(args: string[]): ParsedArgs {
       }
       scriptFile = file;
       scriptArgs = positionalArgs.slice(2);
-      const parsed = loadScript(file, scriptArgs);
-      // Convert parsed lines to display strings for backward compat
-      scriptLines = parsed.lines.map((line) => {
-        if (line.type === 'prompt') {
-          const text =
-            line.text.length > 50 ? line.text.slice(0, 50) + '...' : line.text;
-          return `prompt("${text}")${line.capture ? ` -> $${line.capture}` : ''}`;
-        } else {
-          return `command("${line.name}")${line.capture ? ` -> $${line.capture}` : ''}`;
-        }
-      });
-      frontmatterModel = parsed.frontmatter.model ?? null;
       scriptMode = true;
       displayCommand = positionalArgs.slice(1).join(' ');
+
+      // Check if this is a .rill script (handled by Rill runtime)
+      if (isRillScript(file)) {
+        rillMode = true;
+        // Don't load/parse here - Rill runner handles it
+      } else {
+        // Legacy script format
+        const parsed = loadScript(file, scriptArgs);
+        // Convert parsed lines to display strings for backward compat
+        scriptLines = parsed.lines.map((line) => {
+          if (line.type === 'prompt') {
+            const text =
+              line.text.length > 50
+                ? line.text.slice(0, 50) + '...'
+                : line.text;
+            return `prompt("${text}")${line.capture ? ` -> $${line.capture}` : ''}`;
+          } else {
+            return `command("${line.name}")${line.capture ? ` -> $${line.capture}` : ''}`;
+          }
+        });
+        frontmatterModel = parsed.frontmatter.model ?? null;
+      }
       break;
     }
     case 'prompt': {
@@ -198,6 +210,7 @@ export function parseArgs(args: string[]): ParsedArgs {
     displayCommand,
     scriptLines,
     scriptMode,
+    rillMode,
     config,
     scriptFile,
     scriptArgs,
@@ -230,7 +243,7 @@ Options:
   --quiet              Minimal output (errors only)
   --normal             Default output level
   --verbose            Full output with all details
-  --no-log             Disable logging to file (enabled by default)
+  --log                Enable logging to file (disabled by default)
   --model, -m <model>  Specify Claude model (e.g., sonnet, opus, haiku)
   --deaddrop           Send messages to Deaddrop (requires DEADDROP_API_KEY env var)
 `);

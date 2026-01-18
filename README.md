@@ -141,7 +141,7 @@ Scripts stop on `BLOCKED` or `ERROR` signals, catching issues before continuing 
 | `--quiet`         | Minimal output (errors only)                           |
 | `--normal`        | Default output level                                   |
 | `--verbose`       | Full output with details                               |
-| `--no-log`        | Disable file logging                                   |
+| `--log`           | Enable file logging                                    |
 | `--deaddrop`      | Enable [DeadDrop](https://deaddrop.sh) streaming       |
 
 **Example with model selection:**
@@ -234,7 +234,7 @@ For CI/CD integration:
 
 ## Logs
 
-Sessions are logged to `./logs/` with timestamped filenames. Disable with `--no-log`.
+Sessions are logged to `./logs/` with timestamped filenames when `--log` is specified.
 
 ## Development
 

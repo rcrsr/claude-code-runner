@@ -14,6 +14,8 @@ export interface TemplateFrontmatter {
   model?: string;
   description?: string;
   argumentHint?: string;
+  /** Rill named args definition (e.g., "file: string, retries: number = 3") */
+  args?: string;
 }
 
 /**
@@ -74,6 +76,8 @@ export function parseFrontmatter(content: string): {
         frontmatter.description = trimmedValue;
       } else if (key === 'argument-hint' && trimmedValue) {
         frontmatter.argumentHint = trimmedValue;
+      } else if (key === 'args' && trimmedValue) {
+        frontmatter.args = trimmedValue;
       }
     }
   }
