@@ -1,13 +1,14 @@
 # Claude Code Runner
 
-Deterministic, scripted, unattended Claude Code execution.
+Deterministic, scripted, unattended Claude Code execution with [Rill](https://github.com/rcrsr/rill) scripting.
 
 ## Why Use This?
 
+- **Rich scripting** — Fully scriptable with variables, conditionals, loops, and functions
 - **Walk away** — Workflows run unattended in CI/CD pipelines
 - **Chain results** — Capture output from one step, inject it into the next
-- **Claude decides** — Signals control when to retry, escalate, or finish
-- **No hitting context limits** — Fresh context per step keeps long workflows running
+- **Claude decides** — Results protocol lets Claude control flow with `<ccr:result type="..."/>`
+- **No context limits** — Fresh context per step keeps long workflows running
 - **Watch live** — See tool calls stream as they execute
 - **Replay later** — Full session logs for debugging
 
@@ -75,7 +76,14 @@ Review $1 with severity level $2...
 
 ### script — Run multi-phase workflows
 
-Scripts use [Rill](https://github.com/rcrsr/rill) to chain commands where each phase builds on the previous.
+Scripts use [Rill](https://github.com/rcrsr/rill), a scripting language designed for AI workflows. Rill provides:
+
+- **Variables & capture** — Store Claude's output with `:>` operator
+- **Conditionals** — Branch logic with `(condition) ? action`
+- **Loops** — Iterate with `for` and `while`
+- **Functions** — Reusable logic blocks
+- **String interpolation** — Embed variables with `{$var}` syntax
+- **Heredocs** — Multi-line prompts with `<<EOF...EOF`
 
 ```bash
 claude-code-runner script workflow.rill src/api/
@@ -104,6 +112,18 @@ EOF
 # Summarize
 ccr::prompt("Summarize: Issues: {$issues} Fixes: {$fixes}")
 ```
+
+**Host functions:**
+
+| Function                      | Description                        |
+| ----------------------------- | ---------------------------------- |
+| `ccr::prompt(text, model?)`   | Execute a Claude prompt            |
+| `ccr::command(name, args?)`   | Run a command template             |
+| `ccr::skill(name, args?)`     | Run a slash command                |
+| `ccr::get_result(text)`       | Extract `<ccr:result>` from output |
+| `ccr::file_exists(path)`      | Check if file exists               |
+| `ccr::read_frontmatter(path)` | Parse YAML frontmatter             |
+| `ccr::error(message?)`        | Stop execution with error          |
 
 See [docs/rill-scripting.md](docs/rill-scripting.md) for the full scripting reference.
 
