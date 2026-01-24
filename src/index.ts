@@ -7,11 +7,6 @@
 import { randomBytes } from 'crypto';
 
 import { parseArgs } from './cli/args.js';
-import {
-  type RunnerContext,
-  runWithSignals,
-  type StepContext,
-} from './core/runner.js';
 import { createDeadDropClientFromEnv } from './deaddrop/index.js';
 import {
   configureDeadDrop,
@@ -23,19 +18,10 @@ import {
   createFormatterState,
   finalizeStepStats,
   getRunStatsSummary,
-  resetFormatterState,
 } from './output/formatter.js';
 import { createLogger } from './output/logger.js';
+import { spawnClaude } from './process/pty.js';
 import { runRillScript } from './rill/index.js';
-import {
-  captureOutput,
-  createVariableStore,
-  getSubstitutionList,
-  loadScript,
-  substituteVariables,
-} from './script/index.js';
-import type { ScriptLine } from './script/types.js';
-import { loadCommandTemplate } from './templates/command.js';
 import { DEFAULT_CONFIG, type RunnerConfig } from './types/runner.js';
 
 /**
@@ -43,16 +29,6 @@ import { DEFAULT_CONFIG, type RunnerConfig } from './types/runner.js';
  */
 function generateRunId(): string {
   return randomBytes(4).toString('hex').toUpperCase();
-}
-
-/**
- * Format variables used for "with X" clause
- */
-function formatVarsUsed(vars: string[]): string {
-  if (vars.length === 0) return '';
-  // Convert $_ to "last result", keep others as-is
-  const labels = vars.map((v) => (v === '$_' ? 'last result' : v));
-  return `with ${labels.join(', ')}: `;
 }
 
 async function main(): Promise<void> {
@@ -82,24 +58,14 @@ async function main(): Promise<void> {
   }
 
   // Create logger
-  const commandName = parsed.scriptMode
-    ? 'script'
-    : parsed.subcommand === 'command'
-      ? (args[1] ?? 'prompt')
-      : 'prompt';
-  const logger = createLogger(config.enableLog, config.logDir, commandName);
+  const logger = createLogger(
+    config.enableLog,
+    config.logDir,
+    parsed.subcommand
+  );
 
   // Create formatter state
   const formatterState = createFormatterState();
-
-  // Create runner context
-  const context: RunnerContext = {
-    config,
-    logger,
-    formatterState,
-    cwd: process.cwd(),
-    runId,
-  };
 
   // Emit starting run message first (operational, sent to deaddrop)
   printRunner(`Starting run ${runId}`);
@@ -119,8 +85,8 @@ async function main(): Promise<void> {
   }
   logger.logEvent({ event: 'run_start', runId });
 
-  // Handle Rill scripts separately
-  if (parsed.rillMode && parsed.scriptFile) {
+  // Handle script subcommand (Rill scripts only)
+  if (parsed.subcommand === 'script' && parsed.scriptFile) {
     const result = await runRillScript({
       scriptFile: parsed.scriptFile,
       args: parsed.scriptArgs,
@@ -136,131 +102,54 @@ async function main(): Promise<void> {
     const runSummary = getRunStatsSummary(formatterState, totalDuration);
     printRunner(`Run ${runId} complete: ${runSummary}`);
 
-    context.logger.close();
+    logger.close();
     await flushDeadDrop();
     process.exit(result.success ? 0 : 1);
   }
 
-  // Build script lines - single prompt/command becomes a 1-step script
-  let lines: ScriptLine[];
-  let scriptArgs: string[] = [];
-
-  if (parsed.scriptMode && parsed.scriptFile) {
-    const script = loadScript(parsed.scriptFile, parsed.scriptArgs);
-    lines = script.lines;
-    scriptArgs = parsed.scriptArgs;
-  } else {
-    // Single prompt or command becomes a 1-step script
-    lines = [{ type: 'prompt', text: parsed.prompt }];
+  // Handle prompt and command subcommands (single execution)
+  const promptText = parsed.prompt;
+  if (parsed.subcommand === 'command' && !promptText) {
+    // This shouldn't happen - parseArgs should have handled it
+    console.error('Error: no prompt text');
+    process.exit(1);
   }
 
-  // Run the script
-  const success = await runScript(lines, scriptArgs, context, totalStart);
-  context.logger.close();
+  // Set step info for formatter
+  formatterState.currentStep = 1;
+  formatterState.stepStartTime = Date.now();
+
+  if (config.verbosity !== 'quiet') {
+    printRunner(`Running: ${parsed.displayCommand}`);
+  }
+
+  // Execute via PTY
+  const result = await spawnClaude({
+    prompt: promptText,
+    cwd: process.cwd(),
+    verbosity: config.verbosity,
+    logger,
+    formatterState,
+    parallelThresholdMs: config.parallelThresholdMs,
+    model: config.model,
+  });
+
+  // Finalize step stats
+  const stepDurationMs = formatterState.stepStartTime
+    ? Date.now() - formatterState.stepStartTime
+    : 0;
+  const stepSummary = finalizeStepStats(formatterState, stepDurationMs);
+  printRunner(`Step 1 complete: ${stepSummary}`);
+
+  // Print run completion
+  const totalDuration = Date.now() - totalStart;
+  const runSummary = getRunStatsSummary(formatterState, totalDuration);
+  printRunner(`Run ${runId} complete: ${runSummary}`);
+
+  logger.logEvent({ event: 'run_complete', runId, exit: result.exitCode });
+  logger.close();
   await flushDeadDrop();
-  process.exit(success ? 0 : 1);
-}
-
-/**
- * Build display string for a script line
- */
-function getDisplayLine(line: ScriptLine): string {
-  if (line.type === 'prompt') {
-    // Replace newlines with spaces for single-line display
-    const cleaned = line.text.replace(/[\r\n]+/g, ' ').trim();
-    const preview =
-      cleaned.length > 50 ? cleaned.slice(0, 50) + '...' : cleaned;
-    return `"${preview}"`;
-  }
-  return `command("${line.name}")`;
-}
-
-/**
- * Run a script (unified execution for single prompts and multi-step scripts)
- */
-async function runScript(
-  lines: ScriptLine[],
-  scriptArgs: string[],
-  context: RunnerContext,
-  startTime: number
-): Promise<boolean> {
-  const store = createVariableStore();
-
-  for (const [i, line] of lines.entries()) {
-    const stepNum = i + 1;
-    const displayLine = getDisplayLine(line);
-
-    context.logger.logEvent({
-      event: 'step_start',
-      step: stepNum,
-      prompt: displayLine,
-    });
-
-    // Get the prompt text
-    let promptText: string;
-    if (line.type === 'prompt') {
-      promptText = line.text;
-    } else {
-      // Substitute variables in command args before loading template
-      const substitutedArgs = line.args.map((arg) =>
-        substituteVariables(arg, store, scriptArgs)
-      );
-      const template = loadCommandTemplate(line.name, substitutedArgs);
-      promptText = template.prompt;
-    }
-
-    // Substitute variables
-    const varsUsed = getSubstitutionList(promptText, store);
-    const finalPrompt = substituteVariables(promptText, store, scriptArgs);
-
-    // Build display: show substituted prompt and what variables were used
-    const substitutedDisplay = getDisplayLine({
-      type: 'prompt',
-      text: finalPrompt,
-    });
-    const withClause = formatVarsUsed(varsUsed);
-
-    // Set step number and start time for formatter output
-    context.formatterState.currentStep = stepNum;
-    context.formatterState.stepStartTime = Date.now();
-
-    // Run via runWithSignals (handles iterations, signals, output)
-    const stepContext: StepContext = { stepNum };
-    const result = await runWithSignals(
-      finalPrompt,
-      `${withClause}${substitutedDisplay}`,
-      startTime,
-      context,
-      stepContext
-    );
-
-    // Capture output for variable store
-    captureOutput(store, result.claudeText, line.capture);
-
-    // Finalize step stats and print completion
-    const stepDurationMs = context.formatterState.stepStartTime
-      ? Date.now() - context.formatterState.stepStartTime
-      : (context.formatterState.lastStepDurationMs ?? 0);
-    const stepSummary = finalizeStepStats(
-      context.formatterState,
-      stepDurationMs
-    );
-    printRunner(`Step ${stepNum} complete: ${stepSummary}`);
-
-    // Handle failure (runWithSignals already printed the error)
-    if (result.status !== 'ok') {
-      return false;
-    }
-
-    // Reset step stats for next step (preserves runStats)
-    resetFormatterState(context.formatterState);
-  }
-
-  // Print run completion with overall stats
-  const totalDuration = Date.now() - startTime;
-  const runSummary = getRunStatsSummary(context.formatterState, totalDuration);
-  printRunner(`Run ${context.runId} complete: ${runSummary}`);
-  return true;
+  process.exit(result.exitCode === 0 ? 0 : 1);
 }
 
 // Run main

@@ -52,9 +52,5 @@ export const SECONDS_PER_MINUTE = 60;
 export const SECONDS_PER_HOUR = 3600;
 
 // === Default Configuration ===
-/** Default max iterations before stopping */
-export const DEFAULT_MAX_ITERATIONS = 10;
 /** Default parallel tool detection threshold in ms */
 export const DEFAULT_PARALLEL_THRESHOLD_MS = 100;
-/** Default pause between iterations in ms */
-export const DEFAULT_ITERATION_PAUSE_MS = 2000;

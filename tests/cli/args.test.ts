@@ -5,13 +5,12 @@ vi.mock('../../src/templates/command.js', () => ({
   loadCommandTemplate: vi.fn(),
 }));
 
-// Mock script loader
-vi.mock('../../src/script/index.js', () => ({
-  loadScript: vi.fn(),
+// Mock rill script detection
+vi.mock('../../src/rill/index.js', () => ({
+  isRillScript: vi.fn((file: string) => file.endsWith('.rill')),
 }));
 
-import { parseArgs, parseCommandLine, printUsage } from '../../src/cli/args.js';
-import { loadScript } from '../../src/script/index.js';
+import { parseArgs, printUsage } from '../../src/cli/args.js';
 import { loadCommandTemplate } from '../../src/templates/command.js';
 
 describe('parseArgs', () => {
@@ -66,19 +65,20 @@ describe('parseArgs', () => {
       expect(loadCommandTemplate).toHaveBeenCalledWith('test-cmd', []);
     });
 
-    it('parses script subcommand', () => {
-      vi.mocked(loadScript).mockReturnValue({
-        lines: [
-          { type: 'prompt', text: 'hello' },
-          { type: 'prompt', text: 'world' },
-        ],
-        frontmatter: {},
-      });
-
-      const result = parseArgs(['script', 'test.script']);
+    it('parses script subcommand with .rill file', () => {
+      const result = parseArgs(['script', 'test.rill']);
 
       expect(result.subcommand).toBe('script');
-      expect(result.scriptMode).toBe(true);
+      expect(result.scriptFile).toBe('test.rill');
+    });
+
+    it('rejects non-.rill script files', () => {
+      expect(() => parseArgs(['script', 'test.txt'])).toThrow(
+        'process.exit(1)'
+      );
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Error: script must be a .rill file'
+      );
     });
   });
 
@@ -126,72 +126,30 @@ describe('parseArgs', () => {
       expect(() => parseArgs(['command'])).toThrow('process.exit(1)');
       expect(errorSpy).toHaveBeenCalledWith('Error: command name required');
     });
-  });
 
-  describe('script subcommand', () => {
-    it('loads script with file path', () => {
-      vi.mocked(loadScript).mockReturnValue({
-        lines: [
-          { type: 'prompt', text: 'line1' },
-          { type: 'prompt', text: 'line2' },
-        ],
-        frontmatter: {},
-      });
-
-      const result = parseArgs(['script', 'test.script']);
-
-      expect(loadScript).toHaveBeenCalledWith('test.script', []);
-      expect(result.scriptMode).toBe(true);
-      expect(result.scriptFile).toBe('test.script');
-    });
-
-    it('passes arguments to script loader', () => {
-      vi.mocked(loadScript).mockReturnValue({
-        lines: [{ type: 'prompt', text: 'with arg1' }],
-        frontmatter: {},
-      });
-
-      const result = parseArgs(['script', 'test.script', 'arg1', 'arg2']);
-
-      expect(loadScript).toHaveBeenCalledWith('test.script', ['arg1', 'arg2']);
-      expect(result.scriptArgs).toEqual(['arg1', 'arg2']);
-    });
-
-    it('uses frontmatter model from script', () => {
-      vi.mocked(loadScript).mockReturnValue({
-        lines: [{ type: 'prompt', text: 'test' }],
+    it('uses frontmatter model from command', () => {
+      vi.mocked(loadCommandTemplate).mockReturnValue({
+        prompt: 'test',
         frontmatter: { model: 'opus' },
       });
 
-      const result = parseArgs(['script', 'test.script']);
+      const result = parseArgs(['command', 'my-cmd']);
 
       expect(result.config.model).toBe('opus');
+    });
+  });
+
+  describe('script subcommand', () => {
+    it('sets scriptFile and scriptArgs', () => {
+      const result = parseArgs(['script', 'test.rill', 'arg1', 'arg2']);
+
+      expect(result.scriptFile).toBe('test.rill');
+      expect(result.scriptArgs).toEqual(['arg1', 'arg2']);
     });
 
     it('exits with error when file missing', () => {
       expect(() => parseArgs(['script'])).toThrow('process.exit(1)');
       expect(errorSpy).toHaveBeenCalledWith('Error: script file required');
-    });
-
-    it('propagates error when script not found', () => {
-      vi.mocked(loadScript).mockImplementation(() => {
-        throw new Error('Script not found: missing.script');
-      });
-
-      expect(() => parseArgs(['script', 'missing.script'])).toThrow(
-        'Script not found: missing.script'
-      );
-    });
-
-    it('sets scriptMode to true', () => {
-      vi.mocked(loadScript).mockReturnValue({
-        lines: [{ type: 'prompt', text: 'test' }],
-        frontmatter: {},
-      });
-
-      const result = parseArgs(['script', 'test.script']);
-
-      expect(result.scriptMode).toBe(true);
     });
   });
 
@@ -220,6 +178,30 @@ describe('parseArgs', () => {
       expect(result.config.enableLog).toBe(true);
     });
 
+    it('parses --model flag', () => {
+      const result = parseArgs(['--model', 'opus', 'prompt', 'test']);
+
+      expect(result.config.model).toBe('opus');
+    });
+
+    it('parses -m flag', () => {
+      const result = parseArgs(['-m', 'haiku', 'prompt', 'test']);
+
+      expect(result.config.model).toBe('haiku');
+    });
+
+    it('parses --model=value format', () => {
+      const result = parseArgs(['--model=sonnet', 'prompt', 'test']);
+
+      expect(result.config.model).toBe('sonnet');
+    });
+
+    it('parses --deaddrop flag', () => {
+      const result = parseArgs(['--deaddrop', 'prompt', 'test']);
+
+      expect(result.config.deaddrop).toBe(true);
+    });
+
     it('handles multiple options', () => {
       const result = parseArgs(['--quiet', '--log', 'prompt', 'test']);
 
@@ -233,6 +215,17 @@ describe('parseArgs', () => {
       expect(result.config.verbosity).toBe('quiet');
       expect(result.config.enableLog).toBe(true);
       expect(result.prompt).toBe('test');
+    });
+
+    it('CLI model overrides frontmatter model', () => {
+      vi.mocked(loadCommandTemplate).mockReturnValue({
+        prompt: 'test',
+        frontmatter: { model: 'opus' },
+      });
+
+      const result = parseArgs(['--model', 'haiku', 'command', 'my-cmd']);
+
+      expect(result.config.model).toBe('haiku');
     });
   });
 
@@ -253,82 +246,6 @@ describe('parseArgs', () => {
       const result = parseArgs(['prompt', 'test']);
 
       expect(result.config.enableLog).toBe(false);
-    });
-  });
-});
-
-describe('parseCommandLine', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  describe('prompt command', () => {
-    it('returns prompt text after prompt keyword', () => {
-      const result = parseCommandLine('prompt hello world');
-
-      expect(result.prompt).toBe('hello world');
-    });
-
-    it('handles multi-word prompts', () => {
-      const result = parseCommandLine('prompt this is a longer prompt');
-
-      expect(result.prompt).toBe('this is a longer prompt');
-    });
-  });
-
-  describe('command command', () => {
-    it('loads template for command name', () => {
-      vi.mocked(loadCommandTemplate).mockReturnValue({
-        prompt: 'loaded',
-        frontmatter: {},
-      });
-
-      const result = parseCommandLine('command my-cmd');
-
-      expect(loadCommandTemplate).toHaveBeenCalledWith('my-cmd', []);
-      expect(result.prompt).toBe('loaded');
-    });
-
-    it('passes arguments to template', () => {
-      vi.mocked(loadCommandTemplate).mockReturnValue({
-        prompt: 'loaded',
-        frontmatter: {},
-      });
-
-      parseCommandLine('command my-cmd arg1 arg2');
-
-      expect(loadCommandTemplate).toHaveBeenCalledWith('my-cmd', [
-        'arg1',
-        'arg2',
-      ]);
-    });
-
-    it('throws when command name missing', () => {
-      expect(() => parseCommandLine('command')).toThrow(
-        'command requires a name'
-      );
-    });
-  });
-
-  describe('script command', () => {
-    it('throws error for nested script', () => {
-      expect(() => parseCommandLine('script nested.script')).toThrow(
-        'script cannot be nested'
-      );
-    });
-  });
-
-  describe('raw prompt', () => {
-    it('treats unknown commands as raw prompt', () => {
-      const result = parseCommandLine('do something');
-
-      expect(result.prompt).toBe('do something');
-    });
-
-    it('trims whitespace from raw prompt', () => {
-      const result = parseCommandLine('  do something  ');
-
-      expect(result.prompt).toBe('do something');
     });
   });
 });
@@ -366,14 +283,14 @@ describe('printUsage', () => {
     expect(output).toContain('--quiet');
     expect(output).toContain('--verbose');
     expect(output).toContain('--log');
+    expect(output).toContain('--model');
+    expect(output).toContain('--deaddrop');
   });
 
-  it('includes signal documentation', () => {
+  it('mentions .rill files for script subcommand', () => {
     printUsage();
 
     const output = logSpy.mock.calls[0]?.[0] as string;
-    expect(output).toContain('RUNNER::REPEAT_STEP');
-    expect(output).toContain('RUNNER::BLOCKED');
-    expect(output).toContain('RUNNER::ERROR');
+    expect(output).toContain('.rill');
   });
 });

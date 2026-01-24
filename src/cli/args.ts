@@ -5,7 +5,6 @@
 import { createRequire } from 'module';
 
 import { isRillScript } from '../rill/index.js';
-import { loadScript } from '../script/index.js';
 import { loadCommandTemplate } from '../templates/command.js';
 
 const require = createRequire(import.meta.url);
@@ -66,31 +65,6 @@ function extractOptions(args: string[]): RawArgs {
 }
 
 /**
- * Parse a command line into a prompt
- * Used for script mode line parsing
- */
-export function parseCommandLine(line: string): { prompt: string } {
-  const parts = line.trim().split(/\s+/);
-  const cmd = parts[0];
-
-  if (cmd === 'prompt') {
-    return { prompt: parts.slice(1).join(' ') };
-  } else if (cmd === 'command') {
-    const cmdName = parts[1];
-    if (!cmdName) {
-      throw new Error('command requires a name');
-    }
-    const { prompt } = loadCommandTemplate(cmdName, parts.slice(2));
-    return { prompt };
-  } else if (cmd === 'script') {
-    throw new Error('script cannot be nested');
-  } else {
-    // Treat as raw prompt
-    return { prompt: line.trim() };
-  }
-}
-
-/**
  * Parse CLI arguments
  */
 const VALID_SUBCOMMANDS = ['prompt', 'command', 'script'] as const;
@@ -126,9 +100,6 @@ export function parseArgs(args: string[]): ParsedArgs {
   const subcommand = firstArg;
   let prompt = '';
   let displayCommand = '';
-  let scriptMode = false;
-  let rillMode = false;
-  let scriptLines: string[] = [];
   let scriptFile: string | null = null;
   let scriptArgs: string[] = [];
   let frontmatterModel: string | null = null;
@@ -154,35 +125,16 @@ export function parseArgs(args: string[]): ParsedArgs {
       const file = positionalArgs[1];
       if (!file) {
         console.error('Error: script file required');
-        console.error('Usage: claude-code-runner script <file> [args...]');
+        console.error('Usage: claude-code-runner script <file.rill> [args...]');
+        process.exit(1);
+      }
+      if (!isRillScript(file)) {
+        console.error('Error: script must be a .rill file');
         process.exit(1);
       }
       scriptFile = file;
       scriptArgs = positionalArgs.slice(2);
-      scriptMode = true;
       displayCommand = positionalArgs.slice(1).join(' ');
-
-      // Check if this is a .rill script (handled by Rill runtime)
-      if (isRillScript(file)) {
-        rillMode = true;
-        // Don't load/parse here - Rill runner handles it
-      } else {
-        // Legacy script format
-        const parsed = loadScript(file, scriptArgs);
-        // Convert parsed lines to display strings for backward compat
-        scriptLines = parsed.lines.map((line) => {
-          if (line.type === 'prompt') {
-            const text =
-              line.text.length > 50
-                ? line.text.slice(0, 50) + '...'
-                : line.text;
-            return `prompt("${text}")${line.capture ? ` -> $${line.capture}` : ''}`;
-          } else {
-            return `command("${line.name}")${line.capture ? ` -> $${line.capture}` : ''}`;
-          }
-        });
-        frontmatterModel = parsed.frontmatter.model ?? null;
-      }
       break;
     }
     case 'prompt': {
@@ -205,12 +157,9 @@ export function parseArgs(args: string[]): ParsedArgs {
   };
 
   return {
-    subcommand: scriptMode ? 'script' : subcommand,
+    subcommand,
     prompt,
     displayCommand,
-    scriptLines,
-    scriptMode,
-    rillMode,
     config,
     scriptFile,
     scriptArgs,
@@ -227,17 +176,12 @@ Claude Code Runner - executes claude CLI with proper TTY handling
 Usage:
   claude-code-runner [options] prompt <prompt>
   claude-code-runner [options] command <name> [args...]
-  claude-code-runner [options] script <file> [args...]
+  claude-code-runner [options] script <file.rill> [args...]
 
 Subcommands:
-  prompt <text>              Run with the given prompt (supports RUNNER signals)
-  command <name> [args]      Load .claude/commands/<name>.md (supports RUNNER signals)
-  script <file> [args]       Run commands from file, stop on ERROR/BLOCKED
-
-Iteration Signals (control runner execution):
-  :::RUNNER::REPEAT_STEP:::  Run the same step again
-  :::RUNNER::BLOCKED:::      Exit with error (awaiting human intervention)
-  :::RUNNER::ERROR:::        Exit with error (something went wrong)
+  prompt <text>              Run with the given prompt
+  command <name> [args]      Load .claude/commands/<name>.md template
+  script <file.rill> [args]  Run a Rill script
 
 Options:
   --quiet              Minimal output (errors only)

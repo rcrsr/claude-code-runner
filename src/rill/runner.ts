@@ -6,16 +6,23 @@
  */
 
 import type { RillValue, RuntimeCallbacks } from '@rcrsr/rill';
-import { execute, parse } from '@rcrsr/rill';
+import {
+  AbortError,
+  execute,
+  parse,
+  ParseError,
+  RuntimeError,
+  TimeoutError,
+} from '@rcrsr/rill';
 import * as fs from 'fs';
 
 import { colors, printRunner } from '../output/colors.js';
-import type { FormatterState } from '../output/formatter.js';
+import { finalizeStepStats, type FormatterState } from '../output/formatter.js';
 import type { Logger } from '../output/logger.js';
-import { detectRunnerSignal } from '../parsers/signals.js';
 import { spawnClaude } from '../process/pty.js';
 import { parseFrontmatter } from '../templates/command.js';
-import type { RunnerConfig, RunnerSignal } from '../types/runner.js';
+import type { RunnerConfig } from '../types/runner.js';
+import { formatRillValue } from '../utils/formatting.js';
 import { createRunnerContext, type ExecutionResult } from './context.js';
 
 // ============================================================
@@ -44,8 +51,6 @@ export interface RillRunResult {
   success: boolean;
   /** Last output from Claude (for capture) */
   lastOutput: string;
-  /** Final signal detected (if any) */
-  signal: RunnerSignal | null;
 }
 
 /** Parsed argument definition from frontmatter */
@@ -199,7 +204,6 @@ export async function runRillScript(
   // Track execution state (use object to allow mutation in closures)
   const state = {
     lastOutput: '',
-    lastSignal: null as RunnerSignal | null,
     stepNum: 0,
   };
 
@@ -235,56 +239,29 @@ export async function runRillScript(
       model: model ?? effectiveModel,
     });
 
-    // Detect signal from output
-    const signal = detectRunnerSignal(result.claudeText);
+    // Finalize step stats (merge into runStats for final summary)
+    const stepDurationMs = formatterState.stepStartTime
+      ? Date.now() - formatterState.stepStartTime
+      : 0;
+    finalizeStepStats(formatterState, stepDurationMs);
 
     // Log completion
     logger.logEvent({
       event: 'step_complete',
       step: state.stepNum,
       exit: result.exitCode,
-      signal: signal ?? undefined,
     });
-
-    // Handle signals
-    if (signal === 'blocked') {
-      printRunner(
-        `${colors.red}Blocked${colors.reset} at step ${state.stepNum}`
-      );
-    } else if (signal === 'error') {
-      printRunner(`${colors.red}Error${colors.reset} at step ${state.stepNum}`);
-    } else if (signal === 'repeat_step') {
-      printRunner(`Step ${state.stepNum} requests repeat`);
-    }
 
     return {
       output: result.claudeText,
-      signal,
       exitCode: result.exitCode,
     };
-  };
-
-  // Create shell executor
-  const executeShell = async (command: string): Promise<string> => {
-    const { execSync } = await import('child_process');
-    try {
-      return execSync(command, { encoding: 'utf-8', cwd });
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      throw new Error(`Shell command failed: ${msg}`);
-    }
-  };
-
-  // Signal handler
-  const onSignal = (signal: RunnerSignal, output: string): void => {
-    state.lastSignal = signal;
-    state.lastOutput = output;
   };
 
   // Logging callback
   const callbacks: Partial<RuntimeCallbacks> = {
     onLog: (value: RillValue) => {
-      const text = formatValue(value);
+      const text = formatRillValue(value);
       printRunner(text);
       logger.log(`[LOG] ${text}`);
     },
@@ -293,14 +270,12 @@ export async function runRillScript(
   // Create Rill runtime context
   const ctx = createRunnerContext({
     executeClause,
-    executeShell,
     namedArgs,
     rawArgs: args,
     env: process.env as Record<string, string>,
     commandsDir: '.claude/commands',
     defaultModel: effectiveModel ?? undefined,
     callbacks,
-    onSignal,
   });
 
   // Execute the script
@@ -311,43 +286,67 @@ export async function runRillScript(
 
     // Update last output from final result
     if (result.value !== null) {
-      state.lastOutput = formatValue(result.value);
+      state.lastOutput = formatRillValue(result.value);
     }
 
     logger.logEvent({
       event: 'rill_script_complete',
       runId,
       success: true,
-      signal: state.lastSignal ?? undefined,
     });
 
-    // Success if no blocking signal
-    const success =
-      state.lastSignal !== 'blocked' && state.lastSignal !== 'error';
     return {
-      success,
+      success: true,
       lastOutput: state.lastOutput,
-      signal: state.lastSignal,
     };
   } catch (error) {
+    // Handle specific Rill error types
+    if (error instanceof AbortError) {
+      printRunner(`${colors.yellow}Script cancelled${colors.reset}`);
+      logger.logEvent({ event: 'rill_script_cancelled', runId });
+      return {
+        success: false,
+        lastOutput: state.lastOutput,
+      };
+    }
+
+    if (error instanceof TimeoutError) {
+      const msg = `Timeout: ${error.message}`;
+      printRunner(`${colors.red}${msg}${colors.reset}`);
+      logger.logEvent({ event: 'rill_script_timeout', runId, error: msg });
+      return { success: false, lastOutput: state.lastOutput };
+    }
+
+    if (error instanceof ParseError) {
+      const location = error.location
+        ? ` at line ${error.location.line}:${error.location.column}`
+        : '';
+      const msg = `Parse error${location}: ${error.message}`;
+      printRunner(`${colors.red}${msg}${colors.reset}`);
+      logger.logEvent({ event: 'rill_script_parse_error', runId, error: msg });
+      return { success: false, lastOutput: state.lastOutput };
+    }
+
+    if (error instanceof RuntimeError) {
+      const location = error.location
+        ? ` at line ${error.location.line}:${error.location.column}`
+        : '';
+      const msg = `Runtime error${location}: ${error.message}`;
+      printRunner(`${colors.red}${msg}${colors.reset}`);
+      logger.logEvent({
+        event: 'rill_script_runtime_error',
+        runId,
+        error: msg,
+      });
+      return { success: false, lastOutput: state.lastOutput };
+    }
+
+    // Generic error fallback
     const msg = error instanceof Error ? error.message : String(error);
     printRunner(`${colors.red}Script error:${colors.reset} ${msg}`);
     logger.logEvent({ event: 'rill_script_error', runId, error: msg });
-    return { success: false, lastOutput: state.lastOutput, signal: 'error' };
+    return { success: false, lastOutput: state.lastOutput };
   }
-}
-
-// ============================================================
-// UTILITIES
-// ============================================================
-
-function formatValue(value: RillValue): string {
-  if (value === null) return '';
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
-  }
-  return JSON.stringify(value);
 }
 
 // ============================================================

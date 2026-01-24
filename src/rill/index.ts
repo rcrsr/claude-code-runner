@@ -6,7 +6,6 @@ export type {
   ClaudeExecutor,
   ExecutionResult,
   RunnerContextOptions,
-  ShellExecutor,
 } from './context.js';
 export { createRunnerContext } from './context.js';
 export type {

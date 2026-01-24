@@ -39,9 +39,12 @@ Thumbs.db
 .env.*.local
 
 # Claude Code local settings (contains API keys)
-.claude/settings.local.json
+.claude
 
 # Temporary
 tmp/
 temp/
 *.tmp
+
+# Checkmate config
+checkmate.json

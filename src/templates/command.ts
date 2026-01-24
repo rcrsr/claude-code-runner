@@ -46,6 +46,40 @@ export interface ScriptTemplate {
 export type CommandFrontmatter = TemplateFrontmatter;
 
 /**
+ * Parse YAML frontmatter from markdown content, returning all key-value pairs
+ */
+export function parseGenericFrontmatter(content: string): {
+  frontmatter: Record<string, string>;
+  body: string;
+} {
+  if (!content.startsWith('---')) {
+    return { frontmatter: {}, body: content };
+  }
+  const endIndex = content.indexOf('\n---', 3);
+  if (endIndex === -1) {
+    return { frontmatter: {}, body: content };
+  }
+
+  const yamlContent = content.slice(4, endIndex);
+  const body = content.slice(endIndex + 4).trimStart();
+
+  const frontmatter: Record<string, string> = {};
+  const keyValueRegex = /^(\S+):\s*(.*)$/;
+  for (const line of yamlContent.split('\n')) {
+    const match = keyValueRegex.exec(line);
+    if (!match) continue;
+
+    const [, key, value] = match;
+    const trimmedValue = value?.trim().replace(/^["']|["']$/g, '') ?? '';
+    if (key && trimmedValue) {
+      frontmatter[key] = trimmedValue;
+    }
+  }
+
+  return { frontmatter, body };
+}
+
+/**
  * Parse YAML frontmatter from markdown content
  */
 export function parseFrontmatter(content: string): {
@@ -67,18 +101,25 @@ export function parseFrontmatter(content: string): {
   const keyValueRegex = /^(\S+):\s*(.*)$/;
   for (const line of yamlContent.split('\n')) {
     const match = keyValueRegex.exec(line);
-    if (match) {
-      const [, key, value] = match;
-      const trimmedValue = value?.trim().replace(/^["']|["']$/g, '') ?? '';
-      if (key === 'model' && trimmedValue) {
+    if (!match) continue;
+
+    const [, key, value] = match;
+    const trimmedValue = value?.trim().replace(/^["']|["']$/g, '') ?? '';
+    if (!trimmedValue) continue;
+
+    switch (key) {
+      case 'model':
         frontmatter.model = trimmedValue;
-      } else if (key === 'description' && trimmedValue) {
+        break;
+      case 'description':
         frontmatter.description = trimmedValue;
-      } else if (key === 'argument-hint' && trimmedValue) {
+        break;
+      case 'argument-hint':
         frontmatter.argumentHint = trimmedValue;
-      } else if (key === 'args' && trimmedValue) {
+        break;
+      case 'args':
         frontmatter.args = trimmedValue;
-      }
+        break;
     }
   }
 
