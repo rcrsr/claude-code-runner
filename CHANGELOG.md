@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1]
+
+### Added
+
+- Test coverage for Rill integration (35 tests across `context.test.ts` and `runner.test.ts`)
+
+### Changed
+
+- README updated to highlight Rill scripting features (variables, conditionals, loops, functions)
+- Added host functions reference table to README
+
 ## [0.7.0]
 
 ### Added
@@ -15,7 +26,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - XML result protocol with application-defined results via `<ccr:result type="..." />` elements
 - `ccr::get_result(text)` function to extract result attributes from Claude output
 - `ccr::file_exists(path)` function to check file existence
-- Test coverage for Rill integration (35 tests across `context.test.ts` and `runner.test.ts`)
 
 ### Changed
 
