@@ -13,7 +13,7 @@ Based on these issues:
 
 Suggest specific fixes with code examples.
 """
--> ccr::prompt :> $fixes
+  -> ccr::prompt :> $fixes
 
 # Summarize for the developer
 """
@@ -23,4 +23,4 @@ Issues: {$issues}
 
 Fixes: {$fixes}
 """
--> ccr::prompt
+  -> ccr::prompt

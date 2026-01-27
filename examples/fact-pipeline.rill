@@ -8,7 +8,7 @@ args: topic: string, language: string = "Spanish"
 List 5 interesting facts about {$topic}.
 Format as a numbered list.
 """
--> ccr::prompt :> $facts
+  -> ccr::prompt :> $facts
 
 log("Generated facts about {$topic}")
 
@@ -18,7 +18,7 @@ Summarize these facts into a single concise paragraph:
 
 {$facts}
 """
--> ccr::prompt :> $summary
+  -> ccr::prompt :> $summary
 
 log("Created summary")
 
@@ -28,7 +28,7 @@ Translate this text to {$language}:
 
 {$summary}
 """
--> ccr::prompt :> $translated
+  -> ccr::prompt :> $translated
 
 log("Translated to {$language}")
 

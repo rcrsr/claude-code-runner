@@ -3,9 +3,9 @@ description: Iteratively review and improve text until satisfactory
 args: text: string
 ---
 
-# State dict pattern for condition loop
+# Do-while pattern: review at least once, accumulate with $
 ^(limit: 3) [iter: 0, max: 3, text: $text, done: false]
-  -> (!$.done && $.iter < $.max) @ {
+  -> @ {
     $.iter + 1 :> $i
     log("Iteration {$i}")
 
@@ -30,10 +30,10 @@ args: text: string
     ($result.type == "done")
       ? {
           log("Text is satisfactory after {$i} iterations")
-          [iter: $i, max: $.max, text: $.text, done: true]
+          [iter: $i, max: $.max, text: $.text, done: true] 
         }
       ! [iter: $i, max: $.max, text: $response, done: false]
-  }
+  } ? (!$.done && $.iter < $.max)
   :> $final
 
 log("=== Final Result ===")

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1]
+
+### Changed
+
+- Upgraded all dependencies to latest versions
+- Upgraded `@rcrsr/rill` from `0.2.0` to `~0.2.3`
+- Fixed Rill lint warnings in example scripts (continuation indentation, do-while pattern, brace spacing)
+
 ## [0.8.0]
 
 ### Breaking
