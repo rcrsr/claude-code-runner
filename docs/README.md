@@ -39,7 +39,7 @@ ccr::command(name, args?)        # Run command template
 ccr::skill(name, args?)          # Run slash command
 ccr::file_exists(path)           # Check file existence
 ccr::get_result(text)            # Extract XML signal
-ccr::read_frontmatter(path)      # Read YAML frontmatter
+ccr::get_frontmatter(path)       # Get YAML frontmatter
 ccr::error(message?)             # Stop with error
 ```
 

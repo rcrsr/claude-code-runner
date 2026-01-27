@@ -31,19 +31,25 @@ npm install -g @rcrsr/claude-code-runner
 claude-code-runner prompt "Refactor the auth module to use async/await"
 ```
 
-### command — Run a slash command file
+### command — Run a skill file
 
-Store prompts as markdown files in `.claude/commands/` and invoke them by name:
+Run skills (`.claude/skills/<name>/SKILL.md`) or commands (`.claude/commands/<name>.md`) by name:
 
 ```bash
 claude-code-runner command review-code src/auth.ts
 ```
 
-This loads `.claude/commands/review-code.md` and substitutes `$1` with `src/auth.ts`.
+**Skills** (recommended) support subdirectories with templates, examples, and scripts. **Commands** are single-file prompts. Both use the same template syntax and create `/slash-commands` in Claude Code.
 
-**Example template** (`.claude/commands/review-code.md`):
+**Example skill** (`.claude/skills/review-code/SKILL.md`):
 
 ```markdown
+---
+description: Review code for issues
+argument-hint: <file> [severity]
+model: sonnet
+---
+
 Review the code in $1 for:
 
 - Security vulnerabilities
@@ -58,21 +64,11 @@ Output findings as a numbered list.
 - `$1`, `$2`, `$3`... — Positional arguments
 - `$ARGUMENTS` — All arguments joined with spaces
 
-**Frontmatter support:**
-
-```markdown
----
-description: Review code for issues
-argument-hint: <file> [severity]
-model: sonnet
----
-
-Review $1 with severity level $2...
-```
+**Frontmatter options:**
 
 - `argument-hint` — Defines required `<arg>` and optional `[arg]` arguments
-- `model` — Default model for this command (CLI `--model` takes precedence)
-- `description` — Command description
+- `model` — Default model (CLI `--model` takes precedence)
+- `description` — Skill/command description
 
 ### script — Run multi-phase workflows
 
@@ -83,7 +79,7 @@ Scripts use [Rill](https://github.com/rcrsr/rill), a scripting language designed
 - **Loops** — Iterate with `for` and `while`
 - **Functions** — Reusable logic blocks
 - **String interpolation** — Embed variables with `{$var}` syntax
-- **Heredocs** — Multi-line prompts with `<<EOF...EOF`
+- **Triple-quote strings** — Multi-line prompts with `"""..."""`
 
 ```bash
 claude-code-runner script workflow.rill src/api/
@@ -101,13 +97,13 @@ args: path: string
 ccr::prompt("Review the code in {$path} for bugs") :> $issues
 
 # Get fixes based on issues found
-ccr::prompt(<<EOF
+"""
 Based on these issues:
 {$issues}
 
 Suggest specific fixes with code examples.
-EOF
-) :> $fixes
+"""
+-> ccr::prompt :> $fixes
 
 # Summarize
 ccr::prompt("Summarize: Issues: {$issues} Fixes: {$fixes}")
@@ -115,15 +111,17 @@ ccr::prompt("Summarize: Issues: {$issues} Fixes: {$fixes}")
 
 **Host functions:**
 
-| Function                      | Description                        |
-| ----------------------------- | ---------------------------------- |
-| `ccr::prompt(text, model?)`   | Execute a Claude prompt            |
-| `ccr::command(name, args?)`   | Run a command template             |
-| `ccr::skill(name, args?)`     | Run a slash command                |
-| `ccr::get_result(text)`       | Extract `<ccr:result>` from output |
-| `ccr::file_exists(path)`      | Check if file exists               |
-| `ccr::read_frontmatter(path)` | Parse YAML frontmatter             |
-| `ccr::error(message?)`        | Stop execution with error          |
+| Function                     | Description                        |
+| ---------------------------- | ---------------------------------- |
+| `ccr::prompt(text, model?)`  | Execute a Claude prompt            |
+| `ccr::skill(name, args?)`    | Run a Claude Code skill            |
+| `ccr::command(name, args?)`  | Run a Claude Code slash command    |
+| `ccr::has_result(text)`      | Check if text contains ccr:result  |
+| `ccr::get_result(text)`      | Extract `<ccr:result>` from output |
+| `ccr::has_frontmatter(path)` | Check if file has frontmatter      |
+| `ccr::get_frontmatter(path)` | Parse YAML frontmatter             |
+| `ccr::file_exists(path)`     | Check if file exists               |
+| `ccr::error(message?)`       | Stop execution with error          |
 
 See [docs/rill-scripting.md](docs/rill-scripting.md) for the full scripting reference.
 

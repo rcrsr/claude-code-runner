@@ -153,6 +153,86 @@ describe('parseArgs', () => {
     });
   });
 
+  describe('skill subcommand', () => {
+    it('constructs slash command without args', () => {
+      const result = parseArgs(['skill', 'commit']);
+
+      expect(result.subcommand).toBe('skill');
+      expect(result.prompt).toBe('/commit');
+    });
+
+    it('constructs slash command with single arg', () => {
+      const result = parseArgs(['skill', 'review', 'file.ts']);
+
+      expect(result.subcommand).toBe('skill');
+      expect(result.prompt).toBe('/review file.ts');
+    });
+
+    it('constructs slash command with multiple args', () => {
+      const result = parseArgs(['skill', 'review', '--strict', 'file.ts']);
+
+      expect(result.subcommand).toBe('skill');
+      expect(result.prompt).toBe('/review --strict file.ts');
+    });
+
+    it('handles skill args with spaces', () => {
+      const result = parseArgs(['skill', 'search', 'query', 'with', 'spaces']);
+
+      expect(result.prompt).toBe('/search query with spaces');
+    });
+
+    it('exits with error when skill name missing', () => {
+      expect(() => parseArgs(['skill'])).toThrow('process.exit(1)');
+      expect(errorSpy).toHaveBeenCalledWith('Error: skill name required');
+    });
+
+    it('sets displayCommand to skill name only', () => {
+      const result = parseArgs(['skill', 'commit']);
+
+      expect(result.displayCommand).toBe('commit');
+    });
+
+    it('sets displayCommand to skill name with args', () => {
+      const result = parseArgs(['skill', 'commit', '--amend']);
+
+      expect(result.displayCommand).toBe('commit --amend');
+    });
+
+    it('sets displayCommand for multiple args', () => {
+      const result = parseArgs(['skill', 'review', '--strict', 'src/']);
+
+      expect(result.displayCommand).toBe('review --strict src/');
+    });
+
+    it('works with options before subcommand', () => {
+      const result = parseArgs(['--verbose', 'skill', 'commit']);
+
+      expect(result.config.verbosity).toBe('verbose');
+      expect(result.prompt).toBe('/commit');
+    });
+
+    it('works with options after subcommand', () => {
+      const result = parseArgs(['skill', '--quiet', 'commit']);
+
+      expect(result.config.verbosity).toBe('quiet');
+      expect(result.prompt).toBe('/commit');
+    });
+
+    it('works with model option', () => {
+      const result = parseArgs(['--model', 'opus', 'skill', 'review']);
+
+      expect(result.config.model).toBe('opus');
+      expect(result.prompt).toBe('/review');
+    });
+
+    it('does not set scriptFile or scriptArgs', () => {
+      const result = parseArgs(['skill', 'commit', 'arg1']);
+
+      expect(result.scriptFile).toBeNull();
+      expect(result.scriptArgs).toEqual([]);
+    });
+  });
+
   describe('option parsing', () => {
     it('parses --quiet flag', () => {
       const result = parseArgs(['--quiet', 'prompt', 'test']);
@@ -273,6 +353,7 @@ describe('printUsage', () => {
     const output = logSpy.mock.calls[0]?.[0] as string;
     expect(output).toContain('prompt');
     expect(output).toContain('command');
+    expect(output).toContain('skill');
     expect(output).toContain('script');
   });
 

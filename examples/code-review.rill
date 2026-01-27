@@ -1,5 +1,5 @@
 ---
-description: Code review workflow demonstrating variable capture and heredocs
+description: Code review workflow demonstrating variable capture and multi-line strings
 args: path: string
 ---
 
@@ -7,20 +7,20 @@ args: path: string
 ccr::prompt("Review the code in {$path} for bugs and issues") :> $issues
 
 # Get improvement suggestions based on issues found
-ccr::prompt(<<EOF
+"""
 Based on these issues:
 {$issues}
 
 Suggest specific fixes with code examples.
-EOF
-) :> $fixes
+"""
+-> ccr::prompt :> $fixes
 
 # Summarize for the developer
-ccr::prompt(<<EOF
+"""
 Create a brief summary of the review:
 
 Issues: {$issues}
 
 Fixes: {$fixes}
-EOF
-)
+"""
+-> ccr::prompt

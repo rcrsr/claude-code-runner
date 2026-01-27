@@ -52,7 +52,7 @@ claude-code-runner command review-code src/auth.ts high
 
 ## Code Review Workflow
 
-Multi-step analysis with heredocs:
+Multi-step analysis with triple-quote strings:
 
 ```rill
 ---
@@ -64,23 +64,23 @@ args: path: string
 ccr::prompt("Review the code in {$path} for bugs and issues") :> $issues
 
 # Get improvement suggestions based on issues found
-ccr::prompt(<<EOF
+"""
 Based on these issues:
 {$issues}
 
 Suggest specific fixes with code examples.
-EOF
-) :> $fixes
+"""
+-> ccr::prompt :> $fixes
 
 # Summarize for the developer
-ccr::prompt(<<EOF
+"""
 Create a brief summary of the review:
 
 Issues: {$issues}
 
 Fixes: {$fixes}
-EOF
-)
+"""
+-> ccr::prompt
 ```
 
 ## Test-and-Fix Loop
@@ -215,7 +215,7 @@ description: Fix lint errors iteratively
 args: path: string
 ---
 
-ccr::prompt(<<EOF
+"""
 Fix lint errors in {$path}.
 
 1. Run the linter
@@ -224,8 +224,8 @@ Fix lint errors in {$path}.
 
 If errors remain: output <ccr:result type="repeat"/>
 If clean: output <ccr:result type="done"/>
-EOF
-) :> $result
+"""
+-> ccr::prompt :> $result
 
 ccr::get_result($result) :> $result
 
@@ -252,7 +252,7 @@ ccr::file_exists("package.json")
 Extract frontmatter from plan files:
 
 ```rill
-ccr::read_frontmatter("PLAN.md") :> $meta
+ccr::get_frontmatter("PLAN.md") :> $meta
 
 ($meta.status == "complete")
   ? log("Plan already complete")

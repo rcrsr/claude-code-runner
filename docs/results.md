@@ -35,7 +35,7 @@ ccr::get_result($output) :> $result
 
 ### Return Value
 
-Returns a dict with all attributes plus a `content` key, or empty string if no result found.
+Returns a dict with all attributes plus a `content` key, or empty dict `{}` if no result found.
 
 For `<ccr:result type="blocked" reason="auth">Need API key</ccr:result>`:
 
@@ -62,15 +62,15 @@ ccr::get_result($output) :> $result
 Claude validates its own work and outputs when to retry:
 
 ```rill
-ccr::prompt(<<EOF
+"""
 Fix all lint errors in src/.
 
 After fixing:
 - Run the linter
 - If errors remain, output <ccr:result type="repeat"/>
 - If clean, output <ccr:result type="done"/>
-EOF
-) :> $output
+"""
+-> ccr::prompt :> $output
 
 ccr::get_result($output) :> $result
 # Handle $result.type == "repeat" by re-running or looping
@@ -92,7 +92,7 @@ Claude works through a task list, outputting after each item:
 **Script:**
 
 ```rill
-ccr::prompt(<<EOF
+"""
 Read PLAN.md. Find the first unchecked item (- [ ]).
 
 1. Implement that item
@@ -100,8 +100,8 @@ Read PLAN.md. Find the first unchecked item (- [ ]).
 3. If unchecked items remain, output <ccr:result type="repeat"/>
 4. If all done, output <ccr:result type="done"/>
 5. If stuck, output <ccr:result type="blocked" reason="..."/>
-EOF
-) :> $output
+"""
+-> ccr::prompt :> $output
 ```
 
 ### Multi-Phase Pipeline
@@ -113,13 +113,13 @@ Different phases with different result handling:
 ccr::prompt("Analyze codebase for issues") :> $issues
 
 # Phase 2: Fixes (may repeat)
-ccr::prompt(<<EOF
+"""
 Fix one issue from this list:
 {$issues}
 
 Output <ccr:result type="repeat"/> if more issues remain.
-EOF
-) :> $output
+"""
+-> ccr::prompt :> $output
 
 ccr::get_result($output) :> $result
 ($result.type == "repeat") ? log("More issues to fix")
@@ -133,14 +133,14 @@ ccr::prompt("Run tests to verify fixes")
 Claude outputs when human intervention is needed:
 
 ```rill
-ccr::prompt(<<EOF
+"""
 Deploy to production.
 
 If deployment succeeds, output <ccr:result type="done"/>.
 If blocked by permissions, output <ccr:result type="blocked" reason="permissions"/>.
 If blocked by other issues, output <ccr:result type="blocked" reason="...">Details here</ccr:result>.
-EOF
-) :> $output
+"""
+-> ccr::prompt :> $output
 
 ccr::get_result($output) :> $result
 

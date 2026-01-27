@@ -46,4 +46,7 @@ temp/
 
 # internal files
 .claude/
+conduct/
+.codanna/
+.fastembed*
 

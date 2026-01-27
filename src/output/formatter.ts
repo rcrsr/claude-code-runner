@@ -21,13 +21,11 @@ import {
 } from '../types/runner.js';
 import {
   MAX_RESULT_LINES,
-  TRUNCATE_ANSWER,
   TRUNCATE_BASH_CMD,
   TRUNCATE_ERROR,
   TRUNCATE_GREP_PATTERN,
   TRUNCATE_MESSAGE,
   TRUNCATE_TASK_DESC,
-  TRUNCATE_TERMINAL_LINE,
   TRUNCATE_TOOL_JSON,
   TRUNCATE_VERBOSE_LINE,
 } from '../utils/constants.js';
@@ -368,15 +366,12 @@ export function formatMessage(
           ) {
             const displayText = block.text.replace(/[\r\n]+/g, ' ').trim();
             terminalLog(
-              `${timestampPrefix()}${colors.green}[answer]${colors.reset} ${truncate(displayText, TRUNCATE_ANSWER)}`
+              `${timestampPrefix()}${colors.green}[answer]${colors.reset} ${displayText}`
             );
           }
         } else {
           const displayText = block.text.replace(/[\r\n]+/g, ' ').trim();
-          printClaude(
-            truncate(displayText, TRUNCATE_TERMINAL_LINE),
-            block.text
-          );
+          printClaude(displayText, block.text);
         }
       } else if (isToolUseBlock(block)) {
         const now = Date.now();

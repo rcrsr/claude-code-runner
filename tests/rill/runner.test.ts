@@ -122,7 +122,9 @@ ccr::prompt("test")`
     const result = loadRillScript(scriptPath);
 
     expect(result.meta.model).toBe('opus');
-    expect(result.source).toBe('ccr::prompt("test")');
+    // Source includes full content - Rill handles frontmatter
+    expect(result.source).toContain('---');
+    expect(result.source).toContain('ccr::prompt("test")');
   });
 
   it('parses frontmatter args definition', () => {
@@ -364,14 +366,21 @@ ccr::prompt($file)`
     ).rejects.toThrow('Missing required argument: file');
   });
 
-  it('throws on parse error (parse happens before try/catch)', async () => {
+  it('returns success false on parse error with correct line numbers', async () => {
     const scriptPath = path.join(testDir, 'invalid.rill');
-    fs.writeFileSync(scriptPath, 'this is not valid {{ syntax');
+    fs.writeFileSync(
+      scriptPath,
+      `---
+model: opus
+---
+ccr::prompt("valid")
+this is not valid {{ syntax`
+    );
 
-    // Parse errors throw because parse() is called before the try/catch
-    await expect(
-      runRillScript(createRunnerOptions(scriptPath))
-    ).rejects.toThrow();
+    const result = await runRillScript(createRunnerOptions(scriptPath));
+
+    expect(result.success).toBe(false);
+    // Parse error should reference line 5 (not line 2 which would be relative to body)
   });
 
   it('returns success false on runtime error', async () => {

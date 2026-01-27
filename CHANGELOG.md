@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0]
+
+### Breaking
+
+- `ccr::get_result()` returns empty dict `{}` instead of `null` when no result found
+- Renamed `ccr::read_frontmatter()` to `ccr::get_frontmatter()` (removed `defaults` parameter)
+- Rill heredoc syntax (`<<EOF...EOF`) removed; use triple-quote strings (`"""..."""`)
+- Upgraded `@rcrsr/rill` from `^0.1.0` to `^0.2.0`
+- Removed example `simple-capture.rill`
+
+### Added
+
+- `skill` subcommand: run skills from `.claude/skills/<name>/SKILL.md`
+- `ccr::has_result(text)` host function to check for `<ccr:result>` tags
+- `ccr::has_frontmatter(path)` host function to check file frontmatter existence
+- `loadSkillTemplate()` in `src/templates/command.ts` for skill file loading
+- New examples: `fact-pipeline.rill`, `iterative-review.rill`
+
+### Changed
+
+- Rill parse errors now include file path in location (e.g., `at script.rill:5:3`)
+- Rill script source passed as full content; Rill parser handles frontmatter natively
+- `ccr::command()` host function delegates argument formatting to `loadCommandTemplate()`
+- Answer and Claude message output no longer truncated (removed `TRUNCATE_ANSWER`, `TRUNCATE_TERMINAL_LINE`)
+- Rill `log()` output collapses newlines to spaces
+- Step preview in log events collapses newlines to spaces
+- Upgraded `vitest` and `@vitest/coverage-v8` from `^2.0.0` to `^4.0.18`
+- Result XML patterns extracted to constants in `src/utils/constants.ts`
+
+### Fixed
+
+- Rill parse errors now caught inside `try/catch`; return `{ success: false }` instead of throwing
+- Rill error messages use `error.toString()` instead of `error.message` for full context
+
 ## [0.7.1]
 
 ### Added

@@ -67,7 +67,7 @@ function extractOptions(args: string[]): RawArgs {
 /**
  * Parse CLI arguments
  */
-const VALID_SUBCOMMANDS = ['prompt', 'command', 'script'] as const;
+const VALID_SUBCOMMANDS = ['prompt', 'command', 'script', 'skill'] as const;
 
 function isValidSubcommand(value: string): value is Subcommand {
   return VALID_SUBCOMMANDS.includes(value as Subcommand);
@@ -83,16 +83,16 @@ export function parseArgs(args: string[]): ParsedArgs {
   if (!firstArg) {
     console.error('Error: subcommand required');
     console.error(
-      'Usage: claude-code-runner <prompt|command|script> [args...]'
+      'Usage: claude-code-runner <prompt|command|skill|script> [args...]'
     );
     process.exit(1);
   }
 
   if (!isValidSubcommand(firstArg)) {
     console.error(`Error: unknown subcommand '${firstArg}'`);
-    console.error('Valid subcommands: prompt, command, script');
+    console.error('Valid subcommands: prompt, command, skill, script');
     console.error(
-      'Usage: claude-code-runner <prompt|command|script> [args...]'
+      'Usage: claude-code-runner <prompt|command|skill|script> [args...]'
     );
     process.exit(1);
   }
@@ -118,6 +118,21 @@ export function parseArgs(args: string[]): ParsedArgs {
       );
       prompt = template.prompt;
       frontmatterModel = template.frontmatter.model ?? null;
+      displayCommand = positionalArgs.slice(1).join(' ');
+      break;
+    }
+    case 'skill': {
+      const skillName = positionalArgs[1];
+      if (!skillName) {
+        console.error('Error: skill name required');
+        console.error('Usage: claude-code-runner skill <name> [args...]');
+        process.exit(1);
+      }
+      const skillArgs = positionalArgs.slice(2);
+      prompt =
+        skillArgs.length > 0
+          ? `/${skillName} ${skillArgs.join(' ')}`
+          : `/${skillName}`;
       displayCommand = positionalArgs.slice(1).join(' ');
       break;
     }
@@ -176,11 +191,13 @@ Claude Code Runner - executes claude CLI with proper TTY handling
 Usage:
   claude-code-runner [options] prompt <prompt>
   claude-code-runner [options] command <name> [args...]
+  claude-code-runner [options] skill <name> [args...]
   claude-code-runner [options] script <file.rill> [args...]
 
 Subcommands:
   prompt <text>              Run with the given prompt
   command <name> [args]      Load .claude/commands/<name>.md template
+  skill <name> [args]        Run slash command /<name> [args]
   script <file.rill> [args]  Run a Rill script
 
 Options:

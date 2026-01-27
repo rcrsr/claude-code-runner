@@ -25,7 +25,9 @@ npm run build           # Compile TypeScript
 - `ccr::skill(name, args?)` → Run slash command (args is list)
 - `ccr::get_result(text)` → Extract XML result from output
 - `ccr::file_exists(path)` → Check file existence
-- `ccr::read_frontmatter(path)` → Parse YAML frontmatter
+- `ccr::get_frontmatter(path)` → Parse YAML frontmatter
+- `ccr::has_frontmatter(path)` → Check if file has frontmatter
+- `ccr::has_result(text)` → Check if text contains ccr:result
 - `ccr::error(message?)` → Stop with error
 
 **Script variables**: `$1`, `$2` (args), `$ARGUMENTS` (all args), `$varname` (captures via `:> $varname`)

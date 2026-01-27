@@ -1,0 +1,40 @@
+---
+description: Iteratively review and improve text until satisfactory
+args: text: string
+---
+
+# State dict pattern for condition loop
+^(limit: 3) [iter: 0, max: 3, text: $text, done: false]
+  -> (!$.done && $.iter < $.max) @ {
+    $.iter + 1 :> $i
+    log("Iteration {$i}")
+
+    # Ask Claude to review and improve
+    """
+    Review this text and improve it for clarity and conciseness.
+
+    Text:
+    {$.text}
+
+    If the text is already excellent and needs no changes, respond with:
+    <ccr:result type="done"/>
+
+    Otherwise, provide the improved version and respond with:
+    <ccr:result type="continue"/>
+    """
+    -> ccr::prompt :> $response
+
+    # Check the result
+    ccr::get_result($response) :> $result
+
+    ($result.type == "done")
+      ? {
+          log("Text is satisfactory after {$i} iterations")
+          [iter: $i, max: $.max, text: $.text, done: true]
+        }
+      ! [iter: $i, max: $.max, text: $response, done: false]
+  }
+  :> $final
+
+log("=== Final Result ===")
+log($final.text)

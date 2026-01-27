@@ -125,7 +125,8 @@ function parseArgsDefinition(argsStr: string): RillArgDef[] {
 }
 
 /**
- * Load a .rill script file, extracting frontmatter and body
+ * Load a .rill script file, extracting metadata from frontmatter
+ * Returns full content (Rill parser handles frontmatter natively)
  */
 export function loadRillScript(scriptFile: string): {
   source: string;
@@ -136,7 +137,10 @@ export function loadRillScript(scriptFile: string): {
   }
 
   const content = fs.readFileSync(scriptFile, 'utf-8');
-  const { frontmatter, body } = parseFrontmatter(content);
+
+  // Extract frontmatter metadata for our use (model, args)
+  // Rill parser will handle the full content including frontmatter
+  const { frontmatter } = parseFrontmatter(content);
 
   // Parse args definition if present
   let argsDefs: RillArgDef[] | undefined;
@@ -145,7 +149,7 @@ export function loadRillScript(scriptFile: string): {
   }
 
   return {
-    source: body,
+    source: content, // Pass full content - Rill handles frontmatter
     meta: {
       model: frontmatter.model,
       description: frontmatter.description,
@@ -198,9 +202,6 @@ export async function runRillScript(
     }
   }
 
-  // Parse the Rill script
-  const ast = parse(source);
-
   // Track execution state (use object to allow mutation in closures)
   const state = {
     lastOutput: '',
@@ -217,7 +218,7 @@ export async function runRillScript(
     formatterState.stepStartTime = Date.now();
 
     // Log step start
-    const preview = prompt.length > 50 ? prompt.slice(0, 50) + '...' : prompt;
+    const preview = prompt.replace(/[\r\n]+/g, ' ').trim();
     logger.logEvent({
       event: 'step_start',
       step: state.stepNum,
@@ -278,10 +279,12 @@ export async function runRillScript(
     callbacks,
   });
 
-  // Execute the script
+  // Parse and execute the script
   try {
     logger.logEvent({ event: 'rill_script_start', runId, file: scriptFile });
 
+    // Parse the Rill script inside try/catch to handle parse errors
+    const ast = parse(source);
     const result = await execute(ast, ctx);
 
     // Update last output from final result
@@ -319,9 +322,9 @@ export async function runRillScript(
 
     if (error instanceof ParseError) {
       const location = error.location
-        ? ` at line ${error.location.line}:${error.location.column}`
+        ? ` at ${scriptFile}:${error.location.line}:${error.location.column}`
         : '';
-      const msg = `Parse error${location}: ${error.message}`;
+      const msg = `Parse error${location}: ${error.toString()}`;
       printRunner(`${colors.red}${msg}${colors.reset}`);
       logger.logEvent({ event: 'rill_script_parse_error', runId, error: msg });
       return { success: false, lastOutput: state.lastOutput };
@@ -329,9 +332,9 @@ export async function runRillScript(
 
     if (error instanceof RuntimeError) {
       const location = error.location
-        ? ` at line ${error.location.line}:${error.location.column}`
+        ? ` at ${scriptFile}:${error.location.line}:${error.location.column}`
         : '';
-      const msg = `Runtime error${location}: ${error.message}`;
+      const msg = `Runtime error${location}: ${error.toString()}`;
       printRunner(`${colors.red}${msg}${colors.reset}`);
       logger.logEvent({
         event: 'rill_script_runtime_error',

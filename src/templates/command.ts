@@ -172,27 +172,50 @@ function processTemplate(content: string, args: string[]): ProcessedTemplate {
 }
 
 /**
+ * Load a template from a file path
+ */
+function loadTemplate(
+  filePath: string,
+  errorLabel: string,
+  templateArgs: string[]
+): CommandTemplate {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`${errorLabel} not found: ${filePath}`);
+  }
+
+  const content = fs.readFileSync(filePath, 'utf-8');
+  const { body, frontmatter } = processTemplate(content, templateArgs);
+
+  return { prompt: body, frontmatter };
+}
+
+/**
  * Load a command template from .claude/commands/<name>.md
  */
 export function loadCommandTemplate(
   commandName: string,
-  cmdArgs: string[]
+  cmdArgs: string[],
+  cwd: string = process.cwd()
 ): CommandTemplate {
   const commandFile = path.join(
-    process.cwd(),
+    cwd,
     '.claude',
     'commands',
     `${commandName}.md`
   );
+  return loadTemplate(commandFile, 'Command', cmdArgs);
+}
 
-  if (!fs.existsSync(commandFile)) {
-    throw new Error(`Command not found: ${commandFile}`);
-  }
-
-  const content = fs.readFileSync(commandFile, 'utf-8');
-  const { body, frontmatter } = processTemplate(content, cmdArgs);
-
-  return { prompt: body, frontmatter };
+/**
+ * Load a skill template from .claude/skills/<name>/SKILL.md
+ */
+export function loadSkillTemplate(
+  skillName: string,
+  skillArgs: string[],
+  cwd: string = process.cwd()
+): CommandTemplate {
+  const skillFile = path.join(cwd, '.claude', 'skills', skillName, 'SKILL.md');
+  return loadTemplate(skillFile, 'Skill', skillArgs);
 }
 
 /**

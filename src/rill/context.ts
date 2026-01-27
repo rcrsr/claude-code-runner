@@ -4,7 +4,6 @@
  */
 
 import {
-  type CallableFn,
   createRuntimeContext,
   type HostFunctionDefinition,
   type ObservabilityCallbacks,
@@ -13,13 +12,16 @@ import {
   type RuntimeContext,
 } from '@rcrsr/rill';
 import * as fs from 'fs';
-import * as path from 'path';
 
 import { printRunner } from '../output/colors.js';
 import {
-  parseFrontmatter,
+  loadCommandTemplate as loadCommandTemplateFile,
   parseGenericFrontmatter,
 } from '../templates/command.js';
+import {
+  CCR_RESULT_SELF_CLOSING_PATTERN,
+  CCR_RESULT_WITH_CONTENT_PATTERN,
+} from '../utils/constants.js';
 import { formatRillValue } from '../utils/formatting.js';
 
 // ============================================================
@@ -67,52 +69,6 @@ export interface RunnerContextOptions {
 }
 
 // ============================================================
-// COMMAND LOADING
-// ============================================================
-
-interface CommandTemplate {
-  content: string;
-  model?: string | undefined;
-}
-
-function loadCommandTemplate(
-  name: string,
-  commandsDir: string
-): CommandTemplate {
-  const filePath = path.join(commandsDir, `${name}.md`);
-
-  if (!fs.existsSync(filePath)) {
-    throw new Error(`Command not found: ${name} (looked in ${filePath})`);
-  }
-
-  const content = fs.readFileSync(filePath, 'utf-8');
-  const { frontmatter, body } = parseFrontmatter(content);
-
-  return {
-    content: body,
-    model: frontmatter.model,
-  };
-}
-
-function substituteArgs(template: string, args: RillValue[]): string {
-  let result = template;
-
-  // Substitute positional args: $1, $2, etc.
-  for (let i = 0; i < args.length; i++) {
-    const value = formatRillValue(args[i] ?? null);
-    result = result.replace(new RegExp(`\\$${i + 1}`, 'g'), value);
-  }
-
-  // Substitute $ARGUMENTS with all args joined
-  result = result.replace(/\$ARGUMENTS/g, args.map(formatRillValue).join(' '));
-
-  // Remove unmatched $N placeholders
-  result = result.replace(/\$\d+/g, '');
-
-  return result;
-}
-
-// ============================================================
 // RUNTIME CONTEXT FACTORY
 // ============================================================
 
@@ -137,7 +93,7 @@ export function createRunnerContext(
   } = options;
 
   // Create ccr:: namespaced functions
-  const functions: Record<string, CallableFn | HostFunctionDefinition> = {
+  const functions: Record<string, HostFunctionDefinition> = {
     /**
      * Execute a prompt with Claude
      * Usage: ccr::prompt("analyze this code", "haiku")
@@ -166,13 +122,18 @@ export function createRunnerContext(
       ],
       fn: async (args, ctx) => {
         const name = args[0] as string;
-        const cmdArgs = args[1] as RillValue[];
+        const cmdArgs = (args[1] as RillValue[]).map((a) =>
+          formatRillValue(a ?? null)
+        );
 
-        const template = loadCommandTemplate(name, commandsDir);
-        const promptText = substituteArgs(template.content, cmdArgs);
-        const model = template.model ?? defaultModel;
+        const template = loadCommandTemplateFile(
+          name,
+          cmdArgs,
+          commandsDir.replace('/.claude/commands', '')
+        );
+        const model = template.frontmatter.model ?? defaultModel;
 
-        const result = await executeClause(promptText, model);
+        const result = await executeClause(template.prompt, model);
         ctx.pipeValue = result.output;
         return result.output;
       },
@@ -213,33 +174,28 @@ export function createRunnerContext(
 
     /**
      * Extract result from text
-     * Usage: ccr::get_result($text) -> { type: "...", ...attrs } | null
+     * Usage: ccr::get_result($text) -> { type: "...", ...attrs } or {}
      * Parses <ccr:result type="..." .../> or <ccr:result ...>content</ccr:result>
+     * Returns empty dict if no result found (Rill doesn't support null)
      */
     'ccr::get_result': {
       params: [{ name: 'text', type: 'string' }],
       fn: (args) => {
         const text = args[0] as string;
 
-        // Match self-closing: <ccr:result ... />
-        // Match with content: <ccr:result ...>content</ccr:result>
-        const selfClosingPattern = /<ccr:result\s+([^>]*?)\/>/;
-        const withContentPattern =
-          /<ccr:result\s+([^>]*)>([\s\S]*?)<\/ccr:result>/;
-
         let attrs: string;
         let content: string | undefined;
 
-        const withContentMatch = withContentPattern.exec(text);
+        const withContentMatch = CCR_RESULT_WITH_CONTENT_PATTERN.exec(text);
         if (withContentMatch?.[1] && withContentMatch[2]) {
           attrs = withContentMatch[1];
           content = withContentMatch[2].trim();
         } else {
-          const selfClosingMatch = selfClosingPattern.exec(text);
+          const selfClosingMatch = CCR_RESULT_SELF_CLOSING_PATTERN.exec(text);
           if (selfClosingMatch?.[1]) {
             attrs = selfClosingMatch[1];
           } else {
-            return null;
+            return {};
           }
         }
 
@@ -275,18 +231,48 @@ export function createRunnerContext(
     },
 
     /**
-     * Read frontmatter from a file
-     * Usage: ccr::read_frontmatter("path/to/file.md")
-     *        ccr::read_frontmatter("path/to/file.md", [key: "default"])
+     * Check if text contains a <ccr:result> tag
+     * Usage: ccr::has_result(text) -> boolean
      */
-    'ccr::read_frontmatter': {
-      params: [
-        { name: 'path', type: 'string' },
-        { name: 'defaults', type: 'dict', defaultValue: {} },
-      ],
+    'ccr::has_result': {
+      params: [{ name: 'text', type: 'string' }],
+      fn: (args) => {
+        const text = args[0] as string;
+        return (
+          CCR_RESULT_SELF_CLOSING_PATTERN.test(text) ||
+          CCR_RESULT_WITH_CONTENT_PATTERN.test(text)
+        );
+      },
+    },
+
+    /**
+     * Check if a file has YAML frontmatter
+     * Usage: ccr::has_frontmatter(path) -> boolean
+     */
+    'ccr::has_frontmatter': {
+      params: [{ name: 'path', type: 'string' }],
       fn: (args) => {
         const filePath = args[0] as string;
-        const defaults = args[1] as Record<string, RillValue>;
+
+        if (!fs.existsSync(filePath)) {
+          return false;
+        }
+
+        const content = fs.readFileSync(filePath, 'utf-8');
+        const { frontmatter } = parseGenericFrontmatter(content);
+
+        return Object.keys(frontmatter).length > 0;
+      },
+    },
+
+    /**
+     * Get frontmatter from a file
+     * Usage: ccr::get_frontmatter("path/to/file.md")
+     */
+    'ccr::get_frontmatter': {
+      params: [{ name: 'path', type: 'string' }],
+      fn: (args) => {
+        const filePath = args[0] as string;
 
         if (!fs.existsSync(filePath)) {
           throw new Error(`File not found: ${filePath}`);
@@ -295,7 +281,7 @@ export function createRunnerContext(
         const content = fs.readFileSync(filePath, 'utf-8');
         const { frontmatter } = parseGenericFrontmatter(content);
 
-        return { ...defaults, ...frontmatter };
+        return frontmatter;
       },
     },
   };
@@ -314,7 +300,10 @@ export function createRunnerContext(
       onLog:
         callbacks.onLog ??
         ((v) => {
-          printRunner(formatRillValue(v));
+          const formatted = formatRillValue(v)
+            .replace(/[\r\n]+/g, ' ')
+            .trim();
+          printRunner(formatted);
         }),
     },
     ...(observability && { observability }),

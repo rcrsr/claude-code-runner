@@ -107,9 +107,12 @@ async function main(): Promise<void> {
     process.exit(result.success ? 0 : 1);
   }
 
-  // Handle prompt and command subcommands (single execution)
+  // Handle prompt, command, and skill subcommands (single execution)
   const promptText = parsed.prompt;
-  if (parsed.subcommand === 'command' && !promptText) {
+  if (
+    (parsed.subcommand === 'command' || parsed.subcommand === 'skill') &&
+    !promptText
+  ) {
     // This shouldn't happen - parseArgs should have handled it
     console.error('Error: no prompt text');
     process.exit(1);

@@ -6,7 +6,7 @@ import { DEFAULT_PARALLEL_THRESHOLD_MS } from '../utils/constants.js';
 
 export type Verbosity = 'quiet' | 'normal' | 'verbose';
 
-export type Subcommand = 'prompt' | 'command' | 'script';
+export type Subcommand = 'prompt' | 'command' | 'script' | 'skill';
 
 /**
  * Result of running a single Claude invocation

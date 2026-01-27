@@ -68,9 +68,23 @@ ccr::file_exists("src/config.ts") ? ccr::prompt("Config exists, analyze it")
 ccr::file_exists($1) ? ccr::command("process-file", $1)
 ```
 
-### ccr::get_result(text) -> dict | ""
+### ccr::has_result(text) -> boolean
 
-Extract an XML result from text. See [Results](results.md).
+Check if text contains a `<ccr:result>` tag (self-closing or with content).
+
+```rill
+ccr::prompt("Fix issues. Output <ccr:result type='repeat'/> if more remain.") :> $output
+
+# Branch based on whether result exists
+ccr::has_result($output) ? {
+  ccr::get_result($output) :> $result
+  ($result.type == "repeat") ? log("More work needed")
+} ! log("No result signal found")
+```
+
+### ccr::get_result(text) -> dict | {}
+
+Extract an XML result from text. Returns empty dict `{}` if no result found. See [Results](results.md).
 
 ```rill
 ccr::prompt("Fix issues. Output <ccr:result type='repeat'/> if more remain.") :> $output
@@ -83,6 +97,17 @@ ccr::get_result($output) :> $result
 }
 ```
 
+### ccr::has_frontmatter(path) -> boolean
+
+Check if a file exists and contains YAML frontmatter.
+
+```rill
+ccr::has_frontmatter("PLAN.md") ? {
+  ccr::get_frontmatter("PLAN.md") :> $meta
+  log("Found metadata: {$meta}")
+} ! log("No frontmatter in PLAN.md")
+```
+
 ### ccr::error(message?) -> throws
 
 Stop script execution with an error.
@@ -91,13 +116,15 @@ Stop script execution with an error.
 ccr::error("Missing required configuration")
 ```
 
-### ccr::read_frontmatter(path, defaults?) -> dict
+### ccr::get_frontmatter(path) -> dict
 
-Read YAML frontmatter from a file. Returns defaults merged with frontmatter.
+Get YAML frontmatter from a file. Returns empty dict `{}` if no frontmatter found. Throws error if file doesn't exist.
 
 ```rill
-ccr::read_frontmatter("PLAN.md") :> $meta
-ccr::read_frontmatter("task.md", [priority: "low"]) :> $meta
+ccr::get_frontmatter("PLAN.md") :> $meta
+
+# Set default if key is missing
+($meta.?priority) ! ($meta.priority = "low")
 ```
 
 ## Variables
@@ -129,28 +156,28 @@ Use `{$variable}` in strings:
 ```rill
 ccr::prompt("Analyze {$file} for issues")
 
-ccr::prompt(<<EOF
+"""
 Review these files:
 {$files}
 
 Focus on security issues.
-EOF
-)
+"""
+-> ccr::prompt
 ```
 
-## Heredocs
+## Triple-Quote Strings
 
-Multi-line prompts use heredoc syntax:
+Multi-line prompts use triple-quote syntax. Pipe to a function with `->`:
 
 ```rill
-ccr::prompt(<<EOF
+"""
 Given these issues:
 {$issues}
 
 Suggest fixes with code examples.
 For each fix, explain the reasoning.
-EOF
-) :> $fixes
+"""
+-> ccr::prompt :> $fixes
 ```
 
 ## Control Flow
@@ -185,22 +212,22 @@ args: path: string
 ccr::prompt("Review the code in {$path} for bugs and issues") :> $issues
 
 # Get improvement suggestions
-ccr::prompt(<<EOF
+"""
 Based on these issues:
 {$issues}
 
 Suggest specific fixes with code examples.
-EOF
-) :> $fixes
+"""
+-> ccr::prompt :> $fixes
 
 # Summarize for the developer
-ccr::prompt(<<EOF
+"""
 Create a brief summary of the review:
 
 Issues: {$issues}
 Fixes: {$fixes}
-EOF
-)
+"""
+-> ccr::prompt
 ```
 
 Run with:

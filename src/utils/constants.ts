@@ -54,3 +54,10 @@ export const SECONDS_PER_HOUR = 3600;
 // === Default Configuration ===
 /** Default parallel tool detection threshold in ms */
 export const DEFAULT_PARALLEL_THRESHOLD_MS = 100;
+
+// === Result XML Patterns ===
+/** Regex pattern for self-closing ccr:result tags */
+export const CCR_RESULT_SELF_CLOSING_PATTERN = /<ccr:result\s+([^>]*?)\/>/;
+/** Regex pattern for ccr:result tags with content */
+export const CCR_RESULT_WITH_CONTENT_PATTERN =
+  /<ccr:result\s+([^>]*)>([\s\S]*?)<\/ccr:result>/;
