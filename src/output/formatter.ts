@@ -58,7 +58,14 @@ import {
 export interface FormatterState {
   pendingTools: PendingTool[];
   lastToolTime: number | null;
-  activeTask: ActiveTask | null;
+  /** Multiple active tasks keyed by tool_use_id */
+  activeTasks: Map<string, ActiveTask>;
+  /** Maps tool_use_id to parent task id for attribution */
+  toolToTaskId: Map<string, string>;
+  /** Counter for generating task labels (A, B, C...) */
+  nextLabelIndex: number;
+  /** Most recently started task id (for tool attribution) */
+  currentTaskId: string | null;
   toolStartTimes: Map<string, number>;
   currentStep: number;
   /** When true, step completion is not printed (caller handles it) */
@@ -71,17 +78,20 @@ export interface FormatterState {
   runStats: RunStats;
   /** Step start time */
   stepStartTime: number | null;
-  /** Task statistics (for nested task tracking) */
-  taskStats: RunStats | null;
-  /** Task start time */
-  taskStartTime: number | null;
+  /** Task statistics keyed by task id */
+  taskStatsMap: Map<string, RunStats>;
+  /** Task start times keyed by task id */
+  taskStartTimes: Map<string, number>;
 }
 
 export function createFormatterState(): FormatterState {
   return {
     pendingTools: [],
     lastToolTime: null,
-    activeTask: null,
+    activeTasks: new Map(),
+    toolToTaskId: new Map(),
+    nextLabelIndex: 0,
+    currentTaskId: null,
     toolStartTimes: new Map(),
     currentStep: 1,
     suppressStepCompletion: true,
@@ -89,20 +99,23 @@ export function createFormatterState(): FormatterState {
     stats: createRunStats(),
     runStats: createRunStats(),
     stepStartTime: null,
-    taskStats: null,
-    taskStartTime: null,
+    taskStatsMap: new Map(),
+    taskStartTimes: new Map(),
   };
 }
 
 export function resetFormatterState(state: FormatterState): void {
   state.pendingTools = [];
   state.lastToolTime = null;
-  state.activeTask = null;
+  state.activeTasks.clear();
+  state.toolToTaskId.clear();
+  state.nextLabelIndex = 0;
+  state.currentTaskId = null;
   state.toolStartTimes.clear();
   resetRunStats(state.stats);
   state.stepStartTime = null;
-  state.taskStats = null;
-  state.taskStartTime = null;
+  state.taskStatsMap.clear();
+  state.taskStartTimes.clear();
   // Note: runStats is NOT reset - it accumulates across steps
 }
 
@@ -147,6 +160,26 @@ function filterNoiseLines(text: string): string {
 }
 
 /**
+ * Get task label for a tool, or empty string if not in a task
+ */
+/**
+ * Get task label for a tool, or empty string if not in a task
+ */
+function getToolTaskLabel(toolId: string, state: FormatterState): string {
+  const taskId = state.toolToTaskId.get(toolId);
+  if (!taskId) return '';
+  const task = state.activeTasks.get(taskId);
+  return task?.label ?? '';
+}
+
+/**
+ * Format a task label with color
+ */
+function formatTaskLabel(label: string): string {
+  return `${colors.magenta}${label}${colors.reset}`;
+}
+
+/**
  * Format a single tool use for display
  */
 function formatToolUse(
@@ -154,10 +187,12 @@ function formatToolUse(
   indented: boolean,
   state: FormatterState
 ): void {
-  const inTask = state.activeTask !== null;
+  const taskLabel = getToolTaskLabel(tool.id, state);
+  const inTask = taskLabel !== '';
+  const labelPrefix = inTask ? `│${formatTaskLabel(taskLabel)} ` : '';
   const prefix = indented
-    ? `${timestampPrefix()}${inTask ? '│ ' : ' '} → `
-    : `${timestampPrefix()}${inTask ? '│ ' : ''}`;
+    ? `${timestampPrefix()}${labelPrefix} → `
+    : `${timestampPrefix()}${labelPrefix}`;
   const name = tool.name;
   const input = tool.input;
 
@@ -176,10 +211,10 @@ function formatToolUse(
     summary = truncate(cmd, TRUNCATE_BASH_CMD);
   } else if (name === 'Task') {
     // Task state already initialized in pre-scan, just print header
-    const task = state.activeTask;
+    const task = state.activeTasks.get(tool.id);
     if (task) {
       terminalLog(
-        `${timestampPrefix()}${colors.yellow}[${task.name}]${colors.reset} ${task.description}`
+        `${timestampPrefix()}${colors.yellow}[${task.name}]${colors.reset} ${formatTaskLabel(task.label)}: ${task.description}`
       );
     }
     return;
@@ -239,8 +274,9 @@ function printToolResult(
     return;
   }
 
-  const inTask = state.activeTask !== null;
-  const indent = inTask ? '│' : '';
+  // Get task label for this tool's result
+  const taskLabel = getToolTaskLabel(result.tool_use_id, state);
+  const indent = taskLabel ? `│${formatTaskLabel(taskLabel)}` : '';
 
   if (verbosity === 'normal') {
     // In normal mode, suppress per-tool timing
@@ -271,37 +307,45 @@ function printToolResult(
 }
 
 /**
- * Print a task result
+ * Print a task result and clean up task state
  */
 function printTaskResult(
-  _result: ToolResultBlock,
-  _durationStr: string,
+  taskId: string,
   _verbosity: Verbosity,
   state: FormatterState
 ): void {
+  const task = state.activeTasks.get(taskId);
+  if (!task) return;
+
   // Calculate task duration and format stats summary
-  const taskDuration = state.taskStartTime
-    ? Date.now() - state.taskStartTime
-    : 0;
-  const statsSummary = state.taskStats
-    ? formatStatsSummary(state.taskStats, taskDuration)
+  const taskStartTime = state.taskStartTimes.get(taskId);
+  const taskDuration = taskStartTime ? Date.now() - taskStartTime : 0;
+  const taskStats = state.taskStatsMap.get(taskId);
+  const statsSummary = taskStats
+    ? formatStatsSummary(taskStats, taskDuration)
     : formatDuration(taskDuration);
 
-  // Print task completion with stats
-  const taskName = state.activeTask?.name ?? 'task';
+  // Print task completion with label
   terminalLog(
-    `${timestampPrefix()}└─${colors.yellow}[${taskName}]${colors.reset} Complete: ${statsSummary}`
+    `${timestampPrefix()}└─${formatTaskLabel(task.label)} ${colors.yellow}[${task.name}]${colors.reset} Complete: ${statsSummary}`
   );
 
   // Merge task stats into step stats before clearing
-  if (state.taskStats) {
-    mergeStats(state.stats, state.taskStats);
+  if (taskStats) {
+    mergeStats(state.stats, taskStats);
   }
 
-  // Clear active task and stats
-  state.activeTask = null;
-  state.taskStats = null;
-  state.taskStartTime = null;
+  // Clean up this task's state
+  state.activeTasks.delete(taskId);
+  state.taskStatsMap.delete(taskId);
+  state.taskStartTimes.delete(taskId);
+
+  // Update currentTaskId if this was the current task
+  if (state.currentTaskId === taskId) {
+    // Set to another active task if any, otherwise null
+    const remaining = Array.from(state.activeTasks.keys());
+    state.currentTaskId = remaining.length > 0 ? (remaining[0] ?? null) : null;
+  }
 }
 
 /**
@@ -322,7 +366,7 @@ export function formatMessage(
   } else if (isAssistantMessage(msg)) {
     flushPendingTools(state, verbosity);
 
-    // Check for Task tool first to initialize taskStats before tracking
+    // Check for Task tools first to initialize task tracking
     for (const block of msg.message.content) {
       if (isToolUseBlock(block) && block.name === 'Task') {
         const input = block.input;
@@ -334,19 +378,28 @@ export function formatMessage(
             '',
           TRUNCATE_TASK_DESC
         );
-        state.activeTask = {
+        // Generate label (A, B, C, ...)
+        const label = String.fromCharCode(65 + state.nextLabelIndex);
+        state.nextLabelIndex++;
+
+        const task: ActiveTask = {
           name: taskType,
           description: taskDesc,
           id: block.id,
+          label,
         };
-        state.taskStats = createRunStats();
-        state.taskStartTime = Date.now();
-        break;
+        state.activeTasks.set(block.id, task);
+        state.taskStatsMap.set(block.id, createRunStats());
+        state.taskStartTimes.set(block.id, Date.now());
+        state.currentTaskId = block.id;
       }
     }
 
-    // Track message and token usage in stats
-    const stats = state.taskStats ?? state.stats;
+    // Track message and token usage in stats (use current task's stats if in a task)
+    const currentTaskStats = state.currentTaskId
+      ? state.taskStatsMap.get(state.currentTaskId)
+      : null;
+    const stats = currentTaskStats ?? state.stats;
     incrementMessageCount(stats);
     if (msg.message.usage) {
       updateTokenStats(stats, msg.message.usage);
@@ -377,8 +430,16 @@ export function formatMessage(
         const now = Date.now();
         // Record start time
         state.toolStartTimes.set(block.id, now);
-        // Track tool use in stats (skip Task - it's the container, not a tool within)
-        if (block.name !== 'Task') {
+
+        // Attribute non-Task tools to the current task
+        if (block.name !== 'Task' && state.currentTaskId) {
+          state.toolToTaskId.set(block.id, state.currentTaskId);
+          // Track tool use in current task's stats
+          const taskStats = state.taskStatsMap.get(state.currentTaskId);
+          if (taskStats) {
+            recordToolUse(taskStats, block.name);
+          }
+        } else if (block.name !== 'Task') {
           recordToolUse(stats, block.name);
         }
 
@@ -409,8 +470,10 @@ export function formatMessage(
 
     // Track usage from task results (tool_use_result has aggregated stats)
     if (msg.tool_use_result?.usage) {
-      const stats = state.taskStats ?? state.stats;
-      updateTokenStats(stats, msg.tool_use_result.usage);
+      const taskStats = state.currentTaskId
+        ? state.taskStatsMap.get(state.currentTaskId)
+        : null;
+      updateTokenStats(taskStats ?? state.stats, msg.tool_use_result.usage);
     }
 
     for (const block of msg.message.content) {
@@ -437,16 +500,16 @@ export function formatMessage(
           content.startsWith('error:');
 
         if (isError) {
-          const inTask = state.activeTask !== null;
-          const indent = inTask ? '│' : '';
+          const taskLabel = getToolTaskLabel(toolUseId, state);
+          const indent = taskLabel ? `│${formatTaskLabel(taskLabel)}` : '';
           // Strip <tool_use_error> tags for cleaner display
           const cleanError = content.replace(/<\/?tool_use_error>/g, '').trim();
           terminalLog(
             `${timestampPrefix()}${indent} ${colors.red}ERROR: ${truncate(cleanError, TRUNCATE_ERROR)}${colors.reset}${durationStr}`
           );
-        } else if (state.activeTask?.id === toolUseId) {
+        } else if (state.activeTasks.has(toolUseId)) {
           // Task completing
-          printTaskResult(block, durationStr, verbosity, state);
+          printTaskResult(toolUseId, verbosity, state);
         } else {
           printToolResult(block, durationStr, verbosity, state);
         }
@@ -457,8 +520,10 @@ export function formatMessage(
 
     // Track usage from result message
     if (msg.usage) {
-      const stats = state.taskStats ?? state.stats;
-      updateTokenStats(stats, msg.usage);
+      const taskStats = state.currentTaskId
+        ? state.taskStatsMap.get(state.currentTaskId)
+        : null;
+      updateTokenStats(taskStats ?? state.stats, msg.usage);
     }
 
     state.lastStepDurationMs = msg.duration_ms ?? null;

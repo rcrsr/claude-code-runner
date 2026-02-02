@@ -38,7 +38,10 @@ export function createMockFormatterState(): FormatterState {
   return {
     pendingTools: [],
     lastToolTime: null,
-    activeTask: null,
+    activeTasks: new Map(),
+    toolToTaskId: new Map(),
+    nextLabelIndex: 0,
+    currentTaskId: null,
     toolStartTimes: new Map(),
     currentStep: 1,
     suppressStepCompletion: true,
@@ -46,8 +49,8 @@ export function createMockFormatterState(): FormatterState {
     stats: createRunStats(),
     runStats: createRunStats(),
     stepStartTime: null,
-    taskStats: null,
-    taskStartTime: null,
+    taskStatsMap: new Map(),
+    taskStartTimes: new Map(),
   };
 }
 

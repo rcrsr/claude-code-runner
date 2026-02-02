@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { AssistantMessage } from '../../src/types/claude.js';
 import {
   createFormatterState,
   flushPendingTools,
   formatMessage,
   resetFormatterState,
 } from '../../src/output/formatter.js';
+import type { AssistantMessage } from '../../src/types/claude.js';
 import {
   createMockFormatterState,
   createMockLogger,
@@ -28,9 +28,9 @@ describe('createFormatterState', () => {
     expect(state.lastToolTime).toBeNull();
   });
 
-  it('returns null activeTask', () => {
+  it('returns empty activeTasks map', () => {
     const state = createFormatterState();
-    expect(state.activeTask).toBeNull();
+    expect(state.activeTasks.size).toBe(0);
   });
 
   it('returns empty toolStartTimes map', () => {
@@ -58,13 +58,18 @@ describe('resetFormatterState', () => {
     expect(state.lastToolTime).toBeNull();
   });
 
-  it('resets activeTask to null', () => {
+  it('clears activeTasks map', () => {
     const state = createMockFormatterState();
-    state.activeTask = { name: 'test', description: 'test', id: 'task-1' };
+    state.activeTasks.set('task-1', {
+      name: 'test',
+      description: 'test',
+      id: 'task-1',
+      label: 'A',
+    });
 
     resetFormatterState(state);
 
-    expect(state.activeTask).toBeNull();
+    expect(state.activeTasks.size).toBe(0);
   });
 
   it('clears toolStartTimes map', () => {
@@ -474,7 +479,7 @@ describe('formatMessage', () => {
   });
 
   describe('Task tool handling', () => {
-    it('sets activeTask state for Task tool', () => {
+    it('adds task to activeTasks map with label', () => {
       const state = createMockFormatterState();
       const logger = createMockLogger();
       const msg = createToolUseMessage(
@@ -486,14 +491,16 @@ describe('formatMessage', () => {
       formatMessage(msg, state, 'normal', logger, 100);
       flushPendingTools(state, 'normal');
 
-      expect(state.activeTask).toEqual({
+      const task = state.activeTasks.get('task-1');
+      expect(task).toEqual({
         name: 'Explore',
         description: 'Find files',
         id: 'task-1',
+        label: 'A',
       });
     });
 
-    it('prints task header with box', () => {
+    it('prints task header with label', () => {
       const state = createMockFormatterState();
       const logger = createMockLogger();
       const msg = createToolUseMessage(
@@ -506,9 +513,196 @@ describe('formatMessage', () => {
       flushPendingTools(state, 'normal');
 
       const calls = consoleSpy.mock.calls.map((c) => c[0] as string);
-      const hasTaskHeader = calls.some((c) => c.includes('[Explore]'));
+      // Label has ANSI color codes: [35mA[0m:
+      const hasTaskHeader = calls.some(
+        (c) => c.includes('[Explore]') && /\x1b\[35mA\x1b\[0m:/.test(c)
+      );
 
       expect(hasTaskHeader).toBe(true);
+    });
+  });
+
+  describe('parallel task tracking', () => {
+    it('assigns sequential labels A, B, C to parallel tasks', () => {
+      const state = createMockFormatterState();
+      const logger = createMockLogger();
+
+      // First task
+      const msg1 = createToolUseMessage(
+        'Task',
+        { subagent_type: 'node-engineer', description: 'Add fields' },
+        'task-1'
+      );
+      formatMessage(msg1, state, 'normal', logger, 100);
+
+      // Second task
+      const msg2 = createToolUseMessage(
+        'Task',
+        { subagent_type: 'node-engineer', description: 'Create module' },
+        'task-2'
+      );
+      formatMessage(msg2, state, 'normal', logger, 100);
+
+      expect(state.activeTasks.get('task-1')?.label).toBe('A');
+      expect(state.activeTasks.get('task-2')?.label).toBe('B');
+      expect(state.nextLabelIndex).toBe(2);
+    });
+
+    it('attributes tool calls to current task', () => {
+      const state = createMockFormatterState();
+      const logger = createMockLogger();
+
+      // Start task A
+      const taskMsg = createToolUseMessage(
+        'Task',
+        { subagent_type: 'engineer', description: 'Task A' },
+        'task-1'
+      );
+      formatMessage(taskMsg, state, 'normal', logger, 100);
+
+      // Tool call while in task A
+      const toolMsg = createToolUseMessage(
+        'Read',
+        { file_path: '/test.ts' },
+        'tool-1'
+      );
+      formatMessage(toolMsg, state, 'normal', logger, 100);
+
+      expect(state.toolToTaskId.get('tool-1')).toBe('task-1');
+    });
+
+    it('prints tool prefix with task label', () => {
+      const state = createMockFormatterState();
+      const logger = createMockLogger();
+
+      // Start task A
+      const taskMsg = createToolUseMessage(
+        'Task',
+        { subagent_type: 'engineer', description: 'Task A' },
+        'task-1'
+      );
+      formatMessage(taskMsg, state, 'normal', logger, 100);
+      flushPendingTools(state, 'normal');
+
+      // Tool call while in task A
+      const toolMsg = createToolUseMessage(
+        'Read',
+        { file_path: '/test.ts' },
+        'tool-1'
+      );
+      formatMessage(toolMsg, state, 'normal', logger, 100);
+      flushPendingTools(state, 'normal');
+
+      const calls = consoleSpy.mock.calls.map((c) => c[0] as string);
+      const toolCall = calls.find((c) => c.includes('[Read]'));
+      // Label has ANSI color codes: │[35mA[0m
+      expect(toolCall).toMatch(/│\x1b\[35mA\x1b\[0m/);
+    });
+
+    it('removes task from activeTasks on completion', () => {
+      const state = createMockFormatterState();
+      const logger = createMockLogger();
+
+      // Start task
+      const taskMsg = createToolUseMessage(
+        'Task',
+        { subagent_type: 'engineer', description: 'Task A' },
+        'task-1'
+      );
+      formatMessage(taskMsg, state, 'normal', logger, 100);
+      flushPendingTools(state, 'normal');
+
+      expect(state.activeTasks.has('task-1')).toBe(true);
+
+      // Complete task
+      const resultMsg = createToolResultMessage('task-1', 'Task completed');
+      formatMessage(resultMsg, state, 'normal', logger, 100);
+
+      expect(state.activeTasks.has('task-1')).toBe(false);
+    });
+
+    it('prints task completion with label prefix', () => {
+      const state = createMockFormatterState();
+      const logger = createMockLogger();
+
+      // Start task
+      const taskMsg = createToolUseMessage(
+        'Task',
+        { subagent_type: 'engineer', description: 'Task A' },
+        'task-1'
+      );
+      formatMessage(taskMsg, state, 'normal', logger, 100);
+      flushPendingTools(state, 'normal');
+
+      // Complete task
+      const resultMsg = createToolResultMessage('task-1', 'Task completed');
+      formatMessage(resultMsg, state, 'normal', logger, 100);
+
+      const calls = consoleSpy.mock.calls.map((c) => c[0] as string);
+      const completionLine = calls.find((c) => c.includes('Complete:'));
+      // Label has ANSI color codes: └─[35mA[0m
+      expect(completionLine).toMatch(/└─\x1b\[35mA\x1b\[0m/);
+      expect(completionLine).toContain('[engineer]');
+    });
+
+    it('handles multiple parallel task completions', () => {
+      const state = createMockFormatterState();
+      const logger = createMockLogger();
+
+      // Start two tasks
+      formatMessage(
+        createToolUseMessage(
+          'Task',
+          { subagent_type: 'engineer', description: 'Task A' },
+          'task-1'
+        ),
+        state,
+        'normal',
+        logger,
+        100
+      );
+      formatMessage(
+        createToolUseMessage(
+          'Task',
+          { subagent_type: 'engineer', description: 'Task B' },
+          'task-2'
+        ),
+        state,
+        'normal',
+        logger,
+        100
+      );
+      flushPendingTools(state, 'normal');
+
+      expect(state.activeTasks.size).toBe(2);
+
+      // Complete task A
+      formatMessage(
+        createToolResultMessage('task-1', 'Done'),
+        state,
+        'normal',
+        logger,
+        100
+      );
+      expect(state.activeTasks.size).toBe(1);
+      expect(state.activeTasks.has('task-2')).toBe(true);
+
+      // Complete task B
+      formatMessage(
+        createToolResultMessage('task-2', 'Done'),
+        state,
+        'normal',
+        logger,
+        100
+      );
+      expect(state.activeTasks.size).toBe(0);
+
+      const calls = consoleSpy.mock.calls.map((c) => c[0] as string);
+      const completions = calls.filter((c) => c.includes('Complete:'));
+      expect(completions).toHaveLength(2);
+      // Labels have ANSI color codes: └─[35mA[0m and └─[35mB[0m
+      expect(completions[0]).toMatch(/└─\x1b\[35mA\x1b\[0m/);
+      expect(completions[1]).toMatch(/└─\x1b\[35mB\x1b\[0m/);
     });
   });
 });

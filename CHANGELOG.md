@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] — 2026-02-02
+
+### Added
+
+- Parallel task tracking with labels (A, B, C) for distinguishing concurrent subagent output
+- Task labels displayed in magenta color for visibility
+- Tool calls attributed to parent tasks with labeled prefixes (`│A`, `│B`)
+- Task completions show labeled prefixes (`└─A`, `└─B`)
+
+### Changed
+
+- `FormatterState` now tracks multiple active tasks via `activeTasks` Map
+- Task statistics tracked per-task via `taskStatsMap` and `taskStartTimes` Maps
+
 ## [0.9.0]
 
 ### Breaking
