@@ -220,17 +220,6 @@ export function createRunnerContext(
     },
 
     /**
-     * Stop execution with error
-     * Usage: ccr::error("validation failed")
-     */
-    'ccr::error': {
-      params: [{ name: 'message', type: 'string', defaultValue: 'Error' }],
-      fn: (args) => {
-        throw new Error(args[0] as string);
-      },
-    },
-
-    /**
      * Check if text contains a <ccr:result> tag
      * Usage: ccr::has_result(text) -> boolean
      */

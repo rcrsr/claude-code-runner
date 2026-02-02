@@ -253,16 +253,6 @@ describe('ccr::get_result', () => {
   });
 });
 
-describe('ccr::error', () => {
-  it('throws error with message', async () => {
-    const executor = createMockExecutor();
-
-    await expect(
-      runRill('ccr::error("validation failed")', executor)
-    ).rejects.toThrow('validation failed');
-  });
-});
-
 describe('ccr::has_result', () => {
   it('returns true for self-closing result tag', async () => {
     const executor = createMockExecutor();

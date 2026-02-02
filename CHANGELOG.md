@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0]
+
+### Breaking
+
+- Removed `ccr::error()` host function; use Rill's native `error` statement instead
+
+### Changed
+
+- Upgraded `@rcrsr/rill` from `~0.2.3` to `~0.4.4`
+- Documentation examples updated to use Rill dispatch for result handling
+
 ## [0.8.1]
 
 ### Changed

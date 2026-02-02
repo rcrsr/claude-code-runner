@@ -121,7 +121,6 @@ ccr::prompt("Summarize: Issues: {$issues} Fixes: {$fixes}")
 | `ccr::has_frontmatter(path)` | Check if file has frontmatter      |
 | `ccr::get_frontmatter(path)` | Parse YAML frontmatter             |
 | `ccr::file_exists(path)`     | Check if file exists               |
-| `ccr::error(message?)`       | Stop execution with error          |
 
 See [docs/rill-scripting.md](docs/rill-scripting.md) for the full scripting reference.
 
@@ -156,11 +155,15 @@ Results let Claude communicate control flow decisions back to your scripts using
 Result types are application-defined. Your script extracts and handles them:
 
 ```rill
-ccr::prompt("Fix bugs. Signal <ccr:result type='repeat'/> if more remain.") :> $result
-ccr::get_result($result) :> $result
+ccr::prompt("Fix bugs. Signal <ccr:result type='repeat'/> if more remain.") :> $output
+ccr::get_result($output) :> $result
 
-($result.type == "repeat") ? log("More work needed")
-($result.type == "blocked") ? ccr::error($result.reason)
+# Dispatch on result type
+$result.type -> [
+  repeat: log("More work needed"),
+  blocked: error $result.reason,
+  done: log("Complete")
+]
 ```
 
 See [docs/results.md](docs/results.md) for workflow patterns.

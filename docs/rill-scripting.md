@@ -75,11 +75,9 @@ Check if text contains a `<ccr:result>` tag (self-closing or with content).
 ```rill
 ccr::prompt("Fix issues. Output <ccr:result type='repeat'/> if more remain.") :> $output
 
-# Branch based on whether result exists
-ccr::has_result($output) ? {
-  ccr::get_result($output) :> $result
-  ($result.type == "repeat") ? log("More work needed")
-} ! log("No result signal found")
+# Dispatch on result type
+ccr::get_result($output) :> $result
+$result.type -> [repeat: log("More work needed")] ?? log("No signal")
 ```
 
 ### ccr::get_result(text) -> dict | {}
@@ -90,11 +88,12 @@ Extract an XML result from text. Returns empty dict `{}` if no result found. See
 ccr::prompt("Fix issues. Output <ccr:result type='repeat'/> if more remain.") :> $output
 ccr::get_result($output) :> $result
 
-# Check result type
-($result.?type) ? {
-  ($result.type == "repeat") ? log("More work needed")
-  ($result.type == "blocked") ? ccr::error($result.reason)
-}
+# Dispatch on result type
+$result.type -> [
+  repeat: log("More work needed"),
+  blocked: error $result.reason,
+  done: log("Complete")
+]
 ```
 
 ### ccr::has_frontmatter(path) -> boolean
@@ -106,14 +105,6 @@ ccr::has_frontmatter("PLAN.md") ? {
   ccr::get_frontmatter("PLAN.md") :> $meta
   log("Found metadata: {$meta}")
 } ! log("No frontmatter in PLAN.md")
-```
-
-### ccr::error(message?) -> throws
-
-Stop script execution with an error.
-
-```rill
-ccr::error("Missing required configuration")
 ```
 
 ### ccr::get_frontmatter(path) -> dict
@@ -182,6 +173,8 @@ For each fix, explain the reasoning.
 
 ## Control Flow
 
+### Conditionals
+
 Rill uses `cond ? then_expr ! else_expr` for conditionals:
 
 ```rill
@@ -189,15 +182,30 @@ Rill uses `cond ? then_expr ! else_expr` for conditionals:
 ccr::file_exists("config.ts") ? ccr::prompt("Config found, validate it")
 
 # With else branch
-($count > 10) ? ccr::error("Too many items") ! log("Count OK")
+($count > 10) ? error "Too many items" ! log("Count OK")
+```
 
-# Check signal and branch
-ccr::get_result($output) :> $result
-($result.?type) ? {
-  ($result.type == "repeat") ? log("Continuing...")
-  ($result.type == "blocked") ? ccr::error($result.reason)
-  ($result.type == "done") ? log("Complete")
-}
+### Dispatch (Pattern Matching)
+
+Dispatch matches a value against dict keys—ideal for result handling:
+
+```rill
+# Match result type to action
+$result.type -> [
+  repeat: log("Continuing..."),
+  blocked: error $result.reason,
+  done: log("Complete")
+]
+
+# With default for unmatched values
+$method -> [GET: "read", POST: "write"] ?? "unknown"
+
+# Multi-key matching
+$status -> [
+  [200, 201]: "success",
+  [400, 404]: "client error",
+  [500, 503]: "server error"
+]
 ```
 
 ## Complete Example

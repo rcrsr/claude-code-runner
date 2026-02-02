@@ -28,7 +28,6 @@ npm run build           # Compile TypeScript
 - `ccr::get_frontmatter(path)` → Parse YAML frontmatter
 - `ccr::has_frontmatter(path)` → Check if file has frontmatter
 - `ccr::has_result(text)` → Check if text contains ccr:result
-- `ccr::error(message?)` → Stop with error
 
 **Script variables**: `$1`, `$2` (args), `$ARGUMENTS` (all args), `$varname` (captures via `:> $varname`)
 

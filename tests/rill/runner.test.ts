@@ -385,7 +385,7 @@ this is not valid {{ syntax`
 
   it('returns success false on runtime error', async () => {
     const scriptPath = path.join(testDir, 'error.rill');
-    fs.writeFileSync(scriptPath, 'ccr::error("something went wrong")');
+    fs.writeFileSync(scriptPath, 'error "something went wrong"');
 
     const result = await runRillScript(createRunnerOptions(scriptPath));
 

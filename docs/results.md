@@ -45,14 +45,16 @@ For `<ccr:result type="blocked" reason="auth">Need API key</ccr:result>`:
 
 ### Handling Results
 
+Use dispatch to match result types to actions:
+
 ```rill
 ccr::get_result($output) :> $result
 
-($result.?type) ? {
-  ($result.type == "repeat") ? log("More work needed")
-  ($result.type == "blocked") ? ccr::error($result.reason)
-  ($result.type == "done") ? log("Completed: {$result.summary}")
-}
+$result.type -> [
+  repeat: log("More work needed"),
+  blocked: error $result.reason,
+  done: log("Completed: {$result.summary}")
+]
 ```
 
 ## Workflow Patterns
@@ -122,7 +124,7 @@ Output <ccr:result type="repeat"/> if more issues remain.
 -> ccr::prompt :> $output
 
 ccr::get_result($output) :> $result
-($result.type == "repeat") ? log("More issues to fix")
+$result.type -> [repeat: log("More issues to fix")]
 
 # Phase 3: Verification
 ccr::prompt("Run tests to verify fixes")
@@ -144,8 +146,10 @@ If blocked by other issues, output <ccr:result type="blocked" reason="...">Detai
 
 ccr::get_result($output) :> $result
 
-($result.type == "blocked")
-  ? ccr::error("Blocked: {$result.reason} - {$result.content}")
+$result.type -> [
+  done: log("Deployment complete"),
+  blocked: error "Blocked: {$result.reason} - {$result.content}"
+]
 ```
 
 ## Prompt Engineering Tips

@@ -105,14 +105,14 @@ Run the test suite for $1.
 Script using the command:
 
 ```rill
-ccr::command("fix-tests", ["src/"]) :> $result
-ccr::get_result($result) :> $result
+ccr::command("fix-tests", ["src/"]) :> $output
+ccr::get_result($output) :> $result
 
-($result.?type) ? {
-  ($result.type == "repeat") ? log("More fixes needed")
-  ($result.type == "blocked") ? ccr::error($result.reason)
-  ($result.type == "done") ? log("All tests passing")
-}
+$result.type -> [
+  repeat: log("More fixes needed"),
+  blocked: error $result.reason,
+  done: log("All tests passing")
+]
 ```
 
 ## Checklist-Driven Implementation
@@ -229,7 +229,7 @@ If clean: output <ccr:result type="done"/>
 
 ccr::get_result($result) :> $result
 
-($result.type == "repeat") ? log("More lint errors to fix")
+$result.type -> [repeat: log("More lint errors to fix")]
 ```
 
 ## Conditional Execution
@@ -244,7 +244,7 @@ ccr::file_exists("package.json")
   ? ccr::prompt("Check dependencies for security issues")
 
 (!ccr::file_exists($1))
-  ? ccr::error("File not found: {$1}")
+  ? error "File not found: {$1}"
 ```
 
 ## Reading Metadata
