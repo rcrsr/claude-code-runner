@@ -28,7 +28,6 @@ import {
   TRUNCATE_TASK_DESC,
   TRUNCATE_TOOL_JSON,
   TRUNCATE_VERBOSE_LINE,
-  UI_MIN_TERMINAL_WIDTH,
 } from '../utils/constants.js';
 import {
   colors,
@@ -52,12 +51,6 @@ import {
   type RunStats,
   updateTokenStats,
 } from './stats.js';
-import {
-  completeAgent,
-  recordToolCall,
-  registerAgent,
-  type UIState,
-} from './ui-state.js';
 
 /**
  * State for tracking parallel tool calls and active tasks
@@ -164,32 +157,6 @@ function filterNoiseLines(text: string): string {
     .split('\n')
     .filter((line) => !isNoise(line))
     .join('\n');
-}
-
-/**
- * Check if UI rendering should be active
- * Activation conditions:
- * - Verbosity is 'normal' or 'verbose'
- * - Terminal supports 256 colors (basic check via TERM env var)
- * - Terminal width >= 70
- */
-function shouldUseUI(verbosity: Verbosity): boolean {
-  // Check verbosity
-  if (verbosity === 'quiet') {
-    return false;
-  }
-
-  // Check terminal width
-  if (process.stdout.columns < UI_MIN_TERMINAL_WIDTH) {
-    return false;
-  }
-
-  // Check for color support (basic check via TERM environment variable)
-  const term = process.env['TERM'] ?? '';
-  const hasColorSupport =
-    term.includes('256color') || term.includes('xterm') || term === 'screen';
-
-  return hasColorSupport;
 }
 
 /**
@@ -344,9 +311,8 @@ function printToolResult(
  */
 function printTaskResult(
   taskId: string,
-  verbosity: Verbosity,
-  state: FormatterState,
-  uiState?: UIState
+  _verbosity: Verbosity,
+  state: FormatterState
 ): void {
   const task = state.activeTasks.get(taskId);
   if (!task) return;
@@ -367,15 +333,6 @@ function printTaskResult(
   // Merge task stats into step stats before clearing
   if (taskStats) {
     mergeStats(state.stats, taskStats);
-  }
-
-  // UI Integration: Mark agent complete
-  if (uiState && shouldUseUI(verbosity)) {
-    try {
-      completeAgent(uiState, taskId);
-    } catch {
-      // Fall back silently if UI completion fails
-    }
   }
 
   // Clean up this task's state
@@ -400,8 +357,7 @@ export function formatMessage(
   state: FormatterState,
   verbosity: Verbosity,
   _logger: Logger, // Reserved for future verbose logging
-  parallelThresholdMs: number,
-  uiState?: UIState
+  parallelThresholdMs: number
 ): string {
   let claudeText = '';
 
@@ -436,16 +392,6 @@ export function formatMessage(
         state.taskStatsMap.set(block.id, createRunStats());
         state.taskStartTimes.set(block.id, Date.now());
         state.currentTaskId = block.id;
-
-        // UI Integration: Register agent when Task tool detected
-        if (uiState && shouldUseUI(verbosity)) {
-          try {
-            registerAgent(uiState, task, taskDesc);
-          } catch {
-            // Fall back silently if UI registration fails (e.g., too many agents)
-            // Formatter continues with existing display
-          }
-        }
       }
     }
 
@@ -492,24 +438,6 @@ export function formatMessage(
           const taskStats = state.taskStatsMap.get(state.currentTaskId);
           if (taskStats) {
             recordToolUse(taskStats, block.name);
-          }
-
-          // UI Integration: Record tool call for current agent
-          if (uiState && shouldUseUI(verbosity)) {
-            try {
-              const toolArgs = truncate(
-                JSON.stringify(block.input),
-                TRUNCATE_TOOL_JSON
-              );
-              recordToolCall(
-                uiState,
-                state.currentTaskId,
-                block.name,
-                toolArgs
-              );
-            } catch {
-              // Fall back silently if UI recording fails
-            }
           }
         } else if (block.name !== 'Task') {
           recordToolUse(stats, block.name);
@@ -581,7 +509,7 @@ export function formatMessage(
           );
         } else if (state.activeTasks.has(toolUseId)) {
           // Task completing
-          printTaskResult(toolUseId, verbosity, state, uiState);
+          printTaskResult(toolUseId, verbosity, state);
         } else {
           printToolResult(block, durationStr, verbosity, state);
         }

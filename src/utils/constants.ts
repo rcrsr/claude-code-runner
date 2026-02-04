@@ -61,23 +61,3 @@ export const CCR_RESULT_SELF_CLOSING_PATTERN = /<ccr:result\s+([^>]*?)\/>/;
 /** Regex pattern for ccr:result tags with content */
 export const CCR_RESULT_WITH_CONTENT_PATTERN =
   /<ccr:result\s+([^>]*)>([\s\S]*?)<\/ccr:result>/;
-
-// === UI Rendering ===
-/** Maximum concurrent agents to display */
-export const UI_MAX_AGENTS = 10;
-/** Maximum log entries visible during execution */
-export const UI_MAX_VISIBLE_LOG = 10;
-/** Maximum tool calls visible per agent box */
-export const UI_MAX_VISIBLE_TOOLS = 5;
-/** Render interval in milliseconds (60fps) */
-export const UI_RENDER_INTERVAL_MS = 16;
-/** Spinner animation interval in milliseconds (every 6 frames at 60fps) */
-export const UI_SPINNER_INTERVAL_MS = 96;
-/** Minimum terminal width required */
-export const UI_MIN_TERMINAL_WIDTH = 70;
-/** Minimum box width for agent display */
-export const UI_MIN_BOX_WIDTH = 30;
-/** Maximum description text length before truncation */
-export const UI_MAX_DESCRIPTION_LENGTH = 40;
-/** Maximum tool arguments length before truncation */
-export const UI_MAX_TOOL_ARGS_LENGTH = 100;
