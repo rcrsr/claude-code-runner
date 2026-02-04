@@ -429,8 +429,13 @@ export function formatMessage(
         // Record start time
         state.toolStartTimes.set(block.id, now);
 
-        // Attribute non-Task tools to the current task
-        if (block.name !== 'Task' && state.currentTaskId) {
+        // Attribute non-Task tools to task only when exactly one task is active
+        // (with multiple concurrent tasks, we can't determine which spawned the tool)
+        if (
+          block.name !== 'Task' &&
+          state.activeTasks.size === 1 &&
+          state.currentTaskId
+        ) {
           state.toolToTaskId.set(block.id, state.currentTaskId);
           // Track tool use in current task's stats
           const taskStats = state.taskStatsMap.get(state.currentTaskId);
@@ -504,7 +509,7 @@ export function formatMessage(
           // Strip <tool_use_error> tags for cleaner display
           const cleanError = content.replace(/<\/?tool_use_error>/g, '').trim();
           terminalLog(
-            `${timestampPrefix()}${indent}${colors.red}ERROR: ${truncate(cleanError, TRUNCATE_ERROR)}${colors.reset}${durationStr}`
+            `${timestampPrefix()}${indent}${colors.red}[error]${colors.reset} ${truncate(cleanError, TRUNCATE_ERROR)}`
           );
         } else if (state.activeTasks.has(toolUseId)) {
           // Task completing

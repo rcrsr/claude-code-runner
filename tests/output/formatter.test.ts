@@ -348,7 +348,7 @@ describe('formatMessage', () => {
       expect(state.pendingTools).toEqual([]);
     });
 
-    it('prints error results with ERROR prefix', () => {
+    it('prints error results with [error] prefix', () => {
       const state = createMockFormatterState();
       const logger = createMockLogger();
       const msg = createToolResultMessage('tool-1', 'Error: file not found');
@@ -356,7 +356,7 @@ describe('formatMessage', () => {
       formatMessage(msg, state, 'normal', logger, 100);
 
       const output = consoleSpy.mock.calls[0]?.[0] as string;
-      expect(output).toContain('ERROR');
+      expect(output).toContain('[error]');
     });
 
     it('detects tool_use_error prefix', () => {
@@ -370,7 +370,7 @@ describe('formatMessage', () => {
       formatMessage(msg, state, 'normal', logger, 100);
 
       const output = consoleSpy.mock.calls[0]?.[0] as string;
-      expect(output).toContain('ERROR');
+      expect(output).toContain('[error]');
     });
   });
 
