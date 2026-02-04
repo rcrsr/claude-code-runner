@@ -17,6 +17,12 @@ import {
   createToolUseMessage,
 } from '../helpers/mocks.js';
 
+/** Strip ANSI escape codes from a string */
+function stripAnsi(str: string): string {
+  // eslint-disable-next-line no-control-regex
+  return str.replace(/\x1b\[[0-9;]*m/g, '');
+}
+
 describe('createFormatterState', () => {
   it('returns empty pendingTools array', () => {
     const state = createFormatterState();
@@ -64,7 +70,7 @@ describe('resetFormatterState', () => {
       name: 'test',
       description: 'test',
       id: 'task-1',
-      label: 'A',
+      colorIndex: 0,
     });
 
     resetFormatterState(state);
@@ -83,14 +89,14 @@ describe('resetFormatterState', () => {
 });
 
 describe('flushPendingTools', () => {
-  let consoleSpy: ReturnType<typeof vi.spyOn>;
+  let consoleSpy: ReturnType<typeof vi.spyOn<typeof console, 'log'>>;
 
   beforeEach(() => {
     consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
-    consoleSpy.mockRestore();
+    vi.restoreAllMocks();
   });
 
   it('does nothing when no pending tools', () => {
@@ -217,7 +223,7 @@ describe('flushPendingTools', () => {
 });
 
 describe('formatMessage', () => {
-  let consoleSpy: ReturnType<typeof vi.spyOn>;
+  let consoleSpy: ReturnType<typeof vi.spyOn<typeof console, 'log'>>;
   let mockTime: number;
 
   beforeEach(() => {
@@ -227,7 +233,6 @@ describe('formatMessage', () => {
   });
 
   afterEach(() => {
-    consoleSpy.mockRestore();
     vi.restoreAllMocks();
   });
 
@@ -496,7 +501,7 @@ describe('formatMessage', () => {
         name: 'Explore',
         description: 'Find files',
         id: 'task-1',
-        label: 'A',
+        colorIndex: 0,
       });
     });
 
@@ -512,10 +517,10 @@ describe('formatMessage', () => {
       formatMessage(msg, state, 'normal', logger, 100);
       flushPendingTools(state, 'normal');
 
-      const calls = consoleSpy.mock.calls.map((c) => c[0] as string);
-      // Label has ANSI color codes: [35mA[0m:
+      const calls = consoleSpy.mock.calls.map((c) => stripAnsi(c[0] as string));
+      // Check task header contains marker and [Explore]
       const hasTaskHeader = calls.some(
-        (c) => c.includes('[Explore]') && /\x1b\[35mA\x1b\[0m:/.test(c)
+        (c) => c.includes('[Explore]') && c.includes('●')
       );
 
       expect(hasTaskHeader).toBe(true);
@@ -543,8 +548,8 @@ describe('formatMessage', () => {
       );
       formatMessage(msg2, state, 'normal', logger, 100);
 
-      expect(state.activeTasks.get('task-1')?.label).toBe('A');
-      expect(state.activeTasks.get('task-2')?.label).toBe('B');
+      expect(state.activeTasks.get('task-1')?.colorIndex).toBe(0);
+      expect(state.activeTasks.get('task-2')?.colorIndex).toBe(1);
       expect(state.nextLabelIndex).toBe(2);
     });
 
@@ -593,10 +598,10 @@ describe('formatMessage', () => {
       formatMessage(toolMsg, state, 'normal', logger, 100);
       flushPendingTools(state, 'normal');
 
-      const calls = consoleSpy.mock.calls.map((c) => c[0] as string);
+      const calls = consoleSpy.mock.calls.map((c) => stripAnsi(c[0] as string));
       const toolCall = calls.find((c) => c.includes('[Read]'));
-      // Label has ANSI color codes: │[35mA[0m
-      expect(toolCall).toMatch(/│\x1b\[35mA\x1b\[0m/);
+      // Check tool call has marker
+      expect(toolCall).toContain('●');
     });
 
     it('removes task from activeTasks on completion', () => {
@@ -638,10 +643,10 @@ describe('formatMessage', () => {
       const resultMsg = createToolResultMessage('task-1', 'Task completed');
       formatMessage(resultMsg, state, 'normal', logger, 100);
 
-      const calls = consoleSpy.mock.calls.map((c) => c[0] as string);
-      const completionLine = calls.find((c) => c.includes('Complete:'));
-      // Label has ANSI color codes: └─[35mA[0m
-      expect(completionLine).toMatch(/└─\x1b\[35mA\x1b\[0m/);
+      const calls = consoleSpy.mock.calls.map((c) => stripAnsi(c[0] as string));
+      const completionLine = calls.find((c) => c.includes('Complete'));
+      // Check completion has marker and type
+      expect(completionLine).toContain('●');
       expect(completionLine).toContain('[engineer]');
     });
 
@@ -697,12 +702,12 @@ describe('formatMessage', () => {
       );
       expect(state.activeTasks.size).toBe(0);
 
-      const calls = consoleSpy.mock.calls.map((c) => c[0] as string);
-      const completions = calls.filter((c) => c.includes('Complete:'));
+      const calls = consoleSpy.mock.calls.map((c) => stripAnsi(c[0] as string));
+      const completions = calls.filter((c) => c.includes('Complete'));
       expect(completions).toHaveLength(2);
-      // Labels have ANSI color codes: └─[35mA[0m and └─[35mB[0m
-      expect(completions[0]).toMatch(/└─\x1b\[35mA\x1b\[0m/);
-      expect(completions[1]).toMatch(/└─\x1b\[35mB\x1b\[0m/);
+      // Check both completions have markers
+      expect(completions[0]).toContain('●');
+      expect(completions[1]).toContain('●');
     });
   });
 });

@@ -4,9 +4,14 @@
  * Shows intermediate tool calls and responses in real-time
  */
 
+import { VERSION as RILL_VERSION } from '@rcrsr/rill';
 import { randomBytes } from 'crypto';
+import { createRequire } from 'module';
 
 import { parseArgs } from './cli/args.js';
+
+const require = createRequire(import.meta.url);
+const pkg = require('../package.json') as { version: string };
 import { createDeadDropClientFromEnv } from './deaddrop/index.js';
 import {
   configureDeadDrop,
@@ -67,7 +72,10 @@ async function main(): Promise<void> {
   // Create formatter state
   const formatterState = createFormatterState();
 
-  // Emit starting run message first (operational, sent to deaddrop)
+  // Print version info
+  printRunnerInfo(`v${pkg.version} (rill v${RILL_VERSION})`);
+
+  // Emit starting run message (operational, sent to deaddrop)
   printRunner(`Starting run ${runId}`);
 
   // Print config with [RUNNER] messages (informational, not sent to deaddrop)

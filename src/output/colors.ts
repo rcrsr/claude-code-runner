@@ -26,6 +26,30 @@ export const colors = {
 export type ColorName = keyof typeof colors;
 
 /**
+ * Background colors for agent markers (8 distinct colors)
+ * Uses bright background colors (100-107) for better visibility
+ */
+const AGENT_BG_COLORS = [
+  '\x1b[106m', // bright cyan
+  '\x1b[103m', // bright yellow
+  '\x1b[102m', // bright green
+  '\x1b[105m', // bright magenta
+  '\x1b[104m', // bright blue
+  '\x1b[101m', // bright red
+  '\x1b[107m', // bright white
+  '\x1b[100m', // bright black (gray)
+] as const;
+
+/**
+ * Get an agent marker: inverted dot with cycling background color
+ * @param index - Agent index (0-based), cycles through 8 colors
+ */
+export function agentMarker(index: number): string {
+  const bg = AGENT_BG_COLORS[index % AGENT_BG_COLORS.length];
+  return `${bg}\x1b[30m●${colors.reset}`;
+}
+
+/**
  * Strip ANSI escape codes from a string
  */
 // eslint-disable-next-line no-control-regex -- ANSI escape codes require control characters

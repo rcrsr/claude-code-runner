@@ -30,6 +30,7 @@ import {
   TRUNCATE_VERBOSE_LINE,
 } from '../utils/constants.js';
 import {
+  agentMarker,
   colors,
   formatDuration,
   printClaude,
@@ -160,23 +161,20 @@ function filterNoiseLines(text: string): string {
 }
 
 /**
- * Get task label for a tool, or empty string if not in a task
+ * Get task color index for a tool, or -1 if not in a task
  */
-/**
- * Get task label for a tool, or empty string if not in a task
- */
-function getToolTaskLabel(toolId: string, state: FormatterState): string {
+function getToolTaskColorIndex(toolId: string, state: FormatterState): number {
   const taskId = state.toolToTaskId.get(toolId);
-  if (!taskId) return '';
+  if (!taskId) return -1;
   const task = state.activeTasks.get(taskId);
-  return task?.label ?? '';
+  return task?.colorIndex ?? -1;
 }
 
 /**
- * Format a task label with color
+ * Format a task marker (colored dot)
  */
-function formatTaskLabel(label: string): string {
-  return `${colors.magenta}${label}${colors.reset}`;
+function formatTaskMarker(colorIndex: number): string {
+  return agentMarker(colorIndex);
 }
 
 /**
@@ -187,9 +185,9 @@ function formatToolUse(
   indented: boolean,
   state: FormatterState
 ): void {
-  const taskLabel = getToolTaskLabel(tool.id, state);
-  const inTask = taskLabel !== '';
-  const labelPrefix = inTask ? `│${formatTaskLabel(taskLabel)} ` : '';
+  const colorIndex = getToolTaskColorIndex(tool.id, state);
+  const inTask = colorIndex >= 0;
+  const labelPrefix = inTask ? `${formatTaskMarker(colorIndex)} ` : '';
   const prefix = indented
     ? `${timestampPrefix()}${labelPrefix} → `
     : `${timestampPrefix()}${labelPrefix}`;
@@ -214,7 +212,7 @@ function formatToolUse(
     const task = state.activeTasks.get(tool.id);
     if (task) {
       terminalLog(
-        `${timestampPrefix()}${colors.yellow}[${task.name}]${colors.reset} ${formatTaskLabel(task.label)}: ${task.description}`
+        `${timestampPrefix()}${formatTaskMarker(task.colorIndex)} ${colors.yellow}[${task.name}]${colors.reset} ${task.description}`
       );
     }
     return;
@@ -274,9 +272,9 @@ function printToolResult(
     return;
   }
 
-  // Get task label for this tool's result
-  const taskLabel = getToolTaskLabel(result.tool_use_id, state);
-  const indent = taskLabel ? `│${formatTaskLabel(taskLabel)}` : '';
+  // Get task marker for this tool's result
+  const colorIndex = getToolTaskColorIndex(result.tool_use_id, state);
+  const indent = colorIndex >= 0 ? `${formatTaskMarker(colorIndex)} ` : '';
 
   if (verbosity === 'normal') {
     // In normal mode, suppress per-tool timing
@@ -325,9 +323,9 @@ function printTaskResult(
     ? formatStatsSummary(taskStats, taskDuration)
     : formatDuration(taskDuration);
 
-  // Print task completion with label
+  // Print task completion with marker
   terminalLog(
-    `${timestampPrefix()}└─${formatTaskLabel(task.label)} ${colors.yellow}[${task.name}]${colors.reset} Complete: ${statsSummary}`
+    `${timestampPrefix()}${formatTaskMarker(task.colorIndex)} ${colors.yellow}[${task.name}]${colors.reset} Complete ${statsSummary}`
   );
 
   // Merge task stats into step stats before clearing
@@ -378,15 +376,15 @@ export function formatMessage(
             '',
           TRUNCATE_TASK_DESC
         );
-        // Generate label (A, B, C, ...)
-        const label = String.fromCharCode(65 + state.nextLabelIndex);
+        // Assign color index (cycles through 8 colors)
+        const colorIndex = state.nextLabelIndex;
         state.nextLabelIndex++;
 
         const task: ActiveTask = {
           name: taskType,
           description: taskDesc,
           id: block.id,
-          label,
+          colorIndex,
         };
         state.activeTasks.set(block.id, task);
         state.taskStatsMap.set(block.id, createRunStats());
@@ -500,12 +498,13 @@ export function formatMessage(
           content.startsWith('error:');
 
         if (isError) {
-          const taskLabel = getToolTaskLabel(toolUseId, state);
-          const indent = taskLabel ? `│${formatTaskLabel(taskLabel)}` : '';
+          const colorIndex = getToolTaskColorIndex(toolUseId, state);
+          const indent =
+            colorIndex >= 0 ? `${formatTaskMarker(colorIndex)} ` : '';
           // Strip <tool_use_error> tags for cleaner display
           const cleanError = content.replace(/<\/?tool_use_error>/g, '').trim();
           terminalLog(
-            `${timestampPrefix()}${indent} ${colors.red}ERROR: ${truncate(cleanError, TRUNCATE_ERROR)}${colors.reset}${durationStr}`
+            `${timestampPrefix()}${indent}${colors.red}ERROR: ${truncate(cleanError, TRUNCATE_ERROR)}${colors.reset}${durationStr}`
           );
         } else if (state.activeTasks.has(toolUseId)) {
           // Task completing

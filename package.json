@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/claude-code-runner",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "description": "Execute Claude CLI with PTY handling, real-time tool visualization, and iterative execution support",
   "type": "module",
   "main": "dist/index.js",
@@ -46,12 +46,12 @@
   "author": "Andre Bremer",
   "license": "MIT",
   "dependencies": {
-    "@rcrsr/rill": "~0.4.4",
+    "@rcrsr/rill": "~0.5.0",
     "node-pty": "^1.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
-    "@types/node": "^25.0.10",
+    "@types/node": "^25.2.0",
     "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^9.39.2",
     "eslint-plugin-simple-import-sort": "^12.1.1",

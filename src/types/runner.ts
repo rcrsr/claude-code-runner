@@ -71,8 +71,8 @@ export interface ActiveTask {
   name: string;
   description: string;
   id: string;
-  /** Label for parallel task identification (A, B, C...) */
-  label: string;
+  /** Index for agent marker color (0-7, cycles) */
+  colorIndex: number;
 }
 
 /**
