@@ -650,6 +650,108 @@ describe('formatMessage', () => {
       expect(completionLine).toContain('[engineer]');
     });
 
+    it('attributes tools to correct task with multiple concurrent agents', () => {
+      const state = createMockFormatterState();
+      const logger = createMockLogger();
+
+      // Start two concurrent tasks (same assistant message in practice)
+      formatMessage(
+        createToolUseMessage(
+          'Task',
+          { subagent_type: 'engineer', description: 'Task A' },
+          'task-1'
+        ),
+        state,
+        'normal',
+        logger,
+        100
+      );
+      formatMessage(
+        createToolUseMessage(
+          'Task',
+          { subagent_type: 'engineer', description: 'Task B' },
+          'task-2'
+        ),
+        state,
+        'normal',
+        logger,
+        100
+      );
+      flushPendingTools(state, 'normal');
+
+      expect(state.activeTasks.size).toBe(2);
+
+      // First tool call (from subagent A) - uses pending queue (creation order)
+      formatMessage(
+        createToolUseMessage('Read', { file_path: '/a.ts' }, 'read-a'),
+        state,
+        'normal',
+        logger,
+        100
+      );
+      expect(state.toolToTaskId.get('read-a')).toBe('task-1');
+      flushPendingTools(state, 'normal');
+
+      // Second tool call (from subagent B) - next in pending queue
+      formatMessage(
+        createToolUseMessage('Read', { file_path: '/b.ts' }, 'read-b'),
+        state,
+        'normal',
+        logger,
+        100
+      );
+      expect(state.toolToTaskId.get('read-b')).toBe('task-2');
+      flushPendingTools(state, 'normal');
+
+      // Result for task A's tool
+      formatMessage(
+        createToolResultMessage('read-a', 'contents of a.ts'),
+        state,
+        'normal',
+        logger,
+        100
+      );
+
+      // Next tool from task A (continues after its result)
+      formatMessage(
+        createToolUseMessage('Edit', { file_path: '/a.ts' }, 'edit-a'),
+        state,
+        'normal',
+        logger,
+        100
+      );
+      expect(state.toolToTaskId.get('edit-a')).toBe('task-1');
+      flushPendingTools(state, 'normal');
+
+      // Result for task B's tool
+      formatMessage(
+        createToolResultMessage('read-b', 'contents of b.ts'),
+        state,
+        'normal',
+        logger,
+        100
+      );
+
+      // Next tool from task B (continues after its result)
+      formatMessage(
+        createToolUseMessage('Edit', { file_path: '/b.ts' }, 'edit-b'),
+        state,
+        'normal',
+        logger,
+        100
+      );
+      expect(state.toolToTaskId.get('edit-b')).toBe('task-2');
+
+      // Verify all tools got markers (dots) in output
+      const calls = consoleSpy.mock.calls.map((c) => stripAnsi(c[0] as string));
+      const toolCalls = calls.filter(
+        (c) => c.includes('[Read]') || c.includes('[Edit]')
+      );
+      for (const call of toolCalls) {
+        expect(call).toContain('●');
+      }
+    });
+
     it('handles multiple parallel task completions', () => {
       const state = createMockFormatterState();
       const logger = createMockLogger();

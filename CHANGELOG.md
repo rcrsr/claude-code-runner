@@ -7,13 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `docs` subcommand outputs Rill language reference and CCR function signatures for LLM prompts
+- `--functions-only` and `--language-only` flags for selective docs output
+
 ### Changed
 
 - Error messages display as `[error]` instead of `ERROR:` to match tool call styling
+- CCR host functions now include description metadata for introspection
 
 ### Fixed
 
-- Concurrent agent tools no longer incorrectly attributed to last-started agent
+- Concurrent agent tool calls now show colored dot markers (queue-based attribution replaces dropped markers)
 
 ## [0.10.0] — 2026-02-03
 

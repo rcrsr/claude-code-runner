@@ -8,7 +8,7 @@ import { VERSION as RILL_VERSION } from '@rcrsr/rill';
 import { randomBytes } from 'crypto';
 import { createRequire } from 'module';
 
-import { parseArgs } from './cli/args.js';
+import { generateDocs, parseArgs } from './cli/index.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version: string };
@@ -40,6 +40,13 @@ async function main(): Promise<void> {
   const totalStart = Date.now();
   const args = process.argv.slice(2);
   const parsed = parseArgs(args);
+
+  // Handle docs subcommand (exits immediately, no PTY)
+  if (parsed.subcommand === 'docs' && parsed.docsOptions) {
+    const docs = generateDocs(parsed.docsOptions);
+    console.log(docs);
+    process.exit(0);
+  }
 
   // Generate run ID for this session
   const runId = generateRunId();

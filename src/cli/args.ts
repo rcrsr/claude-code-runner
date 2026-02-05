@@ -67,7 +67,13 @@ function extractOptions(args: string[]): RawArgs {
 /**
  * Parse CLI arguments
  */
-const VALID_SUBCOMMANDS = ['prompt', 'command', 'script', 'skill'] as const;
+const VALID_SUBCOMMANDS = [
+  'prompt',
+  'command',
+  'script',
+  'skill',
+  'docs',
+] as const;
 
 function isValidSubcommand(value: string): value is Subcommand {
   return VALID_SUBCOMMANDS.includes(value as Subcommand);
@@ -83,16 +89,16 @@ export function parseArgs(args: string[]): ParsedArgs {
   if (!firstArg) {
     console.error('Error: subcommand required');
     console.error(
-      'Usage: claude-code-runner <prompt|command|skill|script> [args...]'
+      'Usage: claude-code-runner <prompt|command|skill|script|docs> [args...]'
     );
     process.exit(1);
   }
 
   if (!isValidSubcommand(firstArg)) {
     console.error(`Error: unknown subcommand '${firstArg}'`);
-    console.error('Valid subcommands: prompt, command, skill, script');
+    console.error('Valid subcommands: prompt, command, skill, script, docs');
     console.error(
-      'Usage: claude-code-runner <prompt|command|skill|script> [args...]'
+      'Usage: claude-code-runner <prompt|command|skill|script|docs> [args...]'
     );
     process.exit(1);
   }
@@ -103,6 +109,9 @@ export function parseArgs(args: string[]): ParsedArgs {
   let scriptFile: string | null = null;
   let scriptArgs: string[] = [];
   let frontmatterModel: string | null = null;
+  let docsOptions:
+    | { functionsOnly: boolean; languageOnly: boolean }
+    | undefined = undefined;
 
   switch (subcommand) {
     case 'command': {
@@ -162,6 +171,13 @@ export function parseArgs(args: string[]): ParsedArgs {
       displayCommand = `"${prompt}"`;
       break;
     }
+    case 'docs': {
+      const functionsOnly = positionalArgs.includes('--functions-only');
+      const languageOnly = positionalArgs.includes('--language-only');
+      docsOptions = { functionsOnly, languageOnly };
+      displayCommand = 'docs';
+      break;
+    }
   }
 
   const config: Partial<RunnerConfig> = {
@@ -178,6 +194,7 @@ export function parseArgs(args: string[]): ParsedArgs {
     config,
     scriptFile,
     scriptArgs,
+    docsOptions,
   };
 }
 
@@ -193,12 +210,14 @@ Usage:
   claude-code-runner [options] command <name> [args...]
   claude-code-runner [options] skill <name> [args...]
   claude-code-runner [options] script <file.rill> [args...]
+  claude-code-runner docs [--functions-only | --language-only]
 
 Subcommands:
   prompt <text>              Run with the given prompt
   command <name> [args]      Load .claude/commands/<name>.md template
   skill <name> [args]        Run slash command /<name> [args]
   script <file.rill> [args]  Run a Rill script
+  docs                       Display Rill documentation and CCR host functions
 
 Options:
   --quiet              Minimal output (errors only)
@@ -207,5 +226,9 @@ Options:
   --log                Enable logging to file (disabled by default)
   --model, -m <model>  Specify Claude model (e.g., sonnet, opus, haiku)
   --deaddrop           Send messages to Deaddrop (requires DEADDROP_API_KEY env var)
+
+Docs Options:
+  --functions-only     Show only CCR host function signatures
+  --language-only      Show only Rill language reference
 `);
 }

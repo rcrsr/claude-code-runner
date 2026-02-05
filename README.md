@@ -4,13 +4,14 @@ Deterministic, scripted, unattended Claude Code execution with [Rill](https://gi
 
 ## Why Use This?
 
+Like [Ralph Wiggum](https://awesomeclaude.ai/ralph-wiggum), but smarter.
+
 - **Rich scripting** — Fully scriptable with variables, conditionals, loops, and functions
-- **Walk away** — Workflows run unattended in CI/CD pipelines
-- **Chain results** — Capture output from one step, inject it into the next
-- **Claude decides** — Results protocol lets Claude control flow with `<ccr:result type="..."/>`
-- **No context limits** — Fresh context per step keeps long workflows running
-- **Watch live** — See tool calls stream as they execute
-- **Replay later** — Full session logs for debugging
+- **Walk away** — Workflows can run unattended for hours if needed
+- **Treat Claude Code Skills as Functions** — Call with arguments and get back return values throgh `<ccr:result type="..."/>`
+- **Fresh context** — Each invocation starts with a clean slate
+- **Watch live** — See your calls log activity as they execute
+- **Inspect later** — Full session logs for debugging
 
 ## Prerequisites
 
@@ -18,6 +19,10 @@ Deterministic, scripted, unattended Claude Code execution with [Rill](https://gi
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated
 
 ## Installation
+
+Claude Code Runner depends on `node-pty` for TTY terminal handling. You may need to install build tools first so the native modules can compile. See [node-pty instructions](https://github.com/microsoft/node-pty) for your platform.
+
+Then install Claude Code Runner globally:
 
 ```bash
 npm install -g @rcrsr/claude-code-runner
@@ -31,15 +36,13 @@ npm install -g @rcrsr/claude-code-runner
 claude-code-runner prompt "Refactor the auth module to use async/await"
 ```
 
-### command — Run a skill file
+### skill — Run a Claude Code Skill file
 
-Run skills (`.claude/skills/<name>/SKILL.md`) or commands (`.claude/commands/<name>.md`) by name:
+Run skills by name:
 
 ```bash
 claude-code-runner command review-code src/auth.ts
 ```
-
-**Skills** (recommended) support subdirectories with templates, examples, and scripts. **Commands** are single-file prompts. Both use the same template syntax and create `/slash-commands` in Claude Code.
 
 **Example skill** (`.claude/skills/review-code/SKILL.md`):
 

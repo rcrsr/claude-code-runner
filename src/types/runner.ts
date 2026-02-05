@@ -6,7 +6,7 @@ import { DEFAULT_PARALLEL_THRESHOLD_MS } from '../utils/constants.js';
 
 export type Verbosity = 'quiet' | 'normal' | 'verbose';
 
-export type Subcommand = 'prompt' | 'command' | 'script' | 'skill';
+export type Subcommand = 'prompt' | 'command' | 'script' | 'skill' | 'docs';
 
 /**
  * Result of running a single Claude invocation
@@ -42,6 +42,14 @@ export const DEFAULT_CONFIG: RunnerConfig = {
 };
 
 /**
+ * Docs subcommand options
+ */
+export interface DocsOptions {
+  functionsOnly: boolean;
+  languageOnly: boolean;
+}
+
+/**
  * Parsed CLI arguments
  */
 export interface ParsedArgs {
@@ -53,6 +61,8 @@ export interface ParsedArgs {
   scriptFile: string | null;
   /** Script arguments */
   scriptArgs: string[];
+  /** Docs options (for docs subcommand) */
+  docsOptions?: DocsOptions | undefined;
 }
 
 /**

@@ -99,9 +99,19 @@ export function createRunnerContext(
      * Usage: ccr::prompt("analyze this code", "haiku")
      */
     'ccr::prompt': {
+      description: 'Execute a prompt with Claude and return output',
       params: [
-        { name: 'text', type: 'string' },
-        { name: 'model', type: 'string', defaultValue: '' },
+        {
+          name: 'text',
+          type: 'string',
+          description: 'Prompt text to send to Claude',
+        },
+        {
+          name: 'model',
+          type: 'string',
+          defaultValue: '',
+          description: 'Model override (sonnet, opus, haiku)',
+        },
       ],
       fn: async (args) => {
         const text = args[0] as string;
@@ -116,9 +126,15 @@ export function createRunnerContext(
      * Usage: ccr::command("create-spec", ["arg1", "arg2"])
      */
     'ccr::command': {
+      description: 'Execute a command template by name',
       params: [
-        { name: 'name', type: 'string' },
-        { name: 'args', type: 'list', defaultValue: [] },
+        { name: 'name', type: 'string', description: 'Command template name' },
+        {
+          name: 'args',
+          type: 'list',
+          defaultValue: [],
+          description: 'Arguments to pass to template',
+        },
       ],
       fn: async (args, ctx) => {
         const name = args[0] as string;
@@ -144,9 +160,19 @@ export function createRunnerContext(
      * Usage: ccr::skill("commit", ["--amend"])
      */
     'ccr::skill': {
+      description: 'Execute a Claude Code skill (slash command)',
       params: [
-        { name: 'name', type: 'string' },
-        { name: 'args', type: 'list', defaultValue: [] },
+        {
+          name: 'name',
+          type: 'string',
+          description: 'Skill name (without leading /)',
+        },
+        {
+          name: 'args',
+          type: 'list',
+          defaultValue: [],
+          description: 'Arguments to pass to skill',
+        },
       ],
       fn: async (args, ctx) => {
         const name = args[0] as string;
@@ -168,7 +194,10 @@ export function createRunnerContext(
      * Usage: ccr::file_exists("path/to/file") -> boolean
      */
     'ccr::file_exists': {
-      params: [{ name: 'path', type: 'string' }],
+      description: 'Check if a file exists at the given path',
+      params: [
+        { name: 'path', type: 'string', description: 'File path to check' },
+      ],
       fn: (args) => fs.existsSync(args[0] as string),
     },
 
@@ -179,7 +208,14 @@ export function createRunnerContext(
      * Returns empty dict if no result found (Rill doesn't support null)
      */
     'ccr::get_result': {
-      params: [{ name: 'text', type: 'string' }],
+      description: 'Extract ccr:result XML tag from text',
+      params: [
+        {
+          name: 'text',
+          type: 'string',
+          description: 'Text containing ccr:result tag',
+        },
+      ],
       fn: (args) => {
         const text = args[0] as string;
 
@@ -224,7 +260,14 @@ export function createRunnerContext(
      * Usage: ccr::has_result(text) -> boolean
      */
     'ccr::has_result': {
-      params: [{ name: 'text', type: 'string' }],
+      description: 'Check if text contains a ccr:result tag',
+      params: [
+        {
+          name: 'text',
+          type: 'string',
+          description: 'Text to search for ccr:result tag',
+        },
+      ],
       fn: (args) => {
         const text = args[0] as string;
         return (
@@ -239,7 +282,10 @@ export function createRunnerContext(
      * Usage: ccr::has_frontmatter(path) -> boolean
      */
     'ccr::has_frontmatter': {
-      params: [{ name: 'path', type: 'string' }],
+      description: 'Check if a file has YAML frontmatter',
+      params: [
+        { name: 'path', type: 'string', description: 'File path to check' },
+      ],
       fn: (args) => {
         const filePath = args[0] as string;
 
@@ -259,7 +305,10 @@ export function createRunnerContext(
      * Usage: ccr::get_frontmatter("path/to/file.md")
      */
     'ccr::get_frontmatter': {
-      params: [{ name: 'path', type: 'string' }],
+      description: 'Parse and return YAML frontmatter from a file',
+      params: [
+        { name: 'path', type: 'string', description: 'File path to parse' },
+      ],
       fn: (args) => {
         const filePath = args[0] as string;
 

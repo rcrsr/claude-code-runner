@@ -83,6 +83,10 @@ export interface FormatterState {
   taskStatsMap: Map<string, RunStats>;
   /** Task start times keyed by task id */
   taskStartTimes: Map<string, number>;
+  /** Queue of task IDs ready to act (just received a tool result) */
+  taskReadyQueue: string[];
+  /** Queue of task IDs awaiting first action (in creation order) */
+  taskPendingQueue: string[];
 }
 
 export function createFormatterState(): FormatterState {
@@ -102,6 +106,8 @@ export function createFormatterState(): FormatterState {
     stepStartTime: null,
     taskStatsMap: new Map(),
     taskStartTimes: new Map(),
+    taskReadyQueue: [],
+    taskPendingQueue: [],
   };
 }
 
@@ -117,6 +123,8 @@ export function resetFormatterState(state: FormatterState): void {
   state.stepStartTime = null;
   state.taskStatsMap.clear();
   state.taskStartTimes.clear();
+  state.taskReadyQueue = [];
+  state.taskPendingQueue = [];
   // Note: runStats is NOT reset - it accumulates across steps
 }
 
@@ -337,6 +345,8 @@ function printTaskResult(
   state.activeTasks.delete(taskId);
   state.taskStatsMap.delete(taskId);
   state.taskStartTimes.delete(taskId);
+  state.taskReadyQueue = state.taskReadyQueue.filter((id) => id !== taskId);
+  state.taskPendingQueue = state.taskPendingQueue.filter((id) => id !== taskId);
 
   // Update currentTaskId if this was the current task
   if (state.currentTaskId === taskId) {
@@ -365,6 +375,7 @@ export function formatMessage(
     flushPendingTools(state, verbosity);
 
     // Check for Task tools first to initialize task tracking
+    const preTaskCount = state.activeTasks.size;
     for (const block of msg.message.content) {
       if (isToolUseBlock(block) && block.name === 'Task') {
         const input = block.input;
@@ -390,12 +401,31 @@ export function formatMessage(
         state.taskStatsMap.set(block.id, createRunStats());
         state.taskStartTimes.set(block.id, Date.now());
         state.currentTaskId = block.id;
+        state.taskPendingQueue.push(block.id);
       }
     }
+    const createdTasks = state.activeTasks.size > preTaskCount;
 
-    // Track message and token usage in stats (use current task's stats if in a task)
-    const currentTaskStats = state.currentTaskId
-      ? state.taskStatsMap.get(state.currentTaskId)
+    // Determine message-level task attribution for non-Task tools
+    // Each assistant message comes from one agent context
+    let messageTaskId: string | null = null;
+    if (!createdTasks && state.activeTasks.size > 1) {
+      // Multiple concurrent tasks: use queue-based attribution
+      // Ready queue = tasks that just got a tool result (conversation continues)
+      // Pending queue = tasks awaiting their first action (creation order)
+      const candidateId =
+        state.taskReadyQueue.shift() ?? state.taskPendingQueue.shift() ?? null;
+      if (candidateId && state.activeTasks.has(candidateId)) {
+        messageTaskId = candidateId;
+      }
+    } else if (state.activeTasks.size === 1 && state.currentTaskId) {
+      messageTaskId = state.currentTaskId;
+    }
+
+    // Track message and token usage in stats
+    const statsTaskId = messageTaskId ?? state.currentTaskId;
+    const currentTaskStats = statsTaskId
+      ? state.taskStatsMap.get(statsTaskId)
       : null;
     const stats = currentTaskStats ?? state.stats;
     incrementMessageCount(stats);
@@ -429,16 +459,11 @@ export function formatMessage(
         // Record start time
         state.toolStartTimes.set(block.id, now);
 
-        // Attribute non-Task tools to task only when exactly one task is active
-        // (with multiple concurrent tasks, we can't determine which spawned the tool)
-        if (
-          block.name !== 'Task' &&
-          state.activeTasks.size === 1 &&
-          state.currentTaskId
-        ) {
-          state.toolToTaskId.set(block.id, state.currentTaskId);
-          // Track tool use in current task's stats
-          const taskStats = state.taskStatsMap.get(state.currentTaskId);
+        // Attribute non-Task tools using message-level task attribution
+        if (block.name !== 'Task' && messageTaskId) {
+          state.toolToTaskId.set(block.id, messageTaskId);
+          // Track tool use in attributed task's stats
+          const taskStats = state.taskStatsMap.get(messageTaskId);
           if (taskStats) {
             recordToolUse(taskStats, block.name);
           }
@@ -511,11 +536,31 @@ export function formatMessage(
           terminalLog(
             `${timestampPrefix()}${indent}${colors.red}[error]${colors.reset} ${truncate(cleanError, TRUNCATE_ERROR)}`
           );
+
+          // Queue parent task for next attribution (conversation continues after error)
+          const parentTaskId = state.toolToTaskId.get(toolUseId);
+          if (
+            parentTaskId &&
+            state.activeTasks.has(parentTaskId) &&
+            !state.taskReadyQueue.includes(parentTaskId)
+          ) {
+            state.taskReadyQueue.push(parentTaskId);
+          }
         } else if (state.activeTasks.has(toolUseId)) {
           // Task completing
           printTaskResult(toolUseId, verbosity, state);
         } else {
           printToolResult(block, durationStr, verbosity, state);
+
+          // Queue parent task for next attribution (conversation continues)
+          const parentTaskId = state.toolToTaskId.get(toolUseId);
+          if (
+            parentTaskId &&
+            state.activeTasks.has(parentTaskId) &&
+            !state.taskReadyQueue.includes(parentTaskId)
+          ) {
+            state.taskReadyQueue.push(parentTaskId);
+          }
         }
       }
     }

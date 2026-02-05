@@ -51,6 +51,8 @@ export function createMockFormatterState(): FormatterState {
     stepStartTime: null,
     taskStatsMap: new Map(),
     taskStartTimes: new Map(),
+    taskReadyQueue: [],
+    taskPendingQueue: [],
   };
 }
 
