@@ -3,10 +3,15 @@
  */
 
 import {
+  STATUS_LINE_ELLIPSIS,
+  STATUS_LINE_MIN_WIDTH,
+} from '../utils/constants.js';
+import {
   configureDeadDrop,
   flushDeadDrop,
   sendToDeadDrop,
 } from './deaddrop-queue.js';
+import type { FormatterState } from './formatter.js';
 
 // Re-export deaddrop functions for backward compatibility
 export { configureDeadDrop, flushDeadDrop };
@@ -70,9 +75,15 @@ export function stripCR(str: string): string {
 /**
  * Log to terminal with CR stripping for clean display
  * Use this for all terminal output in the formatter
+ *
+ * @param line - Text to log
+ * @param state - Optional formatter state; if provided and currentStatusText is non-null, re-renders status line
  */
-export function terminalLog(line: string): void {
+export function terminalLog(line: string, state?: FormatterState): void {
   console.log(stripCR(line));
+  if (state && state.currentStatusText !== null) {
+    renderStatusLine(state.currentStatusText, process.stderr);
+  }
 }
 
 /**
@@ -141,6 +152,92 @@ export function formatTimestamp(date: Date = new Date()): string {
  */
 export function timestampPrefix(): string {
   return `${colors.dim}${formatTimestamp()}${colors.reset} `;
+}
+
+/**
+ * ANSI escape sequences for cursor control
+ */
+const ANSI_SAVE_CURSOR = '\x1b[s';
+const ANSI_RESTORE_CURSOR = '\x1b[u';
+const ANSI_MOVE_TO_NEXT_LINE = '\n';
+const ANSI_CLEAR_LINE = '\x1b[2K';
+
+/**
+ * Render a status line on the terminal using cursor control sequences.
+ * When text is null or empty, clears any previously rendered status line.
+ *
+ * @param text - Status text to display, or null to clear
+ * @param stream - Output stream (expected: process.stderr)
+ */
+export function renderStatusLine(
+  text: string | null,
+  stream: NodeJS.WriteStream
+): void {
+  // No-op when not a TTY
+  if (!stream.isTTY) {
+    return;
+  }
+
+  // Get terminal width with fallback to 80 for misconfigured TTYs (EC-5)
+  // TypeScript types guarantee columns is defined when isTTY is true,
+  // but handle edge case where it might be undefined at runtime
+  const terminalWidth = (stream.columns as number | undefined) ?? 80;
+
+  // Suppress display if terminal too narrow
+  if (terminalWidth < STATUS_LINE_MIN_WIDTH) {
+    return;
+  }
+
+  try {
+    // Clear any existing status line
+    stream.write(ANSI_SAVE_CURSOR);
+    stream.write(ANSI_MOVE_TO_NEXT_LINE);
+    stream.write(ANSI_CLEAR_LINE);
+
+    // If text provided, sanitize and render it
+    if (text?.trim()) {
+      // Strip ANSI codes for security (IC-2)
+      let sanitized = stripAnsi(text);
+
+      // Strip newlines to keep single line
+      sanitized = sanitized.replace(/[\r\n]+/g, ' ');
+
+      // Truncate if exceeds terminal width
+      if (sanitized.length > terminalWidth) {
+        sanitized =
+          sanitized.slice(0, terminalWidth - STATUS_LINE_ELLIPSIS.length) +
+          STATUS_LINE_ELLIPSIS;
+      }
+
+      // Apply dim styling and write
+      stream.write(`${colors.dim}${sanitized}${colors.reset}`);
+    }
+
+    stream.write(ANSI_RESTORE_CURSOR);
+  } catch {
+    // Ignore write errors (broken pipe)
+  }
+}
+
+/**
+ * Clear the status line from terminal display.
+ *
+ * @param stream - Output stream (expected: process.stderr)
+ */
+export function clearStatusLine(stream: NodeJS.WriteStream): void {
+  // No-op when not a TTY
+  if (!stream.isTTY) {
+    return;
+  }
+
+  try {
+    stream.write(ANSI_SAVE_CURSOR);
+    stream.write(ANSI_MOVE_TO_NEXT_LINE);
+    stream.write(ANSI_CLEAR_LINE);
+    stream.write(ANSI_RESTORE_CURSOR);
+  } catch {
+    // Ignore write errors
+  }
 }
 
 /**

@@ -13,7 +13,7 @@ import {
 } from '@rcrsr/rill';
 import * as fs from 'fs';
 
-import { printRunner } from '../output/colors.js';
+import { printRunner, stripAnsi } from '../output/colors.js';
 import {
   loadCommandTemplate as loadCommandTemplateFile,
   parseGenericFrontmatter,
@@ -66,6 +66,8 @@ export interface RunnerContextOptions {
   signal?: AbortSignal | undefined;
   /** Regex patterns that halt execution when output matches */
   autoExceptions?: string[] | undefined;
+  /** Callback for state changes from ccr::state host function */
+  onStateChange?: ((text: string | null) => void) | undefined;
 }
 
 // ============================================================
@@ -90,6 +92,7 @@ export function createRunnerContext(
     timeout,
     signal,
     autoExceptions,
+    onStateChange: _onStateChange,
   } = options;
 
   // Create ccr:: namespaced functions
@@ -199,6 +202,34 @@ export function createRunnerContext(
         { name: 'path', type: 'string', description: 'File path to check' },
       ],
       fn: (args) => fs.existsSync(args[0] as string),
+    },
+
+    /**
+     * Set script status line text
+     * Usage: ccr::state("Processing file 3/10")
+     */
+    'ccr::state': {
+      description: 'Set script status line text',
+      params: [{ name: 'text', type: 'string' }],
+      fn: (args) => {
+        let text = args[0] as string;
+
+        // Strip ANSI escape sequences
+        text = stripAnsi(text);
+
+        // Strip newlines to single line
+        text = text.replace(/[\r\n]+/g, ' ');
+
+        // Check if empty or whitespace-only
+        const trimmed = text.trim();
+
+        // Invoke callback if provided
+        if (_onStateChange) {
+          _onStateChange(trimmed || null);
+        }
+
+        return null;
+      },
     },
 
     /**

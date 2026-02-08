@@ -43,6 +43,11 @@ describe('createFormatterState', () => {
     const state = createFormatterState();
     expect(state.toolStartTimes.size).toBe(0);
   });
+
+  it('returns null currentStatusText', () => {
+    const state = createFormatterState();
+    expect(state.currentStatusText).toBeNull();
+  });
 });
 
 describe('resetFormatterState', () => {
@@ -85,6 +90,15 @@ describe('resetFormatterState', () => {
     resetFormatterState(state);
 
     expect(state.toolStartTimes.size).toBe(0);
+  });
+
+  it('clears currentStatusText to null', () => {
+    const state = createMockFormatterState();
+    state.currentStatusText = 'Processing...';
+
+    resetFormatterState(state);
+
+    expect(state.currentStatusText).toBeNull();
   });
 });
 

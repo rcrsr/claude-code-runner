@@ -55,6 +55,12 @@ export const SECONDS_PER_HOUR = 3600;
 /** Default parallel tool detection threshold in ms */
 export const DEFAULT_PARALLEL_THRESHOLD_MS = 100;
 
+// === Status Line ===
+/** Truncation suffix for overflow in status line */
+export const STATUS_LINE_ELLIPSIS = '...';
+/** Minimum terminal width for status line display */
+export const STATUS_LINE_MIN_WIDTH = 20;
+
 // === Result XML Patterns ===
 /** Regex pattern for self-closing ccr:result tags */
 export const CCR_RESULT_SELF_CLOSING_PATTERN = /<ccr:result\s+([^>]*?)\/>/;

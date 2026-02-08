@@ -53,6 +53,7 @@ export function createMockFormatterState(): FormatterState {
     taskStartTimes: new Map(),
     taskReadyQueue: [],
     taskPendingQueue: [],
+    currentStatusText: null,
   };
 }
 

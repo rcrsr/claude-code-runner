@@ -87,6 +87,8 @@ export interface FormatterState {
   taskReadyQueue: string[];
   /** Queue of task IDs awaiting first action (in creation order) */
   taskPendingQueue: string[];
+  /** Current state text from ccr::state() */
+  currentStatusText: string | null;
 }
 
 export function createFormatterState(): FormatterState {
@@ -108,6 +110,7 @@ export function createFormatterState(): FormatterState {
     taskStartTimes: new Map(),
     taskReadyQueue: [],
     taskPendingQueue: [],
+    currentStatusText: null,
   };
 }
 
@@ -125,6 +128,7 @@ export function resetFormatterState(state: FormatterState): void {
   state.taskStartTimes.clear();
   state.taskReadyQueue = [];
   state.taskPendingQueue = [];
+  state.currentStatusText = null;
   // Note: runStats is NOT reset - it accumulates across steps
 }
 

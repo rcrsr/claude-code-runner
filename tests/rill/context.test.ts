@@ -370,3 +370,187 @@ describe('ccr::command', () => {
     ).rejects.toThrow('Command not found');
   });
 });
+
+describe('ccr::state', () => {
+  it('returns null (AC-1)', async () => {
+    const executor = createMockExecutor();
+    const result = await runRill('ccr::state("text")', executor);
+
+    expect(result.value).toBe(null);
+  });
+
+  it('invokes callback with null for empty string (AC-2, BC-1)', async () => {
+    const executor = createMockExecutor();
+    const onStateChange = vi.fn();
+
+    const ctx = createRunnerContext({
+      executeClause: executor,
+      onStateChange,
+    });
+
+    const ast = parse('ccr::state("")');
+    await execute(ast, ctx);
+
+    expect(onStateChange).toHaveBeenCalledWith(null);
+    expect(onStateChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('invokes callback with null for whitespace-only string (BC-2)', async () => {
+    const executor = createMockExecutor();
+    const onStateChange = vi.fn();
+
+    const ctx = createRunnerContext({
+      executeClause: executor,
+      onStateChange,
+    });
+
+    const ast = parse('ccr::state("   ")');
+    await execute(ast, ctx);
+
+    expect(onStateChange).toHaveBeenCalledWith(null);
+    expect(onStateChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('invokes callback with single character (BC-3)', async () => {
+    const executor = createMockExecutor();
+    const onStateChange = vi.fn();
+
+    const ctx = createRunnerContext({
+      executeClause: executor,
+      onStateChange,
+    });
+
+    const ast = parse('ccr::state("X")');
+    await execute(ast, ctx);
+
+    expect(onStateChange).toHaveBeenCalledWith('X');
+    expect(onStateChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('strips ANSI codes before callback (AC-8)', async () => {
+    const executor = createMockExecutor();
+    const onStateChange = vi.fn();
+
+    const ctx = createRunnerContext({
+      executeClause: executor,
+      onStateChange,
+    });
+
+    // Use string interpolation to pass ANSI codes directly
+    const ansiText = '\x1b[31mred text\x1b[0m';
+    const code = `ccr::state("${ansiText}")`;
+    const ast = parse(code);
+    await execute(ast, ctx);
+
+    expect(onStateChange).toHaveBeenCalledWith('red text');
+    expect(onStateChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('strips newlines to single line (BC-6)', async () => {
+    const executor = createMockExecutor();
+    const onStateChange = vi.fn();
+
+    const ctx = createRunnerContext({
+      executeClause: executor,
+      onStateChange,
+    });
+
+    const ast = parse('ccr::state("line1\\nline2\\nline3")');
+    await execute(ast, ctx);
+
+    expect(onStateChange).toHaveBeenCalledWith('line1 line2 line3');
+    expect(onStateChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('strips carriage returns and newlines to single line', async () => {
+    const executor = createMockExecutor();
+    const onStateChange = vi.fn();
+
+    const ctx = createRunnerContext({
+      executeClause: executor,
+      onStateChange,
+    });
+
+    const ast = parse('ccr::state("line1\\r\\nline2\\r\\nline3")');
+    await execute(ast, ctx);
+
+    expect(onStateChange).toHaveBeenCalledWith('line1 line2 line3');
+    expect(onStateChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('invokes callback 100 times with correct values', async () => {
+    const executor = createMockExecutor();
+    const onStateChange = vi.fn();
+
+    const ctx = createRunnerContext({
+      executeClause: executor,
+      onStateChange,
+    });
+
+    // Build Rill code that calls ccr::state 100 times
+    const calls = Array.from(
+      { length: 100 },
+      (_, i) => `ccr::state("State ${i}")`
+    );
+    const code = calls.join('\n');
+
+    const ast = parse(code);
+    await execute(ast, ctx);
+
+    expect(onStateChange).toHaveBeenCalledTimes(100);
+
+    // Verify last call has correct value
+    expect(onStateChange).toHaveBeenLastCalledWith('State 99');
+
+    // Verify first call has correct value
+    expect(onStateChange).toHaveBeenNthCalledWith(1, 'State 0');
+
+    // Verify middle call has correct value
+    expect(onStateChange).toHaveBeenNthCalledWith(50, 'State 49');
+  });
+
+  it('propagates callback throw to Rill runtime (EC-3)', async () => {
+    const executor = createMockExecutor();
+    const onStateChange = vi.fn().mockImplementation(() => {
+      throw new Error('Callback error');
+    });
+
+    const ctx = createRunnerContext({
+      executeClause: executor,
+      onStateChange,
+    });
+
+    const ast = parse('ccr::state("text")');
+
+    await expect(execute(ast, ctx)).rejects.toThrow('Callback error');
+    expect(onStateChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws Rill type error on non-string argument (EC-1)', async () => {
+    const executor = createMockExecutor();
+
+    await expect(runRill('ccr::state(123)', executor)).rejects.toThrow();
+  });
+
+  it('throws Rill arity error on missing argument (EC-2)', async () => {
+    const executor = createMockExecutor();
+
+    await expect(runRill('ccr::state()', executor)).rejects.toThrow();
+  });
+
+  it('does not invoke callback when onStateChange is not provided', async () => {
+    const executor = createMockExecutor();
+
+    // No onStateChange callback provided
+    const ctx = createRunnerContext({
+      executeClause: executor,
+    });
+
+    const ast = parse('ccr::state("text")');
+    const result = await execute(ast, ctx);
+
+    // Should still return null
+    expect(result.value).toBe(null);
+    // Should not throw
+  });
+});

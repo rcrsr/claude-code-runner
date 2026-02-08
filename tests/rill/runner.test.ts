@@ -34,6 +34,8 @@ vi.mock('../../src/output/colors.js', () => ({
   },
   printRunner: vi.fn(),
   formatDuration: vi.fn((ms: number) => `${ms}ms`),
+  renderStatusLine: vi.fn(),
+  clearStatusLine: vi.fn(),
 }));
 
 import { spawnClaude } from '../../src/process/pty.js';

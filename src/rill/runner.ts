@@ -16,7 +16,12 @@ import {
 } from '@rcrsr/rill';
 import * as fs from 'fs';
 
-import { colors, printRunner } from '../output/colors.js';
+import {
+  clearStatusLine,
+  colors,
+  printRunner,
+  renderStatusLine,
+} from '../output/colors.js';
 import { finalizeStepStats, type FormatterState } from '../output/formatter.js';
 import type { Logger } from '../output/logger.js';
 import { spawnClaude } from '../process/pty.js';
@@ -268,6 +273,36 @@ export async function runRillScript(
     },
   };
 
+  // State change callback for ccr::state host function
+  const onStateChange = (text: string | null): void => {
+    // Update formatter state
+    formatterState.currentStatusText = text;
+
+    // Skip rendering in quiet mode
+    if (config.verbosity === 'quiet') {
+      return;
+    }
+
+    // Render or clear status line
+    if (text !== null) {
+      renderStatusLine(text, process.stderr);
+    } else {
+      clearStatusLine(process.stderr);
+    }
+  };
+
+  // Terminal resize handler - re-renders status line with updated columns
+  const handleResize = (): void => {
+    if (formatterState.currentStatusText !== null) {
+      renderStatusLine(formatterState.currentStatusText, process.stderr);
+    }
+  };
+
+  // Attach resize listener if not in quiet mode
+  if (config.verbosity !== 'quiet') {
+    process.stderr.on('resize', handleResize);
+  }
+
   // Create Rill runtime context
   const ctx = createRunnerContext({
     executeClause,
@@ -277,6 +312,7 @@ export async function runRillScript(
     commandsDir: '.claude/commands',
     defaultModel: effectiveModel ?? undefined,
     callbacks,
+    onStateChange,
   });
 
   // Parse and execute the script
@@ -298,13 +334,26 @@ export async function runRillScript(
       success: true,
     });
 
+    // Remove resize listener before exit
+    if (config.verbosity !== 'quiet') {
+      process.stderr.off('resize', handleResize);
+    }
+
+    clearStatusLine(process.stderr);
+
     return {
       success: true,
       lastOutput: state.lastOutput,
     };
   } catch (error) {
+    // Remove resize listener before error handling
+    if (config.verbosity !== 'quiet') {
+      process.stderr.off('resize', handleResize);
+    }
+
     // Handle specific Rill error types
     if (error instanceof AbortError) {
+      clearStatusLine(process.stderr);
       printRunner(`${colors.yellow}Script cancelled${colors.reset}`);
       logger.logEvent({ event: 'rill_script_cancelled', runId });
       return {
@@ -314,6 +363,7 @@ export async function runRillScript(
     }
 
     if (error instanceof TimeoutError) {
+      clearStatusLine(process.stderr);
       const msg = `Timeout: ${error.message}`;
       printRunner(`${colors.red}${msg}${colors.reset}`);
       logger.logEvent({ event: 'rill_script_timeout', runId, error: msg });
@@ -321,6 +371,7 @@ export async function runRillScript(
     }
 
     if (error instanceof ParseError) {
+      clearStatusLine(process.stderr);
       const location = error.location
         ? ` at ${scriptFile}:${error.location.line}:${error.location.column}`
         : '';
@@ -331,6 +382,7 @@ export async function runRillScript(
     }
 
     if (error instanceof RuntimeError) {
+      clearStatusLine(process.stderr);
       const location = error.location
         ? ` at ${scriptFile}:${error.location.line}:${error.location.column}`
         : '';
@@ -345,6 +397,7 @@ export async function runRillScript(
     }
 
     // Generic error fallback
+    clearStatusLine(process.stderr);
     const msg = error instanceof Error ? error.message : String(error);
     printRunner(`${colors.red}Script error:${colors.reset} ${msg}`);
     logger.logEvent({ event: 'rill_script_error', runId, error: msg });
