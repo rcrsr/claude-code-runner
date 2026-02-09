@@ -128,7 +128,7 @@ export function resetFormatterState(state: FormatterState): void {
   state.taskStartTimes.clear();
   state.taskReadyQueue = [];
   state.taskPendingQueue = [];
-  state.currentStatusText = null;
+  // Note: currentStatusText is NOT reset - it persists across steps (set by ccr::state)
   // Note: runStats is NOT reset - it accumulates across steps
 }
 

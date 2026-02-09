@@ -5,6 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.1] — 2026-02-08
+
+### Changed
+
+- Upgraded `@rcrsr/rill` from `~0.7.0` to `~0.7.2`
+
+### Fixed
+
+- Status line rendering replaced cursor save/restore (`\x1b[s`/`\x1b[u`) with `\x1b[2K\r` overwrite; eliminates ghost lines in scrollback
+- Status line persists across `ccr::prompt` steps; `resetFormatterState` no longer resets `currentStatusText`
+
 ## [0.11.0] — 2026-02-08
 
 ### Breaking

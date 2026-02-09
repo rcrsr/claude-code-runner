@@ -98,9 +98,19 @@ export function stripCR(str: string): string {
  * @param state - Optional formatter state; if provided and currentStatusText is non-null, re-renders status line
  */
 export function terminalLog(line: string, state?: FormatterState): void {
-  console.log(stripCR(line));
   const effectiveState = state ?? boundFormatterState;
-  if (effectiveState && effectiveState.currentStatusText !== null) {
+  const hasStatus =
+    effectiveState !== null && effectiveState.currentStatusText !== null;
+
+  // Clear status line before logging to prevent ghost lines in scrollback
+  if (hasStatus) {
+    clearStatusLine(process.stderr);
+  }
+
+  console.log(stripCR(line));
+
+  // Re-render status line below new cursor position
+  if (hasStatus) {
     renderStatusLine(effectiveState.currentStatusText, process.stderr);
   }
 }
@@ -174,16 +184,14 @@ export function timestampPrefix(): string {
 }
 
 /**
- * ANSI escape sequences for cursor control
+ * ANSI escape sequence: clear entire line + carriage return to column 0
  */
-const ANSI_SAVE_CURSOR = '\x1b[s';
-const ANSI_RESTORE_CURSOR = '\x1b[u';
-const ANSI_MOVE_TO_NEXT_LINE = '\n';
-const ANSI_CLEAR_LINE = '\x1b[2K';
+const ANSI_CLEAR_LINE_CR = '\x1b[2K\r';
 
 /**
- * Render a status line on the terminal using cursor control sequences.
- * When text is null or empty, clears any previously rendered status line.
+ * Render a status line on the current cursor line.
+ * Uses \r to park cursor at column 0 so the next console.log overwrites it.
+ * When text is null or empty, clears the status line.
  *
  * @param text - Status text to display, or null to clear
  * @param stream - Output stream (expected: process.stderr)
@@ -208,12 +216,10 @@ export function renderStatusLine(
   }
 
   try {
-    // Clear any existing status line
-    stream.write(ANSI_SAVE_CURSOR);
-    stream.write(ANSI_MOVE_TO_NEXT_LINE);
-    stream.write(ANSI_CLEAR_LINE);
+    // Clear current line
+    stream.write(ANSI_CLEAR_LINE_CR);
 
-    // If text provided, sanitize and render it
+    // If text provided, sanitize and render on current line
     if (text?.trim()) {
       // Strip ANSI codes for security (IC-2)
       let sanitized = stripAnsi(text);
@@ -228,11 +234,9 @@ export function renderStatusLine(
           STATUS_LINE_ELLIPSIS;
       }
 
-      // Apply dim styling and write
-      stream.write(`${colors.dim}${sanitized}${colors.reset}`);
+      // Write dim text, then \r to park cursor at column 0
+      stream.write(`${colors.dim}${sanitized}${colors.reset}\r`);
     }
-
-    stream.write(ANSI_RESTORE_CURSOR);
   } catch {
     // Ignore write errors (broken pipe)
   }
@@ -250,10 +254,7 @@ export function clearStatusLine(stream: NodeJS.WriteStream): void {
   }
 
   try {
-    stream.write(ANSI_SAVE_CURSOR);
-    stream.write(ANSI_MOVE_TO_NEXT_LINE);
-    stream.write(ANSI_CLEAR_LINE);
-    stream.write(ANSI_RESTORE_CURSOR);
+    stream.write(ANSI_CLEAR_LINE_CR);
   } catch {
     // Ignore write errors
   }

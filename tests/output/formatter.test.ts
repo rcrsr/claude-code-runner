@@ -92,13 +92,13 @@ describe('resetFormatterState', () => {
     expect(state.toolStartTimes.size).toBe(0);
   });
 
-  it('clears currentStatusText to null', () => {
+  it('preserves currentStatusText across reset', () => {
     const state = createMockFormatterState();
     state.currentStatusText = 'Processing...';
 
     resetFormatterState(state);
 
-    expect(state.currentStatusText).toBeNull();
+    expect(state.currentStatusText).toBe('Processing...');
   });
 });
 
