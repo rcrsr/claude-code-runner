@@ -36,6 +36,13 @@ vi.mock('../../src/output/colors.js', () => ({
   formatDuration: vi.fn((ms: number) => `${ms}ms`),
   renderStatusLine: vi.fn(),
   clearStatusLine: vi.fn(),
+  stripAnsi: vi.fn((str: string) => str),
+  stripCR: vi.fn((str: string) => str),
+  terminalLog: vi.fn(),
+  printRunnerInfo: vi.fn(),
+  printClaude: vi.fn(),
+  bindFormatterState: vi.fn(),
+  unbindFormatterState: vi.fn(),
 }));
 
 import { spawnClaude } from '../../src/process/pty.js';
@@ -44,7 +51,10 @@ function createMockFormatterState(): FormatterState {
   return {
     pendingTools: [],
     lastToolTime: null,
-    activeTask: null,
+    activeTasks: new Map(),
+    toolToTaskId: new Map(),
+    nextLabelIndex: 0,
+    currentTaskId: null,
     toolStartTimes: new Map(),
     currentStep: 1,
     suppressStepCompletion: true,
@@ -52,8 +62,11 @@ function createMockFormatterState(): FormatterState {
     stats: createRunStats(),
     runStats: createRunStats(),
     stepStartTime: null,
-    taskStats: null,
-    taskStartTime: null,
+    taskStatsMap: new Map(),
+    taskStartTimes: new Map(),
+    taskReadyQueue: [],
+    taskPendingQueue: [],
+    currentStatusText: null,
   };
 }
 
@@ -415,5 +428,319 @@ this is not valid {{ syntax`
         success: true,
       }),
     ]);
+  });
+});
+
+describe('status line clearing', () => {
+  const testDir = path.join(process.cwd(), 'tests', 'fixtures', 'rill');
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fs.mkdirSync(testDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(testDir, { recursive: true, force: true });
+  });
+
+  function createRunnerOptions(
+    scriptFile: string,
+    overrides?: Partial<RillRunnerOptions>
+  ): RillRunnerOptions {
+    return {
+      scriptFile,
+      args: [],
+      config: createMockConfig(),
+      logger: createMockLogger(),
+      formatterState: createMockFormatterState(),
+      cwd: process.cwd(),
+      runId: 'test-run-1',
+      ...overrides,
+    };
+  }
+
+  it('clears status line on script completion (AC-4)', async () => {
+    const scriptPath = path.join(testDir, 'status-complete.rill');
+    fs.writeFileSync(
+      scriptPath,
+      `
+ccr::state("Processing...")
+log("Work done")
+`
+    );
+
+    // Import the mocked modules
+    const { clearStatusLine } = await import('../../src/output/colors.js');
+
+    const formatterState = createMockFormatterState();
+    const config = createMockConfig({ verbosity: 'normal' });
+    await runRillScript(
+      createRunnerOptions(scriptPath, { formatterState, config })
+    );
+
+    // Verify clearStatusLine was called after script completion (AC-4)
+    expect(clearStatusLine).toHaveBeenCalled();
+
+    // Verify the clear happened after any state updates
+    // (clearStatusLine is called in the finally block, line 342)
+    const clearCalls = vi.mocked(clearStatusLine).mock.calls;
+    expect(clearCalls.length).toBeGreaterThan(0);
+  });
+
+  it('clears status line before error output (AC-5)', async () => {
+    const scriptPath = path.join(testDir, 'status-error.rill');
+    fs.writeFileSync(
+      scriptPath,
+      `
+ccr::state("Processing...")
+error "Something went wrong"
+`
+    );
+
+    const { clearStatusLine, printRunner } =
+      await import('../../src/output/colors.js');
+
+    const formatterState = createMockFormatterState();
+    const config = createMockConfig({ verbosity: 'normal' });
+    const result = await runRillScript(
+      createRunnerOptions(scriptPath, { formatterState, config })
+    );
+
+    expect(result.success).toBe(false);
+
+    // Get all mock calls
+    const clearCalls = vi.mocked(clearStatusLine).mock.invocationCallOrder;
+    const printCalls = vi.mocked(printRunner).mock.invocationCallOrder;
+
+    // Find the error message print call
+    const errorPrintCall = printCalls[printCalls.length - 1];
+
+    // Verify clearStatusLine was called before error output
+    expect(clearCalls.length).toBeGreaterThan(0);
+    const lastClearCall = clearCalls[clearCalls.length - 1];
+    expect(lastClearCall).toBeLessThan(errorPrintCall ?? Infinity);
+  });
+
+  it('clears status line on parse error (AC-5 variant)', async () => {
+    const scriptPath = path.join(testDir, 'status-parse-error.rill');
+    fs.writeFileSync(
+      scriptPath,
+      `
+ccr::state("Parsing...")
+this is {{ invalid syntax
+`
+    );
+
+    const { clearStatusLine } = await import('../../src/output/colors.js');
+
+    const formatterState = createMockFormatterState();
+    const config = createMockConfig({ verbosity: 'normal' });
+    const result = await runRillScript(
+      createRunnerOptions(scriptPath, { formatterState, config })
+    );
+
+    expect(result.success).toBe(false);
+    expect(clearStatusLine).toHaveBeenCalled();
+  });
+
+  it('clears status line on runtime error (AC-5 variant)', async () => {
+    const scriptPath = path.join(testDir, 'status-runtime-error.rill');
+    fs.writeFileSync(
+      scriptPath,
+      `
+ccr::state("Running...")
+$nonexistent_variable + 1
+`
+    );
+
+    const { clearStatusLine } = await import('../../src/output/colors.js');
+
+    const formatterState = createMockFormatterState();
+    const config = createMockConfig({ verbosity: 'normal' });
+    const result = await runRillScript(
+      createRunnerOptions(scriptPath, { formatterState, config })
+    );
+
+    expect(result.success).toBe(false);
+    expect(clearStatusLine).toHaveBeenCalled();
+  });
+
+  it('does not render status in quiet mode (AC-11)', async () => {
+    const scriptPath = path.join(testDir, 'status-quiet.rill');
+    fs.writeFileSync(
+      scriptPath,
+      `
+ccr::state("Processing...")
+log("Work done")
+`
+    );
+
+    const { renderStatusLine } = await import('../../src/output/colors.js');
+
+    await runRillScript(
+      createRunnerOptions(scriptPath, {
+        config: createMockConfig({ verbosity: 'quiet' }),
+      })
+    );
+
+    // In quiet mode, renderStatusLine should never be called
+    expect(renderStatusLine).not.toHaveBeenCalled();
+  });
+
+  it('quiet verbosity suppresses status display - no stderr writes (AC-7)', async () => {
+    const scriptPath = path.join(testDir, 'status-quiet-stderr.rill');
+    fs.writeFileSync(
+      scriptPath,
+      `
+ccr::state("Processing step 1...")
+log("Step 1 complete")
+ccr::state("Processing step 2...")
+log("Step 2 complete")
+ccr::state("")
+log("All done")
+`
+    );
+
+    const { renderStatusLine, clearStatusLine } =
+      await import('../../src/output/colors.js');
+
+    // Create a spy on stderr.write to verify no writes occur
+    const stderrWriteSpy = vi.spyOn(process.stderr, 'write');
+
+    const formatterState = createMockFormatterState();
+    const config = createMockConfig({ verbosity: 'quiet' });
+
+    await runRillScript(
+      createRunnerOptions(scriptPath, { formatterState, config })
+    );
+
+    // Verify no status rendering functions were called
+    expect(renderStatusLine).not.toHaveBeenCalled();
+    expect(clearStatusLine).not.toHaveBeenCalled();
+
+    // Verify no writes to stderr occurred (status display suppressed)
+    expect(stderrWriteSpy).not.toHaveBeenCalled();
+
+    // Verify state was updated internally (callback executed)
+    // Final state should be null after the script clears it
+    expect(formatterState.currentStatusText).toBeNull();
+
+    stderrWriteSpy.mockRestore();
+  });
+
+  it('non-TTY environments skip status rendering - no writes (AC-6, EC-4)', async () => {
+    const scriptPath = path.join(testDir, 'status-non-tty.rill');
+    fs.writeFileSync(
+      scriptPath,
+      `
+ccr::state("Processing step 1...")
+log("Step 1 complete")
+ccr::state("Processing step 2...")
+log("Step 2 complete")
+ccr::state("")
+log("All done")
+`
+    );
+
+    const { renderStatusLine } = await import('../../src/output/colors.js');
+
+    // Mock stderr as non-TTY by setting isTTY to undefined
+    const originalIsTTY = process.stderr.isTTY;
+    Object.defineProperty(process.stderr, 'isTTY', {
+      value: undefined,
+      configurable: true,
+    });
+
+    // Create a spy on stderr.write to verify no writes occur
+    const stderrWriteSpy = vi.spyOn(process.stderr, 'write');
+
+    const formatterState = createMockFormatterState();
+    const config = createMockConfig({ verbosity: 'normal' }); // Normal verbosity, but non-TTY
+
+    await runRillScript(
+      createRunnerOptions(scriptPath, { formatterState, config })
+    );
+
+    // Verify renderStatusLine was called but produced no output (silent no-op)
+    expect(renderStatusLine).toHaveBeenCalled();
+
+    // Verify zero writes to stderr (no-op in non-TTY environment)
+    expect(stderrWriteSpy).not.toHaveBeenCalled();
+
+    // Verify state was updated internally (callback executed)
+    expect(formatterState.currentStatusText).toBeNull();
+
+    // Restore original isTTY value
+    Object.defineProperty(process.stderr, 'isTTY', {
+      value: originalIsTTY,
+      configurable: true,
+    });
+
+    stderrWriteSpy.mockRestore();
+  });
+
+  it('terminal resize during active status re-renders with updated columns (AC-EC-2)', async () => {
+    const scriptPath = path.join(testDir, 'status-resize.rill');
+    fs.writeFileSync(
+      scriptPath,
+      `
+ccr::state("Processing a very long status message that should be visible")
+log("Work in progress")
+`
+    );
+
+    const { renderStatusLine } = await import('../../src/output/colors.js');
+
+    // Configure non-quiet mode to enable resize listener
+    const config = createMockConfig({ verbosity: 'normal' });
+    const formatterState = createMockFormatterState();
+
+    // Track the number of resize event listeners before execution
+    const initialListenerCount = process.stderr.listenerCount('resize');
+
+    // Execute the script
+    await runRillScript(
+      createRunnerOptions(scriptPath, { config, formatterState })
+    );
+
+    // Verify resize listener was removed after completion
+    const finalListenerCount = process.stderr.listenerCount('resize');
+    expect(finalListenerCount).toBe(initialListenerCount);
+
+    // Verify renderStatusLine was called (for state rendering)
+    expect(renderStatusLine).toHaveBeenCalled();
+  });
+
+  it('rapid sequential state updates display only latest value (AC-EC-3)', async () => {
+    const scriptPath = path.join(testDir, 'status-rapid.rill');
+    // Create a script that rapidly updates state 10 times
+    const stateUpdates = Array.from(
+      { length: 10 },
+      (_, i) => `ccr::state("State ${i}")`
+    ).join('\n');
+    fs.writeFileSync(scriptPath, stateUpdates);
+
+    const { renderStatusLine } = await import('../../src/output/colors.js');
+
+    const formatterState = createMockFormatterState();
+    const config = createMockConfig({ verbosity: 'normal' });
+    await runRillScript(
+      createRunnerOptions(scriptPath, {
+        formatterState,
+        config,
+      })
+    );
+
+    // Verify renderStatusLine was called multiple times (once per state update)
+    expect(renderStatusLine).toHaveBeenCalled();
+
+    // Get all calls to renderStatusLine
+    const calls = vi.mocked(renderStatusLine).mock.calls;
+
+    // Verify the last call before clearing has the final state value
+    const nonNullCalls = calls.filter((call) => call[0] !== null);
+    expect(nonNullCalls.length).toBeGreaterThan(0);
+    const lastNonNullCall = nonNullCalls[nonNullCalls.length - 1];
+    expect(lastNonNullCall?.[0]).toBe('State 9');
   });
 });

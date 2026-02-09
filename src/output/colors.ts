@@ -16,6 +16,24 @@ import type { FormatterState } from './formatter.js';
 // Re-export deaddrop functions for backward compatibility
 export { configureDeadDrop, flushDeadDrop };
 
+// Module-level formatter state binding (follows configureDeadDrop pattern)
+let boundFormatterState: FormatterState | null = null;
+
+/**
+ * Bind a FormatterState so terminalLog re-renders the status line after each log.
+ * Call once at runner startup; call unbindFormatterState() on teardown.
+ */
+export function bindFormatterState(state: FormatterState): void {
+  boundFormatterState = state;
+}
+
+/**
+ * Unbind the formatter state (teardown).
+ */
+export function unbindFormatterState(): void {
+  boundFormatterState = null;
+}
+
 export const colors = {
   reset: '\x1b[0m',
   dim: '\x1b[2m',
@@ -81,8 +99,9 @@ export function stripCR(str: string): string {
  */
 export function terminalLog(line: string, state?: FormatterState): void {
   console.log(stripCR(line));
-  if (state && state.currentStatusText !== null) {
-    renderStatusLine(state.currentStatusText, process.stderr);
+  const effectiveState = state ?? boundFormatterState;
+  if (effectiveState && effectiveState.currentStatusText !== null) {
+    renderStatusLine(effectiveState.currentStatusText, process.stderr);
   }
 }
 

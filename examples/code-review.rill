@@ -4,7 +4,7 @@ args: path: string
 ---
 
 # Analyze the code
-ccr::prompt("Review the code in {$path} for bugs and issues") :> $issues
+ccr::prompt("Review the code in {$path} for bugs and issues") => $issues
 
 # Get improvement suggestions based on issues found
 """
@@ -13,7 +13,7 @@ Based on these issues:
 
 Suggest specific fixes with code examples.
 """
-  -> ccr::prompt :> $fixes
+  -> ccr::prompt => $fixes
 
 # Summarize for the developer
 """

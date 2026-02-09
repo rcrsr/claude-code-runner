@@ -6,7 +6,7 @@ args: text: string
 # Do-while pattern: review at least once, accumulate with $
 ^(limit: 3) [iter: 0, max: 3, text: $text, done: false]
   -> @ {
-    $.iter + 1 :> $i
+    $.iter + 1 => $i
     log("Iteration {$i}")
 
     # Ask Claude to review and improve
@@ -22,10 +22,10 @@ args: text: string
     Otherwise, provide the improved version and respond with:
     <ccr:result type="continue"/>
     """
-    -> ccr::prompt :> $response
+    -> ccr::prompt => $response
 
     # Check the result
-    ccr::get_result($response) :> $result
+    ccr::get_result($response) => $result
 
     ($result.type == "done")
       ? {
@@ -34,7 +34,7 @@ args: text: string
         }
       ! [iter: $i, max: $.max, text: $response, done: false]
   } ? (!$.done && $.iter < $.max)
-  :> $final
+  => $final
 
 log("=== Final Result ===")
 log($final.text)

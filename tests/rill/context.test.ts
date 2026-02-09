@@ -553,4 +553,51 @@ describe('ccr::state', () => {
     expect(result.value).toBe(null);
     // Should not throw
   });
+
+  it('status persists across multiple log messages (AC-10)', async () => {
+    const executor = createMockExecutor();
+    const onStateChange = vi.fn();
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation();
+
+    const ctx = createRunnerContext({
+      executeClause: executor,
+      onStateChange,
+    });
+
+    // Set state once, then emit 3 log messages
+    const code = `
+      ccr::state("Working...")
+      log("Log message 1")
+      log("Log message 2")
+      log("Log message 3")
+    `;
+    const ast = parse(code);
+    await execute(ast, ctx);
+
+    // Verify onStateChange called exactly once with correct value
+    expect(onStateChange).toHaveBeenCalledTimes(1);
+    expect(onStateChange).toHaveBeenCalledWith('Working...');
+
+    // Verify the state value persisted unchanged across all log calls
+    const allCalls = onStateChange.mock.calls;
+    expect(allCalls.length).toBe(1);
+    expect(allCalls[0]?.[0]).toBe('Working...');
+
+    // Verify log messages were emitted (default onLog callback uses console.log)
+    expect(consoleSpy).toHaveBeenCalledTimes(3);
+    expect(consoleSpy).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('Log message 1')
+    );
+    expect(consoleSpy).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('Log message 2')
+    );
+    expect(consoleSpy).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining('Log message 3')
+    );
+
+    consoleSpy.mockRestore();
+  });
 });

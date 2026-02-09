@@ -5,10 +5,18 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.11.0] — 2026-02-08
+
+### Breaking
+
+- Upgraded `@rcrsr/rill` from `~0.5.0` to `~0.7.0`; capture arrow `=>` replaces `:>` (enables ligatures in programming fonts; `:>` rejected with RILL-P006)
 
 ### Added
 
+- `ccr::state(text)` host function for Rill scripts to display current execution phase on a persistent status line below log output; status updates via callback flow through `FormatterState` and re-renders after each log message
+- Status line uses ANSI cursor control sequences for positioning, ANSI stripping for security, and automatic clearing on script completion
+- `STATUS_LINE_ELLIPSIS` and `STATUS_LINE_MIN_WIDTH` constants control truncation behavior with 20-column terminal width minimum
+- Terminal resize handling enables responsive status line display; quiet mode suppression prevents status output in piped contexts
 - `docs` subcommand outputs Rill language reference and CCR function signatures for LLM prompts
 - `--functions-only` and `--language-only` flags for selective docs output
 
@@ -19,13 +27,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Status line persists across log output; `bindFormatterState` connects `terminalLog` re-rendering to the active `FormatterState`
 - Concurrent agent tool calls now show colored dot markers (queue-based attribution replaces dropped markers)
 
 ## [0.10.0] — 2026-02-03
 
 ### Added
 
-- Version display on startup: `[runner] v0.10.0 (rill v0.5.0)`
+- Version display on startup: `[runner] v.10.0 (rill v0.5.0)`
 
 ### Changed
 
