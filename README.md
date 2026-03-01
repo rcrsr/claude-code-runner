@@ -1,6 +1,6 @@
 # Claude Code Runner
 
-Deterministic, scripted, unattended Claude Code execution with [Rill](https://github.com/rcrsr/rill) scripting.
+Deterministic, scripted, unattended Claude Code execution with [rill](https://rill.run) scripting.
 
 ## Why Use This?
 

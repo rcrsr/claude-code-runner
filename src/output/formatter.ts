@@ -219,7 +219,7 @@ function formatToolUse(
       ' '
     );
     summary = truncate(cmd, TRUNCATE_BASH_CMD);
-  } else if (name === 'Task') {
+  } else if (name === 'Task' || name === 'Agent') {
     // Task state already initialized in pre-scan, just print header
     const task = state.activeTasks.get(tool.id);
     if (task) {
@@ -381,7 +381,10 @@ export function formatMessage(
     // Check for Task tools first to initialize task tracking
     const preTaskCount = state.activeTasks.size;
     for (const block of msg.message.content) {
-      if (isToolUseBlock(block) && block.name === 'Task') {
+      if (
+        isToolUseBlock(block) &&
+        (block.name === 'Task' || block.name === 'Agent')
+      ) {
         const input = block.input;
         const taskType =
           (input['subagent_type'] as string | undefined) ?? 'agent';
@@ -463,15 +466,15 @@ export function formatMessage(
         // Record start time
         state.toolStartTimes.set(block.id, now);
 
-        // Attribute non-Task tools using message-level task attribution
-        if (block.name !== 'Task' && messageTaskId) {
+        // Attribute non-Task/Agent tools using message-level task attribution
+        if (block.name !== 'Task' && block.name !== 'Agent' && messageTaskId) {
           state.toolToTaskId.set(block.id, messageTaskId);
           // Track tool use in attributed task's stats
           const taskStats = state.taskStatsMap.get(messageTaskId);
           if (taskStats) {
             recordToolUse(taskStats, block.name);
           }
-        } else if (block.name !== 'Task') {
+        } else if (block.name !== 'Task' && block.name !== 'Agent') {
           recordToolUse(stats, block.name);
         }
 

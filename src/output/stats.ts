@@ -149,14 +149,6 @@ function totalInputTokens(tokens: TokenCounts): number {
 }
 
 /**
- * Estimate output tokens from character count
- * Rough estimate: ~4 chars per token
- */
-function estimateOutputTokens(chars: number): number {
-  return Math.ceil(chars / 4);
-}
-
-/**
  * Format number with commas
  */
 function formatNumber(n: number): string {
@@ -165,7 +157,7 @@ function formatNumber(n: number): string {
 
 /**
  * Format stats summary for display
- * Example: 33s | 14 msgs | 319,449 in (32 p / 6,579 cw5m / 312,838 cr) | ~931 out | 3 tools (Bash, Edit, Read)
+ * Example: 33s | 14 msgs | 319,449 in (32 p / 6,579 cw5m / 312,838 cr) | 931 out | 3 tools (Bash, Edit, Read)
  */
 export function formatStatsSummary(
   stats: RunStats,
@@ -198,13 +190,8 @@ export function formatStatsSummary(
     breakdownParts.length > 0 ? ` (${breakdownParts.join(' / ')})` : '';
   parts.push(`${formatNumber(totalIn)} in${breakdown}`);
 
-  // Output tokens (actual if available, otherwise estimated from chars)
-  if (stats.tokens.output > 0) {
-    parts.push(`${formatNumber(stats.tokens.output)} out`);
-  } else {
-    const outputTokens = estimateOutputTokens(stats.outputChars);
-    parts.push(`~${formatNumber(outputTokens)} out`);
-  }
+  // Output tokens
+  parts.push(`${formatNumber(stats.tokens.output)} out`);
 
   // Tools
   if (stats.toolUseCount > 0) {

@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Task tracking (colored markers, agent names) now activates for Claude Code's renamed `Agent` tool; matches both `Agent` and `Task` for backwards compatibility
+- Output token display uses API-reported `output_tokens` directly; removes `~` prefix and character-based estimation fallback
+
 ## [0.11.1] — 2026-02-08
 
 ### Changed

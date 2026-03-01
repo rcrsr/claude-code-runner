@@ -539,6 +539,48 @@ describe('formatMessage', () => {
 
       expect(hasTaskHeader).toBe(true);
     });
+
+    it("adds task to activeTasks map with label when tool name is 'Agent'", () => {
+      const state = createMockFormatterState();
+      const logger = createMockLogger();
+      const msg = createToolUseMessage(
+        'Agent',
+        { subagent_type: 'Explore', description: 'Find files' },
+        'task-1'
+      );
+
+      formatMessage(msg, state, 'normal', logger, 100);
+      flushPendingTools(state, 'normal');
+
+      const task = state.activeTasks.get('task-1');
+      expect(task).toEqual({
+        name: 'Explore',
+        description: 'Find files',
+        id: 'task-1',
+        colorIndex: 0,
+      });
+    });
+
+    it("prints task header with label when tool name is 'Agent'", () => {
+      const state = createMockFormatterState();
+      const logger = createMockLogger();
+      const msg = createToolUseMessage(
+        'Agent',
+        { subagent_type: 'Explore', description: 'Find files' },
+        'task-1'
+      );
+
+      formatMessage(msg, state, 'normal', logger, 100);
+      flushPendingTools(state, 'normal');
+
+      const calls = consoleSpy.mock.calls.map((c) => stripAnsi(c[0] as string));
+      // Check task header contains marker and [Explore]
+      const hasTaskHeader = calls.some(
+        (c) => c.includes('[Explore]') && c.includes('●')
+      );
+
+      expect(hasTaskHeader).toBe(true);
+    });
   });
 
   describe('parallel task tracking', () => {

@@ -1,8 +1,8 @@
 # Rill Scripting
 
-Rill scripts chain multiple Claude prompts and commands into multi-step workflows.
+rill scripts chain multiple Claude prompts and commands into multi-step workflows.
 
-For full Rill language reference, see [github.com/rcrsr/rill](https://github.com/rcrsr/rill). Claude Code Runner extends Rill with the `ccr::` host functions documented below.
+For full rill language reference, see [https://rill.run](https://rill.run). Claude Code Runner extends rill with the `ccr::` host functions documented below.
 
 ## Script Structure
 
