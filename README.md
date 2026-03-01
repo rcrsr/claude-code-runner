@@ -75,7 +75,7 @@ Output findings as a numbered list.
 
 ### script — Run multi-phase workflows
 
-Scripts use [Rill](https://github.com/rcrsr/rill), a scripting language designed for AI workflows. Rill provides:
+Scripts use [rill](https://rill.run), a scripting language designed for AI workflows. Rill provides:
 
 - **Variables & capture** — Store Claude's output with `:>` operator
 - **Conditionals** — Branch logic with `(condition) ? action`
