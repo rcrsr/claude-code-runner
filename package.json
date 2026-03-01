@@ -46,12 +46,12 @@
   "author": "Andre Bremer",
   "license": "MIT",
   "dependencies": {
-    "@rcrsr/rill": "~0.7.2",
+    "@rcrsr/rill": "~0.8.6",
     "node-pty": "^1.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
-    "@types/node": "^25.2.0",
+    "@types/node": "^25.3.3",
     "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^9.39.2",
     "eslint-plugin-simple-import-sort": "^12.1.1",
@@ -59,7 +59,7 @@
     "react": "^19.2.4",
     "tsc-files": "^1.1.4",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.54.0",
+    "typescript-eslint": "^8.56.1",
     "vitest": "^4.0.18"
   },
   "engines": {

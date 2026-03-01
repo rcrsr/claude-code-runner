@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Upgraded `@rcrsr/rill` from `~0.7.2` to `~0.8.6`
+- Upgraded `@types/node` from `^25.2.0` to `^25.3.3`
+- Upgraded `typescript-eslint` from `^8.54.0` to `^8.56.1`
+
 ### Fixed
 
 - Task tracking (colored markers, agent names) now activates for Claude Code's renamed `Agent` tool; matches both `Agent` and `Task` for backwards compatibility
