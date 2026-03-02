@@ -41,6 +41,16 @@ npm run build           # Compile TypeScript
 - **Type guards with unions**: Place `is*` type guards next to discriminated union definitions
 - **No global state**: Pass state objects through function calls (`FormatterState`, `RunnerContext`)
 
+## Releasing
+
+1. Bump `version` in `package.json`
+2. Stamp `[Unreleased]` in `CHANGELOG.md` with version and date (`[x.y.z] — YYYY-MM-DD`)
+3. Commit: `chore: vX.Y.Z — summary`
+4. Push to `main`
+5. Trigger the release workflow: `gh workflow run 232052149`
+
+Do **not** create GitHub releases manually — the workflow handles release creation and npm publish.
+
 ## Testing
 
 - Mock factories in `tests/helpers/mocks.ts` with optional `overrides` parameter
