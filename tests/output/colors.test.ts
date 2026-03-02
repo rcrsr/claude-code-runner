@@ -455,7 +455,7 @@ describe('terminalLog', () => {
       lastToolTime: null,
       activeTasks: new Map(),
       toolToTaskId: new Map(),
-      nextLabelIndex: 0,
+
       currentTaskId: null,
       toolStartTimes: new Map(),
       currentStep: 1,
@@ -504,7 +504,7 @@ describe('terminalLog', () => {
       lastToolTime: null,
       activeTasks: new Map(),
       toolToTaskId: new Map(),
-      nextLabelIndex: 0,
+
       currentTaskId: null,
       toolStartTimes: new Map(),
       currentStep: 1,
@@ -565,7 +565,7 @@ describe('terminalLog', () => {
       lastToolTime: null,
       activeTasks: new Map(),
       toolToTaskId: new Map(),
-      nextLabelIndex: 0,
+
       currentTaskId: null,
       toolStartTimes: new Map(),
       currentStep: 1,
@@ -651,7 +651,7 @@ describe('bindFormatterState / unbindFormatterState', () => {
       lastToolTime: null,
       activeTasks: new Map(),
       toolToTaskId: new Map(),
-      nextLabelIndex: 0,
+
       currentTaskId: null,
       toolStartTimes: new Map(),
       currentStep: 1,
@@ -703,7 +703,7 @@ describe('bindFormatterState / unbindFormatterState', () => {
       lastToolTime: null,
       activeTasks: new Map(),
       toolToTaskId: new Map(),
-      nextLabelIndex: 0,
+
       currentTaskId: null,
       toolStartTimes: new Map(),
       currentStep: 1,
@@ -755,7 +755,7 @@ describe('bindFormatterState / unbindFormatterState', () => {
       lastToolTime: null,
       activeTasks: new Map(),
       toolToTaskId: new Map(),
-      nextLabelIndex: 0,
+
       currentTaskId: null,
       toolStartTimes: new Map(),
       currentStep: 1,
@@ -812,7 +812,7 @@ describe('bindFormatterState / unbindFormatterState', () => {
       lastToolTime: null,
       activeTasks: new Map(),
       toolToTaskId: new Map(),
-      nextLabelIndex: 0,
+
       currentTaskId: null,
       toolStartTimes: new Map(),
       currentStep: 1,

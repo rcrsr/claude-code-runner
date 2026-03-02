@@ -43,6 +43,9 @@ vi.mock('../../src/output/colors.js', () => ({
   printClaude: vi.fn(),
   bindFormatterState: vi.fn(),
   unbindFormatterState: vi.fn(),
+  statusDisplayText: vi.fn(
+    (state: { currentStatusText: string | null }) => state.currentStatusText
+  ),
 }));
 
 import { spawnClaude } from '../../src/process/pty.js';
@@ -53,7 +56,6 @@ function createMockFormatterState(): FormatterState {
     lastToolTime: null,
     activeTasks: new Map(),
     toolToTaskId: new Map(),
-    nextLabelIndex: 0,
     currentTaskId: null,
     toolStartTimes: new Map(),
     currentStep: 1,
@@ -741,6 +743,6 @@ log("Work in progress")
     const nonNullCalls = calls.filter((call) => call[0] !== null);
     expect(nonNullCalls.length).toBeGreaterThan(0);
     const lastNonNullCall = nonNullCalls[nonNullCalls.length - 1];
-    expect(lastNonNullCall?.[0]).toBe('State 9');
+    expect(lastNonNullCall?.[0]).toContain('State 9');
   });
 });

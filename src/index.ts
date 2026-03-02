@@ -25,9 +25,18 @@ import {
   getRunStatsSummary,
 } from './output/formatter.js';
 import { createLogger } from './output/logger.js';
+import { cloneStats, mergeStats } from './output/stats.js';
 import { spawnClaude } from './process/pty.js';
 import { runRillScript } from './rill/index.js';
 import { DEFAULT_CONFIG, type RunnerConfig } from './types/runner.js';
+import {
+  clearRunState,
+  generateStableId,
+  loadRunState,
+  type PersistedRunState,
+  type PersistedRunStats,
+  saveRunState,
+} from './utils/run-state.js';
 
 /**
  * Generate a short unique run ID (8 chars, uppercase)
@@ -37,8 +46,9 @@ function generateRunId(): string {
 }
 
 async function main(): Promise<void> {
-  const totalStart = Date.now();
+  let totalStart = Date.now();
   const args = process.argv.slice(2);
+  const stableId = generateStableId(process.cwd(), args);
   const parsed = parseArgs(args);
 
   // Handle docs subcommand (exits immediately, no PTY)
@@ -78,6 +88,52 @@ async function main(): Promise<void> {
 
   // Create formatter state
   const formatterState = createFormatterState();
+
+  // Restore accumulated stats from a prior crashed run, if any
+  const priorState = loadRunState(stableId);
+  if (priorState) {
+    formatterState.runStats.messageCount = priorState.runStats.messageCount;
+    formatterState.runStats.tokens = { ...priorState.runStats.tokens };
+    formatterState.runStats.toolsUsed = new Set(priorState.runStats.toolsUsed);
+    formatterState.runStats.toolUseCount = priorState.runStats.toolUseCount;
+    formatterState.runStats.outputChars = priorState.runStats.outputChars;
+    formatterState.elapsedMs = priorState.elapsedMs;
+    totalStart = Date.parse(priorState.startedAt);
+    printRunnerInfo(`Resuming state from step ${priorState.currentStep}`);
+  }
+
+  // Start tick clock regardless of whether we recovered prior state
+  formatterState.lastTickTime = Date.now();
+
+  // Persist state after every processed message for crash recovery
+  const startedAt = priorState?.startedAt ?? new Date().toISOString();
+  formatterState.onUpdate = () => {
+    // Accumulate active runtime
+    const now = Date.now();
+    if (formatterState.lastTickTime !== null) {
+      formatterState.elapsedMs += now - formatterState.lastTickTime;
+    }
+    formatterState.lastTickTime = now;
+
+    const snapshot = cloneStats(formatterState.runStats);
+    mergeStats(snapshot, formatterState.stats);
+    const persistedStats: PersistedRunStats = {
+      messageCount: snapshot.messageCount,
+      tokens: { ...snapshot.tokens },
+      toolsUsed: Array.from(snapshot.toolsUsed),
+      toolUseCount: snapshot.toolUseCount,
+      outputChars: snapshot.outputChars,
+    };
+    const state: PersistedRunState = {
+      version: 1,
+      pid: process.pid,
+      startedAt,
+      currentStep: formatterState.currentStep,
+      elapsedMs: formatterState.elapsedMs,
+      runStats: persistedStats,
+    };
+    saveRunState(stableId, state);
+  };
 
   // Print version info
   printRunnerInfo(`v${pkg.version} (rill v${RILL_VERSION})`);
@@ -119,6 +175,7 @@ async function main(): Promise<void> {
 
     logger.close();
     await flushDeadDrop();
+    if (result.success) clearRunState(stableId);
     process.exit(result.success ? 0 : 1);
   }
 
@@ -167,6 +224,7 @@ async function main(): Promise<void> {
   logger.logEvent({ event: 'run_complete', runId, exit: result.exitCode });
   logger.close();
   await flushDeadDrop();
+  if (result.exitCode === 0) clearRunState(stableId);
   process.exit(result.exitCode === 0 ? 0 : 1);
 }
 

@@ -515,7 +515,7 @@ describe('formatMessage', () => {
         name: 'Explore',
         description: 'Find files',
         id: 'task-1',
-        colorIndex: 0,
+        colorIndex: 1,
       });
     });
 
@@ -557,7 +557,7 @@ describe('formatMessage', () => {
         name: 'Explore',
         description: 'Find files',
         id: 'task-1',
-        colorIndex: 0,
+        colorIndex: 1,
       });
     });
 
@@ -604,9 +604,8 @@ describe('formatMessage', () => {
       );
       formatMessage(msg2, state, 'normal', logger, 100);
 
-      expect(state.activeTasks.get('task-1')?.colorIndex).toBe(0);
-      expect(state.activeTasks.get('task-2')?.colorIndex).toBe(1);
-      expect(state.nextLabelIndex).toBe(2);
+      expect(state.activeTasks.get('task-1')?.colorIndex).toBe(1);
+      expect(state.activeTasks.get('task-2')?.colorIndex).toBe(2);
     });
 
     it('attributes tool calls to current task', () => {

@@ -33,6 +33,7 @@ import {
   agentMarker,
   colors,
   formatDuration,
+  hashAgentId,
   printClaude,
   printRunner,
   shortenPath,
@@ -63,8 +64,6 @@ export interface FormatterState {
   activeTasks: Map<string, ActiveTask>;
   /** Maps tool_use_id to parent task id for attribution */
   toolToTaskId: Map<string, string>;
-  /** Counter for generating task labels (A, B, C...) */
-  nextLabelIndex: number;
   /** Most recently started task id (for tool attribution) */
   currentTaskId: string | null;
   toolStartTimes: Map<string, number>;
@@ -89,6 +88,12 @@ export interface FormatterState {
   taskPendingQueue: string[];
   /** Current state text from ccr::state() */
   currentStatusText: string | null;
+  /** Called after each processed message; used for state persistence */
+  onUpdate?: () => void;
+  /** Accumulated active runtime in ms (excludes crash gaps) */
+  elapsedMs: number;
+  /** Timestamp of last onUpdate tick (for computing deltas) */
+  lastTickTime: number | null;
 }
 
 export function createFormatterState(): FormatterState {
@@ -97,7 +102,6 @@ export function createFormatterState(): FormatterState {
     lastToolTime: null,
     activeTasks: new Map(),
     toolToTaskId: new Map(),
-    nextLabelIndex: 0,
     currentTaskId: null,
     toolStartTimes: new Map(),
     currentStep: 1,
@@ -111,6 +115,8 @@ export function createFormatterState(): FormatterState {
     taskReadyQueue: [],
     taskPendingQueue: [],
     currentStatusText: null,
+    elapsedMs: 0,
+    lastTickTime: null,
   };
 }
 
@@ -119,7 +125,6 @@ export function resetFormatterState(state: FormatterState): void {
   state.lastToolTime = null;
   state.activeTasks.clear();
   state.toolToTaskId.clear();
-  state.nextLabelIndex = 0;
   state.currentTaskId = null;
   state.toolStartTimes.clear();
   resetRunStats(state.stats);
@@ -394,9 +399,8 @@ export function formatMessage(
             '',
           TRUNCATE_TASK_DESC
         );
-        // Assign color index (cycles through 8 colors)
-        const colorIndex = state.nextLabelIndex;
-        state.nextLabelIndex++;
+        // Assign stable color from agent ID hash
+        const colorIndex = hashAgentId(block.id);
 
         const task: ActiveTask = {
           name: taskType,
@@ -595,5 +599,6 @@ export function formatMessage(
     }
   }
 
+  state.onUpdate?.();
   return claudeText;
 }

@@ -64,8 +64,21 @@ const AGENT_BG_COLORS = [
 ] as const;
 
 /**
+ * Hash an agent ID string to a stable color index in [0, AGENT_BG_COLORS.length).
+ * Uses djb2-style hashing: accumulates hash = (hash * 31 + charCode) >>> 0.
+ * @param id - Agent ID string to hash
+ */
+export function hashAgentId(id: string): number {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  }
+  return hash % AGENT_BG_COLORS.length;
+}
+
+/**
  * Get an agent marker: inverted dot with cycling background color
- * @param index - Agent index (0-based), cycles through 8 colors
+ * @param index - Color index (0-based), from hashAgentId or direct value
  */
 export function agentMarker(index: number): string {
   const bg = AGENT_BG_COLORS[index % AGENT_BG_COLORS.length];
@@ -99,19 +112,17 @@ export function stripCR(str: string): string {
  */
 export function terminalLog(line: string, state?: FormatterState): void {
   const effectiveState = state ?? boundFormatterState;
-  const hasStatus =
-    effectiveState !== null && effectiveState.currentStatusText !== null;
 
   // Clear status line before logging to prevent ghost lines in scrollback
-  if (hasStatus) {
+  if (effectiveState !== null && effectiveState.currentStatusText !== null) {
     clearStatusLine(process.stderr);
   }
 
   console.log(stripCR(line));
 
   // Re-render status line below new cursor position
-  if (hasStatus) {
-    renderStatusLine(effectiveState.currentStatusText, process.stderr);
+  if (effectiveState !== null && effectiveState.currentStatusText !== null) {
+    renderStatusLine(statusDisplayText(effectiveState), process.stderr);
   }
 }
 
@@ -130,6 +141,26 @@ export function truncate(str: string, len: number): string {
     return str;
   }
   return str.slice(0, len) + '...';
+}
+
+/**
+ * Format elapsed milliseconds as hh:mm:ss
+ */
+export function formatElapsed(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+/**
+ * Build display text for the status line, prepending accumulated runtime.
+ * Returns null when there is no active status text.
+ */
+export function statusDisplayText(state: FormatterState): string | null {
+  if (state.currentStatusText === null) return null;
+  return `[${formatElapsed(state.elapsedMs)}] ${state.currentStatusText}`;
 }
 
 /**

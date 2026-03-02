@@ -40,7 +40,6 @@ export function createMockFormatterState(): FormatterState {
     lastToolTime: null,
     activeTasks: new Map(),
     toolToTaskId: new Map(),
-    nextLabelIndex: 0,
     currentTaskId: null,
     toolStartTimes: new Map(),
     currentStep: 1,
@@ -54,6 +53,8 @@ export function createMockFormatterState(): FormatterState {
     taskReadyQueue: [],
     taskPendingQueue: [],
     currentStatusText: null,
+    elapsedMs: 0,
+    lastTickTime: null,
   };
 }
 

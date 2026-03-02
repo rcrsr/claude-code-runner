@@ -22,6 +22,7 @@ import {
   colors,
   printRunner,
   renderStatusLine,
+  statusDisplayText,
   unbindFormatterState,
 } from '../output/colors.js';
 import { finalizeStepStats, type FormatterState } from '../output/formatter.js';
@@ -287,7 +288,10 @@ export async function runRillScript(
 
     // Render or clear status line
     if (text !== null) {
-      renderStatusLine(text, process.stderr);
+      renderStatusLine(
+        statusDisplayText(formatterState) ?? text,
+        process.stderr
+      );
     } else {
       clearStatusLine(process.stderr);
     }
@@ -296,7 +300,7 @@ export async function runRillScript(
   // Terminal resize handler - re-renders status line with updated columns
   const handleResize = (): void => {
     if (formatterState.currentStatusText !== null) {
-      renderStatusLine(formatterState.currentStatusText, process.stderr);
+      renderStatusLine(statusDisplayText(formatterState), process.stderr);
     }
   };
 
