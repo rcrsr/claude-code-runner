@@ -46,10 +46,10 @@ npm run build           # Compile TypeScript
 1. Bump `version` in `package.json`
 2. Stamp `[Unreleased]` in `CHANGELOG.md` with version and date (`[x.y.z] — YYYY-MM-DD`)
 3. Commit: `chore: vX.Y.Z — summary`
-4. Push to `main`
-5. Trigger the release workflow: `gh workflow run 232052149`
+4. Tag: `git tag -a vX.Y.Z -m "vX.Y.Z"`
+5. Push commit and tag: `git push && git push --tags`
 
-Do **not** create GitHub releases manually — the workflow handles release creation and npm publish.
+The tag push triggers the release workflow, which handles npm publish and GitHub release creation.
 
 ## Testing
 

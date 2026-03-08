@@ -1,7 +1,9 @@
 name: Release
 
 on:
-  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
 
 jobs:
   release:
@@ -41,26 +43,14 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Create git tag and GitHub Release
+      - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION=$(node -p "require('./package.json').version")
-
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
-          if git ls-remote --tags origin "refs/tags/v${VERSION}" | grep -q .; then
-            echo "Tag v${VERSION} already exists on remote, skipping"
-          else
-            git tag -a "v${VERSION}" -m "Release v${VERSION}"
-            git push --tags
+          if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
+            echo "GitHub Release '${{ github.ref_name }}' already exists. Skipping creation."
+            exit 0
           fi
-
-          if gh release view "v${VERSION}" &>/dev/null; then
-            echo "Release v${VERSION} already exists, skipping"
-          else
-            gh release create "v${VERSION}" \
-              --title "v${VERSION}" \
-              --generate-notes
-          fi
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --generate-notes
