@@ -1,5 +1,10 @@
 # Claude Code Runner
 
+[![CI](https://github.com/rcrsr/claude-code-runner/actions/workflows/pr-check.yml/badge.svg)](https://github.com/rcrsr/claude-code-runner/actions/workflows/pr-check.yml)
+[![npm](https://img.shields.io/npm/v/@rcrsr/claude-code-runner)](https://www.npmjs.com/package/@rcrsr/claude-code-runner)
+[![Node](https://img.shields.io/node/v/@rcrsr/claude-code-runner)](https://www.npmjs.com/package/@rcrsr/claude-code-runner)
+[![License](https://img.shields.io/npm/l/@rcrsr/claude-code-runner)](https://github.com/rcrsr/claude-code-runner/blob/main/LICENSE)
+
 Deterministic, scripted, unattended Claude Code execution with [rill](https://rill.run) scripting.
 
 ## Why Use This?
