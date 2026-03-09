@@ -72,6 +72,7 @@ export function createMockConfig(
     parallelThresholdMs: 100,
     iterationPauseMs: 0,
     model: null,
+    inactivityTimeoutMs: 600_000,
     ...overrides,
   };
 }

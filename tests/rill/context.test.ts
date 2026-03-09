@@ -151,7 +151,10 @@ describe('ccr::prompt', () => {
     const executor = createMockExecutor({ output: 'Claude response' });
     const result = await runRill('ccr::prompt("test prompt")', executor);
 
-    expect(executor).toHaveBeenCalledWith('test prompt', undefined);
+    expect(executor).toHaveBeenCalledWith('test prompt', undefined, {
+      method: 'ccr::prompt',
+      model: undefined,
+    });
     expect(result.value).toBe('Claude response');
   });
 
@@ -159,7 +162,10 @@ describe('ccr::prompt', () => {
     const executor = createMockExecutor({ output: 'response' });
     await runRill('ccr::prompt("prompt text", "haiku")', executor);
 
-    expect(executor).toHaveBeenCalledWith('prompt text', 'haiku');
+    expect(executor).toHaveBeenCalledWith('prompt text', 'haiku', {
+      method: 'ccr::prompt',
+      model: 'haiku',
+    });
   });
 
   it('uses defaultModel when model parameter is empty', async () => {
@@ -168,7 +174,10 @@ describe('ccr::prompt', () => {
       defaultModel: 'sonnet',
     });
 
-    expect(executor).toHaveBeenCalledWith('prompt text', 'sonnet');
+    expect(executor).toHaveBeenCalledWith('prompt text', 'sonnet', {
+      method: 'ccr::prompt',
+      model: 'sonnet',
+    });
   });
 });
 
@@ -177,7 +186,11 @@ describe('ccr::skill', () => {
     const executor = createMockExecutor({ output: 'skill output' });
     const result = await runRill('ccr::skill("commit")', executor);
 
-    expect(executor).toHaveBeenCalledWith('/commit', undefined);
+    expect(executor).toHaveBeenCalledWith('/commit', undefined, {
+      method: 'ccr::skill',
+      name: 'commit',
+      model: undefined,
+    });
     expect(result.value).toBe('skill output');
   });
 
@@ -187,7 +200,8 @@ describe('ccr::skill', () => {
 
     expect(executor).toHaveBeenCalledWith(
       '/review --strict file.ts',
-      undefined
+      undefined,
+      { method: 'ccr::skill', name: 'review', model: undefined }
     );
   });
 });

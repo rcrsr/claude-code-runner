@@ -36,10 +36,19 @@ export interface ExecutionResult {
   exitCode: number;
 }
 
+/** Invocation context for timeout reporting */
+export interface InvocationContext {
+  /** CCR host function that triggered execution (e.g. ccr::prompt) */
+  method: string;
+  /** Additional fields specific to the method (e.g. model, name) */
+  [key: string]: string | undefined;
+}
+
 /** Function to execute Claude CLI */
 export type ClaudeExecutor = (
   prompt: string,
-  model?: string
+  model?: string,
+  invocation?: InvocationContext
 ) => Promise<ExecutionResult>;
 
 /** Options for creating runner context */
@@ -119,7 +128,10 @@ export function createRunnerContext(
       fn: async (args) => {
         const text = args[0] as string;
         const model = (args[1] as string) || defaultModel;
-        const result = await executeClause(text, model);
+        const result = await executeClause(text, model, {
+          method: 'ccr::prompt',
+          model: model ?? undefined,
+        });
         return result.output;
       },
     },
@@ -152,7 +164,11 @@ export function createRunnerContext(
         );
         const model = template.frontmatter.model ?? defaultModel;
 
-        const result = await executeClause(template.prompt, model);
+        const result = await executeClause(template.prompt, model, {
+          method: 'ccr::command',
+          name,
+          model: model ?? undefined,
+        });
         ctx.pipeValue = result.output;
         return result.output;
       },
@@ -186,7 +202,11 @@ export function createRunnerContext(
         const promptText =
           skillArgs.length > 0 ? `/${name} ${skillArgs.join(' ')}` : `/${name}`;
 
-        const result = await executeClause(promptText, defaultModel);
+        const result = await executeClause(promptText, defaultModel, {
+          method: 'ccr::skill',
+          name,
+          model: defaultModel ?? undefined,
+        });
         ctx.pipeValue = result.output;
         return result.output;
       },

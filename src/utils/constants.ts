@@ -50,6 +50,8 @@ export const MS_PER_SECOND = 1000;
 export const SECONDS_PER_MINUTE = 60;
 /** Seconds per hour */
 export const SECONDS_PER_HOUR = 3600;
+/** Default inactivity timeout in ms (10 minutes) — kills the process when no output is received */
+export const DEFAULT_INACTIVITY_TIMEOUT_MS = 600_000;
 
 // === Default Configuration ===
 /** Default parallel tool detection threshold in ms */

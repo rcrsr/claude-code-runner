@@ -2,7 +2,10 @@
  * Runner configuration and state types
  */
 
-import { DEFAULT_PARALLEL_THRESHOLD_MS } from '../utils/constants.js';
+import {
+  DEFAULT_INACTIVITY_TIMEOUT_MS,
+  DEFAULT_PARALLEL_THRESHOLD_MS,
+} from '../utils/constants.js';
 
 export type Verbosity = 'quiet' | 'normal' | 'verbose';
 
@@ -15,6 +18,8 @@ export interface RunResult {
   exitCode: number;
   duration: number;
   claudeText: string;
+  /** True when the process was killed due to inactivity timeout */
+  timedOut?: boolean;
 }
 
 /**
@@ -27,6 +32,8 @@ export interface RunnerConfig {
   parallelThresholdMs: number;
   model: string | null;
   deaddrop: boolean;
+  /** Inactivity timeout in ms — kills the process when no output is received */
+  inactivityTimeoutMs: number;
 }
 
 /**
@@ -39,6 +46,7 @@ export const DEFAULT_CONFIG: RunnerConfig = {
   parallelThresholdMs: DEFAULT_PARALLEL_THRESHOLD_MS,
   model: null,
   deaddrop: false,
+  inactivityTimeoutMs: DEFAULT_INACTIVITY_TIMEOUT_MS,
 };
 
 /**

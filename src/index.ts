@@ -207,6 +207,7 @@ async function main(): Promise<void> {
     formatterState,
     parallelThresholdMs: config.parallelThresholdMs,
     model: config.model,
+    inactivityTimeoutMs: config.inactivityTimeoutMs,
   });
 
   // Finalize step stats

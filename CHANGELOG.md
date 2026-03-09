@@ -9,12 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- PR check workflow runs `npm run check` on pull requests
-- README badges: CI status, npm version, Node.js version, license
-
-### Changed
-
-- Release workflow triggers on tag push (`v*`) instead of manual `workflow_dispatch`
+- Configurable inactivity timeout (default 10 min) kills hung Claude processes when no output is received
+- Timeout returns `<ccr:result type="timeout" method="..." .../>` with invocation details (method, name, model)
+- `inactivityTimeoutMs` field on `RunnerConfig` and `ClaudeProcessOptions`
 
 ### Fixed
 

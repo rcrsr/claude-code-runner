@@ -10,11 +10,13 @@ import {
 // Mock node-pty
 const mockOnData = vi.fn();
 const mockOnExit = vi.fn();
+const mockKill = vi.fn();
 
 vi.mock('node-pty', () => ({
   spawn: vi.fn(() => ({
     onData: mockOnData,
     onExit: mockOnExit,
+    kill: mockKill,
   })),
 }));
 
@@ -35,6 +37,7 @@ vi.mock('../../src/parsers/stream.js', () => ({
 
 // Import mocked modules for assertions
 import * as pty from 'node-pty';
+
 import {
   flushPendingTools,
   formatMessage,
@@ -322,6 +325,77 @@ describe('spawnClaude', () => {
 
       expect(formatMessage).toHaveBeenCalledTimes(2);
       expect(result.claudeText).toBe('text');
+    });
+  });
+
+  describe('inactivity timeout', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('kills the process after inactivity timeout', async () => {
+      const promise = spawnClaude({ ...options, inactivityTimeoutMs: 5000 });
+
+      // Advance past the timeout
+      vi.advanceTimersByTime(5000);
+
+      // The kill should have been called
+      expect(mockKill).toHaveBeenCalled();
+
+      // Simulate process exit after kill
+      onExitCallback({ exitCode: 1 });
+      const result = await promise;
+
+      expect(result.timedOut).toBe(true);
+    });
+
+    it('resets the timer when data is received', async () => {
+      const promise = spawnClaude({ ...options, inactivityTimeoutMs: 5000 });
+
+      // Advance partway
+      vi.advanceTimersByTime(4000);
+      expect(mockKill).not.toHaveBeenCalled();
+
+      // Receive data, which resets the timer
+      onDataCallback('some data');
+
+      // Advance another 4 seconds (total 8s, but only 4s since last data)
+      vi.advanceTimersByTime(4000);
+      expect(mockKill).not.toHaveBeenCalled();
+
+      // Advance past the timeout from last data
+      vi.advanceTimersByTime(1000);
+      expect(mockKill).toHaveBeenCalled();
+
+      onExitCallback({ exitCode: 1 });
+      const result = await promise;
+
+      expect(result.timedOut).toBe(true);
+    });
+
+    it('clears the timer on normal exit', async () => {
+      const promise = spawnClaude({ ...options, inactivityTimeoutMs: 5000 });
+
+      // Exit normally before timeout
+      onExitCallback({ exitCode: 0 });
+      const result = await promise;
+
+      // Advance past the timeout — kill should not fire
+      vi.advanceTimersByTime(10000);
+      expect(mockKill).not.toHaveBeenCalled();
+      expect(result.timedOut).toBeUndefined();
+    });
+
+    it('does not set timedOut on normal exit', async () => {
+      const promise = spawnClaude(options);
+      onExitCallback({ exitCode: 0 });
+
+      const result = await promise;
+      expect(result.timedOut).toBeUndefined();
     });
   });
 });

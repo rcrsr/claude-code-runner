@@ -31,7 +31,11 @@ import { spawnClaude } from '../process/pty.js';
 import { parseFrontmatter } from '../templates/command.js';
 import type { RunnerConfig } from '../types/runner.js';
 import { formatRillValue } from '../utils/formatting.js';
-import { createRunnerContext, type ExecutionResult } from './context.js';
+import {
+  createRunnerContext,
+  type ExecutionResult,
+  type InvocationContext,
+} from './context.js';
 
 // ============================================================
 // TYPES
@@ -219,7 +223,8 @@ export async function runRillScript(
   // Create Claude executor that uses the existing infrastructure
   const executeClause = async (
     prompt: string,
-    model?: string
+    model?: string,
+    invocation?: InvocationContext
   ): Promise<ExecutionResult> => {
     state.stepNum++;
     formatterState.currentStep = state.stepNum;
@@ -246,6 +251,7 @@ export async function runRillScript(
       formatterState,
       parallelThresholdMs: config.parallelThresholdMs,
       model: model ?? effectiveModel,
+      inactivityTimeoutMs: config.inactivityTimeoutMs,
     });
 
     // Finalize step stats (merge into runStats for final summary)
@@ -253,6 +259,27 @@ export async function runRillScript(
       ? Date.now() - formatterState.stepStartTime
       : 0;
     finalizeStepStats(formatterState, stepDurationMs);
+
+    if (result.timedOut) {
+      // Build timeout result tag with invocation details
+      const attrs = Object.entries(invocation ?? { method: 'ccr::prompt' })
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => `${k}="${v}"`)
+        .join(' ');
+      const timeoutTag = `<ccr:result type="timeout" ${attrs}/>`;
+
+      logger.logEvent({
+        event: 'step_timeout',
+        step: state.stepNum,
+        ...invocation,
+      });
+
+      printRunner(
+        `${colors.red}Step ${state.stepNum} timed out (no output for ${Math.round(config.inactivityTimeoutMs / 60000)}m)${colors.reset}`
+      );
+
+      return { output: timeoutTag, exitCode: 1 };
+    }
 
     // Log completion
     logger.logEvent({
