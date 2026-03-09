@@ -265,11 +265,18 @@ export async function runRillScript(
       const { timeoutMs: _, ...reportFields } = invocation ?? {
         method: 'ccr::prompt',
       };
-      const attrs = Object.entries(reportFields)
+      const escapeXml = (s: string): string =>
+        s
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&apos;');
+      const attrsStr = Object.entries(reportFields)
         .filter(([, v]) => v !== undefined)
-        .map(([k, v]) => `${k}="${v}"`)
+        .map(([k, v]) => `${k}="${escapeXml(String(v))}"`)
         .join(' ');
-      const timeoutTag = `<ccr:result type="timeout" ${attrs}/>`;
+      const timeoutTag = `<ccr:result type="timeout"${attrsStr ? ` ${attrsStr}` : ''}/>`;
 
       const effectiveTimeoutMs =
         invocation?.timeoutMs ?? config.inactivityTimeoutMs;

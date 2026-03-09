@@ -179,6 +179,25 @@ describe('ccr::prompt', () => {
       model: 'sonnet',
     });
   });
+
+  it('passes timeoutMs when timeout > 0', async () => {
+    const executor = createMockExecutor({ output: 'response' });
+    await runRill('ccr::prompt("text", "", 5)', executor);
+
+    expect(executor).toHaveBeenCalledWith(
+      'text',
+      undefined,
+      expect.objectContaining({ timeoutMs: 300_000 })
+    );
+  });
+
+  it('omits timeoutMs when timeout is 0', async () => {
+    const executor = createMockExecutor({ output: 'response' });
+    await runRill('ccr::prompt("text", "", 0)', executor);
+
+    const call = vi.mocked(executor).mock.calls[0]?.[2];
+    expect(call).not.toHaveProperty('timeoutMs');
+  });
 });
 
 describe('ccr::skill', () => {

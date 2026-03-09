@@ -55,6 +55,7 @@ export function spawnClaude(options: ClaudeProcessOptions): Promise<RunResult> {
     let claudeText = '';
     const parser = createStreamParser();
     let timedOut = false;
+    let exited = false;
 
     const args = [
       '-p',
@@ -79,8 +80,13 @@ export function spawnClaude(options: ClaudeProcessOptions): Promise<RunResult> {
 
     const resetTimer = (): NodeJS.Timeout =>
       setTimeout(() => {
+        if (exited) return;
         timedOut = true;
-        ptyProcess.kill();
+        try {
+          ptyProcess.kill();
+        } catch {
+          // Process may have already exited
+        }
       }, inactivityTimeoutMs);
 
     let inactivityTimer = resetTimer();
@@ -105,6 +111,7 @@ export function spawnClaude(options: ClaudeProcessOptions): Promise<RunResult> {
     });
 
     ptyProcess.onExit(({ exitCode }) => {
+      exited = true;
       clearTimeout(inactivityTimer);
       flushPendingTools(formatterState, verbosity);
       const duration = Math.round((Date.now() - runStart) / 1000);
