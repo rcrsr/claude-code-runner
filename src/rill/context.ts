@@ -36,12 +36,16 @@ export interface ExecutionResult {
   exitCode: number;
 }
 
-/** Invocation context for timeout reporting */
+/** Invocation context for timeout reporting and per-call options */
 export interface InvocationContext {
   /** CCR host function that triggered execution (e.g. ccr::prompt) */
   method: string;
-  /** Additional fields specific to the method (e.g. model, name) */
-  [key: string]: string | undefined;
+  /** Model override passed to the host function */
+  model?: string | undefined;
+  /** Command or skill name */
+  name?: string | undefined;
+  /** Per-call inactivity timeout in ms (overrides config default) */
+  timeoutMs?: number | undefined;
 }
 
 /** Function to execute Claude CLI */
@@ -124,13 +128,21 @@ export function createRunnerContext(
           defaultValue: '',
           description: 'Model override (sonnet, opus, haiku)',
         },
+        {
+          name: 'timeout',
+          type: 'number',
+          defaultValue: 0,
+          description: 'Inactivity timeout in minutes (0 = use default)',
+        },
       ],
       fn: async (args) => {
         const text = args[0] as string;
         const model = (args[1] as string) || defaultModel;
+        const timeoutMin = args[2] as number;
         const result = await executeClause(text, model, {
           method: 'ccr::prompt',
           model: model ?? undefined,
+          ...(timeoutMin > 0 && { timeoutMs: timeoutMin * 60_000 }),
         });
         return result.output;
       },
@@ -150,12 +162,19 @@ export function createRunnerContext(
           defaultValue: [],
           description: 'Arguments to pass to template',
         },
+        {
+          name: 'timeout',
+          type: 'number',
+          defaultValue: 0,
+          description: 'Inactivity timeout in minutes (0 = use default)',
+        },
       ],
       fn: async (args, ctx) => {
         const name = args[0] as string;
         const cmdArgs = (args[1] as RillValue[]).map((a) =>
           formatRillValue(a ?? null)
         );
+        const timeoutMin = args[2] as number;
 
         const template = loadCommandTemplateFile(
           name,
@@ -168,6 +187,7 @@ export function createRunnerContext(
           method: 'ccr::command',
           name,
           model: model ?? undefined,
+          ...(timeoutMin > 0 && { timeoutMs: timeoutMin * 60_000 }),
         });
         ctx.pipeValue = result.output;
         return result.output;
@@ -192,12 +212,19 @@ export function createRunnerContext(
           defaultValue: [],
           description: 'Arguments to pass to skill',
         },
+        {
+          name: 'timeout',
+          type: 'number',
+          defaultValue: 0,
+          description: 'Inactivity timeout in minutes (0 = use default)',
+        },
       ],
       fn: async (args, ctx) => {
         const name = args[0] as string;
         const skillArgs = (args[1] as RillValue[]).map((a) =>
           formatRillValue(a ?? null)
         );
+        const timeoutMin = args[2] as number;
 
         const promptText =
           skillArgs.length > 0 ? `/${name} ${skillArgs.join(' ')}` : `/${name}`;
@@ -206,6 +233,7 @@ export function createRunnerContext(
           method: 'ccr::skill',
           name,
           model: defaultModel ?? undefined,
+          ...(timeoutMin > 0 && { timeoutMs: timeoutMin * 60_000 }),
         });
         ctx.pipeValue = result.output;
         return result.output;

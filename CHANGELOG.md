@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Configurable inactivity timeout (default 10 min) kills hung Claude processes when no output is received
 - Timeout returns `<ccr:result type="timeout" method="..." .../>` with invocation details (method, name, model)
 - `inactivityTimeoutMs` field on `RunnerConfig` and `ClaudeProcessOptions`
+- Per-call `timeout` parameter (in minutes) on `ccr::prompt`, `ccr::command`, `ccr::skill` host functions
 
 ### Fixed
 

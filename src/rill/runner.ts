@@ -251,7 +251,7 @@ export async function runRillScript(
       formatterState,
       parallelThresholdMs: config.parallelThresholdMs,
       model: model ?? effectiveModel,
-      inactivityTimeoutMs: config.inactivityTimeoutMs,
+      inactivityTimeoutMs: invocation?.timeoutMs ?? config.inactivityTimeoutMs,
     });
 
     // Finalize step stats (merge into runStats for final summary)
@@ -261,21 +261,26 @@ export async function runRillScript(
     finalizeStepStats(formatterState, stepDurationMs);
 
     if (result.timedOut) {
-      // Build timeout result tag with invocation details
-      const attrs = Object.entries(invocation ?? { method: 'ccr::prompt' })
+      // Build timeout result tag with invocation details (exclude internal timeoutMs)
+      const { timeoutMs: _, ...reportFields } = invocation ?? {
+        method: 'ccr::prompt',
+      };
+      const attrs = Object.entries(reportFields)
         .filter(([, v]) => v !== undefined)
         .map(([k, v]) => `${k}="${v}"`)
         .join(' ');
       const timeoutTag = `<ccr:result type="timeout" ${attrs}/>`;
 
+      const effectiveTimeoutMs =
+        invocation?.timeoutMs ?? config.inactivityTimeoutMs;
       logger.logEvent({
         event: 'step_timeout',
         step: state.stepNum,
-        ...invocation,
+        ...reportFields,
       });
 
       printRunner(
-        `${colors.red}Step ${state.stepNum} timed out (no output for ${Math.round(config.inactivityTimeoutMs / 60000)}m)${colors.reset}`
+        `${colors.red}Step ${state.stepNum} timed out (no output for ${Math.round(effectiveTimeoutMs / 60_000)}m)${colors.reset}`
       );
 
       return { output: timeoutTag, exitCode: 1 };
