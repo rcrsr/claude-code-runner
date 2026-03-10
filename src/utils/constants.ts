@@ -58,6 +58,8 @@ export const DEFAULT_INACTIVITY_TIMEOUT_MS = 600_000;
 export const DEFAULT_PARALLEL_THRESHOLD_MS = 100;
 
 // === Status Line ===
+/** Interval in ms for re-rendering the status line timer */
+export const STATUS_TIMER_INTERVAL_MS = 250;
 /** Truncation suffix for overflow in status line */
 export const STATUS_LINE_ELLIPSIS = '...';
 /** Minimum terminal width for status line display */

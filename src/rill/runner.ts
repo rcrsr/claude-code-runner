@@ -30,6 +30,7 @@ import type { Logger } from '../output/logger.js';
 import { spawnClaude } from '../process/pty.js';
 import { parseFrontmatter } from '../templates/command.js';
 import type { RunnerConfig } from '../types/runner.js';
+import { STATUS_TIMER_INTERVAL_MS } from '../utils/constants.js';
 import { formatRillValue } from '../utils/formatting.js';
 import {
   createRunnerContext,
@@ -315,6 +316,16 @@ export async function runRillScript(
     },
   };
 
+  // Interval handle for periodic status line re-renders
+  let statusInterval: NodeJS.Timeout | null = null;
+
+  const clearStatusInterval = (): void => {
+    if (statusInterval !== null) {
+      clearInterval(statusInterval);
+      statusInterval = null;
+    }
+  };
+
   // State change callback for ccr::state host function
   const onStateChange = (text: string | null): void => {
     // Update formatter state
@@ -331,7 +342,17 @@ export async function runRillScript(
         statusDisplayText(formatterState) ?? text,
         process.stderr
       );
+      // Start interval to keep the elapsed timer ticking
+      statusInterval ??= setInterval(() => {
+        if (formatterState.currentStatusText !== null) {
+          renderStatusLine(statusDisplayText(formatterState), process.stderr);
+        }
+      }, STATUS_TIMER_INTERVAL_MS);
     } else {
+      if (statusInterval !== null) {
+        clearInterval(statusInterval);
+        statusInterval = null;
+      }
       clearStatusLine(process.stderr);
     }
   };
@@ -372,8 +393,8 @@ export async function runRillScript(
     const result = await execute(ast, ctx);
 
     // Update last output from final result
-    if (result.value !== null) {
-      state.lastOutput = formatRillValue(result.value);
+    if (result.result !== null) {
+      state.lastOutput = formatRillValue(result.result);
     }
 
     logger.logEvent({
@@ -386,6 +407,7 @@ export async function runRillScript(
     unbindFormatterState();
     if (config.verbosity !== 'quiet') {
       process.stderr.off('resize', handleResize);
+      clearStatusInterval();
       clearStatusLine(process.stderr);
     }
 
@@ -403,6 +425,7 @@ export async function runRillScript(
     // Handle specific Rill error types
     if (error instanceof AbortError) {
       if (config.verbosity !== 'quiet') {
+        clearStatusInterval();
         clearStatusLine(process.stderr);
       }
       printRunner(`${colors.yellow}Script cancelled${colors.reset}`);
@@ -415,6 +438,7 @@ export async function runRillScript(
 
     if (error instanceof TimeoutError) {
       if (config.verbosity !== 'quiet') {
+        clearStatusInterval();
         clearStatusLine(process.stderr);
       }
       const msg = `Timeout: ${error.message}`;
@@ -425,6 +449,7 @@ export async function runRillScript(
 
     if (error instanceof ParseError) {
       if (config.verbosity !== 'quiet') {
+        clearStatusInterval();
         clearStatusLine(process.stderr);
       }
       const location = error.location
@@ -438,6 +463,7 @@ export async function runRillScript(
 
     if (error instanceof RuntimeError) {
       if (config.verbosity !== 'quiet') {
+        clearStatusInterval();
         clearStatusLine(process.stderr);
       }
       const location = error.location
@@ -455,6 +481,7 @@ export async function runRillScript(
 
     // Generic error fallback
     if (config.verbosity !== 'quiet') {
+      clearStatusInterval();
       clearStatusLine(process.stderr);
     }
     const msg = error instanceof Error ? error.message : String(error);
