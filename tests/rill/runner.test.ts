@@ -383,6 +383,27 @@ ccr::prompt($file)`
     ).rejects.toThrow('Missing required argument: file');
   });
 
+  it('includes script filename in error when createRunnerContext throws', async () => {
+    const scriptPath = path.join(testDir, 'setup-error.rill');
+    fs.writeFileSync(scriptPath, 'log("hello")');
+
+    // Force createRunnerContext to throw a setup error
+    vi.spyOn(
+      await import('../../src/rill/context.js'),
+      'createRunnerContext'
+    ).mockImplementationOnce(() => {
+      throw new Error(
+        "Invalid defaultValue for parameter 'model': expected any, got string"
+      );
+    });
+
+    await expect(
+      runRillScript(createRunnerOptions(scriptPath))
+    ).rejects.toThrow(`Script setup failed for ${scriptPath}:`);
+
+    vi.restoreAllMocks();
+  });
+
   it('returns success false on parse error with correct line numbers', async () => {
     const scriptPath = path.join(testDir, 'invalid.rill');
     fs.writeFileSync(

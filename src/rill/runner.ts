@@ -369,20 +369,33 @@ export async function runRillScript(
     process.stderr.on('resize', handleResize);
   }
 
-  // Create Rill runtime context
-  const ctx = createRunnerContext({
-    executeClause,
-    namedArgs,
-    rawArgs: args,
-    env: process.env as Record<string, string>,
-    commandsDir: '.claude/commands',
-    defaultModel: effectiveModel ?? undefined,
-    callbacks,
-    onStateChange,
-  });
+  // Create Rill runtime context — wrap in try/catch so setup errors include the script filename
+  let ctx: ReturnType<typeof createRunnerContext>;
+  try {
+    ctx = createRunnerContext({
+      executeClause,
+      namedArgs,
+      rawArgs: args,
+      env: process.env as Record<string, string>,
+      commandsDir: '.claude/commands',
+      defaultModel: effectiveModel ?? undefined,
+      callbacks,
+      onStateChange,
+    });
 
-  // Bind formatter state so terminalLog re-renders the status line
-  bindFormatterState(formatterState);
+    // Bind formatter state so terminalLog re-renders the status line
+    bindFormatterState(formatterState);
+  } catch (setupError) {
+    // Clean up before re-throwing
+    unbindFormatterState();
+    if (config.verbosity !== 'quiet') {
+      process.stderr.off('resize', handleResize);
+      clearStatusInterval();
+    }
+    const msg =
+      setupError instanceof Error ? setupError.message : String(setupError);
+    throw new Error(`Script setup failed for ${scriptFile}: ${msg}`);
+  }
 
   // Parse and execute the script
   try {
@@ -485,7 +498,9 @@ export async function runRillScript(
       clearStatusLine(process.stderr);
     }
     const msg = error instanceof Error ? error.message : String(error);
-    printRunner(`${colors.red}Script error:${colors.reset} ${msg}`);
+    printRunner(
+      `${colors.red}Script error${colors.reset} [${scriptFile}]: ${msg}`
+    );
     logger.logEvent({ event: 'rill_script_error', runId, error: msg });
     return { success: false, lastOutput: state.lastOutput };
   }

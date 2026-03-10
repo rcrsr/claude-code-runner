@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Script setup errors now include the script filename (e.g. `Script setup failed for workflow.rill: ...`)
+- Generic script errors include the script filename in the `[runner]` output
 - Error messages strip `\r\n` for single-line display, consistent with Claude text block formatting
 
 ## [0.12.1] — 2026-03-01
