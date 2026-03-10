@@ -5,8 +5,8 @@
 
 import {
   createRuntimeContext,
-  type HostFunctionDefinition,
   type ObservabilityCallbacks,
+  type RillFunction,
   type RillValue,
   type RuntimeCallbacks,
   type RuntimeContext,
@@ -109,30 +109,34 @@ export function createRunnerContext(
   } = options;
 
   // Create ccr:: namespaced functions
-  const functions: Record<string, HostFunctionDefinition> = {
+  const functions: Record<string, RillFunction> = {
     /**
      * Execute a prompt with Claude
      * Usage: ccr::prompt("analyze this code", "haiku")
      */
     'ccr::prompt': {
       description: 'Execute a prompt with Claude and return output',
+      returnType: { type: 'string' },
       params: [
         {
           name: 'text',
-          type: 'string',
-          description: 'Prompt text to send to Claude',
+          type: { type: 'string' },
+          defaultValue: undefined,
+          annotations: { description: 'Prompt text to send to Claude' },
         },
         {
           name: 'model',
-          type: 'string',
+          type: { type: 'string' },
           defaultValue: '',
-          description: 'Model override (sonnet, opus, haiku)',
+          annotations: { description: 'Model override (sonnet, opus, haiku)' },
         },
         {
           name: 'timeout',
-          type: 'number',
+          type: { type: 'number' },
           defaultValue: 0,
-          description: 'Inactivity timeout in minutes (0 = use default)',
+          annotations: {
+            description: 'Inactivity timeout in minutes (0 = use default)',
+          },
         },
       ],
       fn: async (args) => {
@@ -154,19 +158,27 @@ export function createRunnerContext(
      */
     'ccr::command': {
       description: 'Execute a command template by name',
+      returnType: { type: 'string' },
       params: [
-        { name: 'name', type: 'string', description: 'Command template name' },
+        {
+          name: 'name',
+          type: { type: 'string' },
+          defaultValue: undefined,
+          annotations: { description: 'Command template name' },
+        },
         {
           name: 'args',
-          type: 'list',
+          type: { type: 'list' },
           defaultValue: [],
-          description: 'Arguments to pass to template',
+          annotations: { description: 'Arguments to pass to template' },
         },
         {
           name: 'timeout',
-          type: 'number',
+          type: { type: 'number' },
           defaultValue: 0,
-          description: 'Inactivity timeout in minutes (0 = use default)',
+          annotations: {
+            description: 'Inactivity timeout in minutes (0 = use default)',
+          },
         },
       ],
       fn: async (args, ctx) => {
@@ -200,23 +212,27 @@ export function createRunnerContext(
      */
     'ccr::skill': {
       description: 'Execute a Claude Code skill (slash command)',
+      returnType: { type: 'string' },
       params: [
         {
           name: 'name',
-          type: 'string',
-          description: 'Skill name (without leading /)',
+          type: { type: 'string' },
+          defaultValue: undefined,
+          annotations: { description: 'Skill name (without leading /)' },
         },
         {
           name: 'args',
-          type: 'list',
+          type: { type: 'list' },
           defaultValue: [],
-          description: 'Arguments to pass to skill',
+          annotations: { description: 'Arguments to pass to skill' },
         },
         {
           name: 'timeout',
-          type: 'number',
+          type: { type: 'number' },
           defaultValue: 0,
-          description: 'Inactivity timeout in minutes (0 = use default)',
+          annotations: {
+            description: 'Inactivity timeout in minutes (0 = use default)',
+          },
         },
       ],
       fn: async (args, ctx) => {
@@ -246,8 +262,14 @@ export function createRunnerContext(
      */
     'ccr::file_exists': {
       description: 'Check if a file exists at the given path',
+      returnType: { type: 'bool' },
       params: [
-        { name: 'path', type: 'string', description: 'File path to check' },
+        {
+          name: 'path',
+          type: { type: 'string' },
+          defaultValue: undefined,
+          annotations: { description: 'File path to check' },
+        },
       ],
       fn: (args) => fs.existsSync(args[0] as string),
     },
@@ -258,7 +280,15 @@ export function createRunnerContext(
      */
     'ccr::state': {
       description: 'Set script status line text',
-      params: [{ name: 'text', type: 'string' }],
+      returnType: { type: 'dict' },
+      params: [
+        {
+          name: 'text',
+          type: { type: 'string' },
+          defaultValue: undefined,
+          annotations: {},
+        },
+      ],
       fn: (args) => {
         let text = args[0] as string;
 
@@ -288,11 +318,13 @@ export function createRunnerContext(
      */
     'ccr::get_result': {
       description: 'Extract ccr:result XML tag from text',
+      returnType: { type: 'dict' },
       params: [
         {
           name: 'text',
-          type: 'string',
-          description: 'Text containing ccr:result tag',
+          type: { type: 'string' },
+          defaultValue: undefined,
+          annotations: { description: 'Text containing ccr:result tag' },
         },
       ],
       fn: (args) => {
@@ -340,11 +372,13 @@ export function createRunnerContext(
      */
     'ccr::has_result': {
       description: 'Check if text contains a ccr:result tag',
+      returnType: { type: 'bool' },
       params: [
         {
           name: 'text',
-          type: 'string',
-          description: 'Text to search for ccr:result tag',
+          type: { type: 'string' },
+          defaultValue: undefined,
+          annotations: { description: 'Text to search for ccr:result tag' },
         },
       ],
       fn: (args) => {
@@ -362,8 +396,14 @@ export function createRunnerContext(
      */
     'ccr::has_frontmatter': {
       description: 'Check if a file has YAML frontmatter',
+      returnType: { type: 'bool' },
       params: [
-        { name: 'path', type: 'string', description: 'File path to check' },
+        {
+          name: 'path',
+          type: { type: 'string' },
+          defaultValue: undefined,
+          annotations: { description: 'File path to check' },
+        },
       ],
       fn: (args) => {
         const filePath = args[0] as string;
@@ -385,8 +425,14 @@ export function createRunnerContext(
      */
     'ccr::get_frontmatter': {
       description: 'Parse and return YAML frontmatter from a file',
+      returnType: { type: 'dict' },
       params: [
-        { name: 'path', type: 'string', description: 'File path to parse' },
+        {
+          name: 'path',
+          type: { type: 'string' },
+          defaultValue: undefined,
+          annotations: { description: 'File path to parse' },
+        },
       ],
       fn: (args) => {
         const filePath = args[0] as string;
