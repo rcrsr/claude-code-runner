@@ -7,12 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] — 2026-03-10
+
 ### Added
 
+- Live-ticking status line timer at 250ms refresh rate (previously only updated on message arrival)
+- `returnType` declared on all `ccr::` host functions for rill type introspection
 - Configurable inactivity timeout (default 10 min) kills hung Claude processes when no output is received
 - Timeout returns `<ccr:result type="timeout" method="..." .../>` with invocation details (method, name, model)
 - `inactivityTimeoutMs` field on `RunnerConfig` and `ClaudeProcessOptions`
 - Per-call `timeout` parameter (in minutes) on `ccr::prompt`, `ccr::command`, `ccr::skill` host functions
+
+### Changed
+
+- Upgraded `@rcrsr/rill` from `~0.8.6` to `^0.11.0`
+- Host function definitions migrated from `HostFunctionDefinition` to `RillFunction` with `RillParam` and `RillType`
+- Param descriptions preserved in `RillParam.annotations` field
 
 ### Fixed
 
