@@ -160,7 +160,11 @@ export function formatElapsed(ms: number): string {
  */
 export function statusDisplayText(state: FormatterState): string | null {
   if (state.currentStatusText === null) return null;
-  return `[${formatElapsed(state.elapsedMs)}] ${state.currentStatusText}`;
+  const liveElapsed =
+    state.lastTickTime !== null
+      ? state.elapsedMs + (Date.now() - state.lastTickTime)
+      : state.elapsedMs;
+  return `[${formatElapsed(liveElapsed)}] ${state.currentStatusText}`;
 }
 
 /**

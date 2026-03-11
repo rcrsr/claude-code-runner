@@ -14,7 +14,11 @@ import {
 import type { Logger } from '../output/logger.js';
 import { createStreamParser } from '../parsers/stream.js';
 import type { RunResult, Verbosity } from '../types/runner.js';
-import { PTY_COLS, PTY_ROWS } from '../utils/constants.js';
+import {
+  DEFAULT_INACTIVITY_TIMEOUT_MS,
+  PTY_COLS,
+  PTY_ROWS,
+} from '../utils/constants.js';
 
 export interface ClaudeProcessOptions {
   prompt: string;
@@ -24,6 +28,8 @@ export interface ClaudeProcessOptions {
   formatterState: FormatterState;
   parallelThresholdMs: number;
   model: string | null;
+  /** Inactivity timeout in ms — kills the process when no output is received */
+  inactivityTimeoutMs?: number;
 }
 
 /**
@@ -38,6 +44,7 @@ export function spawnClaude(options: ClaudeProcessOptions): Promise<RunResult> {
     formatterState,
     parallelThresholdMs,
     model,
+    inactivityTimeoutMs = DEFAULT_INACTIVITY_TIMEOUT_MS,
   } = options;
 
   return new Promise((resolve) => {
@@ -47,6 +54,8 @@ export function spawnClaude(options: ClaudeProcessOptions): Promise<RunResult> {
     const runStart = Date.now();
     let claudeText = '';
     const parser = createStreamParser();
+    let timedOut = false;
+    let exited = false;
 
     const args = [
       '-p',
@@ -69,7 +78,23 @@ export function spawnClaude(options: ClaudeProcessOptions): Promise<RunResult> {
       env: { ...process.env },
     });
 
+    const resetTimer = (): NodeJS.Timeout =>
+      setTimeout(() => {
+        if (exited) return;
+        timedOut = true;
+        try {
+          ptyProcess.kill();
+        } catch {
+          // Process may have already exited
+        }
+      }, inactivityTimeoutMs);
+
+    let inactivityTimer = resetTimer();
+
     ptyProcess.onData((data: string) => {
+      clearTimeout(inactivityTimer);
+      inactivityTimer = resetTimer();
+
       const messages = parser.process(data);
 
       for (const msg of messages) {
@@ -86,9 +111,16 @@ export function spawnClaude(options: ClaudeProcessOptions): Promise<RunResult> {
     });
 
     ptyProcess.onExit(({ exitCode }) => {
+      exited = true;
+      clearTimeout(inactivityTimer);
       flushPendingTools(formatterState, verbosity);
       const duration = Math.round((Date.now() - runStart) / 1000);
-      resolve({ exitCode, duration, claudeText });
+      resolve({
+        exitCode,
+        duration,
+        claudeText,
+        ...(timedOut && { timedOut }),
+      });
     });
   });
 }

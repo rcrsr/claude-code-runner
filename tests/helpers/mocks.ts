@@ -18,6 +18,7 @@ import type {
   RunResult,
   Verbosity,
 } from '../../src/types/runner.js';
+import { DEFAULT_INACTIVITY_TIMEOUT_MS } from '../../src/utils/constants.js';
 
 /**
  * Create a mock logger
@@ -72,6 +73,7 @@ export function createMockConfig(
     parallelThresholdMs: 100,
     iterationPauseMs: 0,
     model: null,
+    inactivityTimeoutMs: DEFAULT_INACTIVITY_TIMEOUT_MS,
     ...overrides,
   };
 }

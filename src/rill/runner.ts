@@ -30,8 +30,13 @@ import type { Logger } from '../output/logger.js';
 import { spawnClaude } from '../process/pty.js';
 import { parseFrontmatter } from '../templates/command.js';
 import type { RunnerConfig } from '../types/runner.js';
+import { STATUS_TIMER_INTERVAL_MS } from '../utils/constants.js';
 import { formatRillValue } from '../utils/formatting.js';
-import { createRunnerContext, type ExecutionResult } from './context.js';
+import {
+  createRunnerContext,
+  type ExecutionResult,
+  type InvocationContext,
+} from './context.js';
 
 // ============================================================
 // TYPES
@@ -219,7 +224,8 @@ export async function runRillScript(
   // Create Claude executor that uses the existing infrastructure
   const executeClause = async (
     prompt: string,
-    model?: string
+    model?: string,
+    invocation?: InvocationContext
   ): Promise<ExecutionResult> => {
     state.stepNum++;
     formatterState.currentStep = state.stepNum;
@@ -246,6 +252,7 @@ export async function runRillScript(
       formatterState,
       parallelThresholdMs: config.parallelThresholdMs,
       model: model ?? effectiveModel,
+      inactivityTimeoutMs: invocation?.timeoutMs ?? config.inactivityTimeoutMs,
     });
 
     // Finalize step stats (merge into runStats for final summary)
@@ -253,6 +260,39 @@ export async function runRillScript(
       ? Date.now() - formatterState.stepStartTime
       : 0;
     finalizeStepStats(formatterState, stepDurationMs);
+
+    if (result.timedOut) {
+      // Build timeout result tag with invocation details (exclude internal timeoutMs)
+      const { timeoutMs: _, ...reportFields } = invocation ?? {
+        method: 'ccr::prompt',
+      };
+      const escapeXml = (s: string): string =>
+        s
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&apos;');
+      const attrsStr = Object.entries(reportFields)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => `${k}="${escapeXml(String(v))}"`)
+        .join(' ');
+      const timeoutTag = `<ccr:result type="timeout"${attrsStr ? ` ${attrsStr}` : ''}/>`;
+
+      const effectiveTimeoutMs =
+        invocation?.timeoutMs ?? config.inactivityTimeoutMs;
+      logger.logEvent({
+        event: 'step_timeout',
+        step: state.stepNum,
+        ...reportFields,
+      });
+
+      printRunner(
+        `${colors.red}Step ${state.stepNum} timed out (no output for ${Math.round(effectiveTimeoutMs / 60_000)}m)${colors.reset}`
+      );
+
+      return { output: timeoutTag, exitCode: 1 };
+    }
 
     // Log completion
     logger.logEvent({
@@ -276,6 +316,16 @@ export async function runRillScript(
     },
   };
 
+  // Interval handle for periodic status line re-renders
+  let statusInterval: NodeJS.Timeout | null = null;
+
+  const clearStatusInterval = (): void => {
+    if (statusInterval !== null) {
+      clearInterval(statusInterval);
+      statusInterval = null;
+    }
+  };
+
   // State change callback for ccr::state host function
   const onStateChange = (text: string | null): void => {
     // Update formatter state
@@ -292,7 +342,17 @@ export async function runRillScript(
         statusDisplayText(formatterState) ?? text,
         process.stderr
       );
+      // Start interval to keep the elapsed timer ticking
+      statusInterval ??= setInterval(() => {
+        if (formatterState.currentStatusText !== null) {
+          renderStatusLine(statusDisplayText(formatterState), process.stderr);
+        }
+      }, STATUS_TIMER_INTERVAL_MS);
     } else {
+      if (statusInterval !== null) {
+        clearInterval(statusInterval);
+        statusInterval = null;
+      }
       clearStatusLine(process.stderr);
     }
   };
@@ -309,20 +369,33 @@ export async function runRillScript(
     process.stderr.on('resize', handleResize);
   }
 
-  // Create Rill runtime context
-  const ctx = createRunnerContext({
-    executeClause,
-    namedArgs,
-    rawArgs: args,
-    env: process.env as Record<string, string>,
-    commandsDir: '.claude/commands',
-    defaultModel: effectiveModel ?? undefined,
-    callbacks,
-    onStateChange,
-  });
+  // Create Rill runtime context — wrap in try/catch so setup errors include the script filename
+  let ctx: ReturnType<typeof createRunnerContext>;
+  try {
+    ctx = createRunnerContext({
+      executeClause,
+      namedArgs,
+      rawArgs: args,
+      env: process.env as Record<string, string>,
+      commandsDir: '.claude/commands',
+      defaultModel: effectiveModel ?? undefined,
+      callbacks,
+      onStateChange,
+    });
 
-  // Bind formatter state so terminalLog re-renders the status line
-  bindFormatterState(formatterState);
+    // Bind formatter state so terminalLog re-renders the status line
+    bindFormatterState(formatterState);
+  } catch (setupError) {
+    // Clean up before re-throwing
+    unbindFormatterState();
+    if (config.verbosity !== 'quiet') {
+      process.stderr.off('resize', handleResize);
+      clearStatusInterval();
+    }
+    const msg =
+      setupError instanceof Error ? setupError.message : String(setupError);
+    throw new Error(`Script setup failed for ${scriptFile}: ${msg}`);
+  }
 
   // Parse and execute the script
   try {
@@ -333,8 +406,8 @@ export async function runRillScript(
     const result = await execute(ast, ctx);
 
     // Update last output from final result
-    if (result.value !== null) {
-      state.lastOutput = formatRillValue(result.value);
+    if (result.result !== null) {
+      state.lastOutput = formatRillValue(result.result);
     }
 
     logger.logEvent({
@@ -347,6 +420,7 @@ export async function runRillScript(
     unbindFormatterState();
     if (config.verbosity !== 'quiet') {
       process.stderr.off('resize', handleResize);
+      clearStatusInterval();
       clearStatusLine(process.stderr);
     }
 
@@ -364,6 +438,7 @@ export async function runRillScript(
     // Handle specific Rill error types
     if (error instanceof AbortError) {
       if (config.verbosity !== 'quiet') {
+        clearStatusInterval();
         clearStatusLine(process.stderr);
       }
       printRunner(`${colors.yellow}Script cancelled${colors.reset}`);
@@ -376,6 +451,7 @@ export async function runRillScript(
 
     if (error instanceof TimeoutError) {
       if (config.verbosity !== 'quiet') {
+        clearStatusInterval();
         clearStatusLine(process.stderr);
       }
       const msg = `Timeout: ${error.message}`;
@@ -386,6 +462,7 @@ export async function runRillScript(
 
     if (error instanceof ParseError) {
       if (config.verbosity !== 'quiet') {
+        clearStatusInterval();
         clearStatusLine(process.stderr);
       }
       const location = error.location
@@ -399,6 +476,7 @@ export async function runRillScript(
 
     if (error instanceof RuntimeError) {
       if (config.verbosity !== 'quiet') {
+        clearStatusInterval();
         clearStatusLine(process.stderr);
       }
       const location = error.location
@@ -416,10 +494,13 @@ export async function runRillScript(
 
     // Generic error fallback
     if (config.verbosity !== 'quiet') {
+      clearStatusInterval();
       clearStatusLine(process.stderr);
     }
     const msg = error instanceof Error ? error.message : String(error);
-    printRunner(`${colors.red}Script error:${colors.reset} ${msg}`);
+    printRunner(
+      `${colors.red}Script error${colors.reset} [${scriptFile}]: ${msg}`
+    );
     logger.logEvent({ event: 'rill_script_error', runId, error: msg });
     return { success: false, lastOutput: state.lastOutput };
   }

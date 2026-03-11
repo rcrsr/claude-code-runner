@@ -37,7 +37,7 @@ async function runRill(
     commandsDir?: string;
     defaultModel?: string;
   } = {}
-): Promise<{ value: unknown }> {
+): Promise<{ result: unknown }> {
   const ctx = createRunnerContext({
     executeClause: executor,
     ...options,
@@ -114,7 +114,7 @@ describe('createRunnerContext', () => {
         rawArgs: ['arg1', 'arg2'],
       });
 
-      expect(result.value).toEqual(['arg1', 'arg2']);
+      expect(result.result).toEqual(['arg1', 'arg2']);
     });
 
     it('sets ENV from env option', async () => {
@@ -125,7 +125,7 @@ describe('createRunnerContext', () => {
       const ast = parse('$ENV');
       const result = await execute(ast, ctx);
 
-      expect(result.value).toEqual({ FOO: 'bar', BAZ: 'qux' });
+      expect(result.result).toEqual({ FOO: 'bar', BAZ: 'qux' });
     });
 
     it('includes namedArgs as top-level variables', async () => {
@@ -134,14 +134,14 @@ describe('createRunnerContext', () => {
         namedArgs: { file: 'test.ts' },
       });
 
-      expect(result.value).toBe('test.ts');
+      expect(result.result).toBe('test.ts');
     });
 
     it('defaults rawArgs to empty array', async () => {
       const executor = createMockExecutor();
       const result = await runRill('$ARGS', executor);
 
-      expect(result.value).toEqual([]);
+      expect(result.result).toEqual([]);
     });
   });
 });
@@ -151,15 +151,21 @@ describe('ccr::prompt', () => {
     const executor = createMockExecutor({ output: 'Claude response' });
     const result = await runRill('ccr::prompt("test prompt")', executor);
 
-    expect(executor).toHaveBeenCalledWith('test prompt', undefined);
-    expect(result.value).toBe('Claude response');
+    expect(executor).toHaveBeenCalledWith('test prompt', undefined, {
+      method: 'ccr::prompt',
+      model: undefined,
+    });
+    expect(result.result).toBe('Claude response');
   });
 
   it('passes model parameter when provided', async () => {
     const executor = createMockExecutor({ output: 'response' });
     await runRill('ccr::prompt("prompt text", "haiku")', executor);
 
-    expect(executor).toHaveBeenCalledWith('prompt text', 'haiku');
+    expect(executor).toHaveBeenCalledWith('prompt text', 'haiku', {
+      method: 'ccr::prompt',
+      model: 'haiku',
+    });
   });
 
   it('uses defaultModel when model parameter is empty', async () => {
@@ -168,7 +174,29 @@ describe('ccr::prompt', () => {
       defaultModel: 'sonnet',
     });
 
-    expect(executor).toHaveBeenCalledWith('prompt text', 'sonnet');
+    expect(executor).toHaveBeenCalledWith('prompt text', 'sonnet', {
+      method: 'ccr::prompt',
+      model: 'sonnet',
+    });
+  });
+
+  it('passes timeoutMs when timeout > 0', async () => {
+    const executor = createMockExecutor({ output: 'response' });
+    await runRill('ccr::prompt("text", "", 5)', executor);
+
+    expect(executor).toHaveBeenCalledWith(
+      'text',
+      undefined,
+      expect.objectContaining({ timeoutMs: 300_000 })
+    );
+  });
+
+  it('omits timeoutMs when timeout is 0', async () => {
+    const executor = createMockExecutor({ output: 'response' });
+    await runRill('ccr::prompt("text", "", 0)', executor);
+
+    const call = vi.mocked(executor).mock.calls[0]?.[2];
+    expect(call).not.toHaveProperty('timeoutMs');
   });
 });
 
@@ -177,8 +205,12 @@ describe('ccr::skill', () => {
     const executor = createMockExecutor({ output: 'skill output' });
     const result = await runRill('ccr::skill("commit")', executor);
 
-    expect(executor).toHaveBeenCalledWith('/commit', undefined);
-    expect(result.value).toBe('skill output');
+    expect(executor).toHaveBeenCalledWith('/commit', undefined, {
+      method: 'ccr::skill',
+      name: 'commit',
+      model: undefined,
+    });
+    expect(result.result).toBe('skill output');
   });
 
   it('includes args in skill command', async () => {
@@ -187,7 +219,8 @@ describe('ccr::skill', () => {
 
     expect(executor).toHaveBeenCalledWith(
       '/review --strict file.ts',
-      undefined
+      undefined,
+      { method: 'ccr::skill', name: 'review', model: undefined }
     );
   });
 });
@@ -197,7 +230,7 @@ describe('ccr::file_exists', () => {
     const executor = createMockExecutor();
     const result = await runRill('ccr::file_exists("package.json")', executor);
 
-    expect(result.value).toBe(true);
+    expect(result.result).toBe(true);
   });
 
   it('returns false for non-existing file', async () => {
@@ -207,7 +240,7 @@ describe('ccr::file_exists', () => {
       executor
     );
 
-    expect(result.value).toBe(false);
+    expect(result.result).toBe(false);
   });
 });
 
@@ -218,7 +251,7 @@ describe('ccr::get_result', () => {
       'ccr::get_result("Some text <ccr:result type=\\"done\\" status=\\"success\\"/> more")';
     const result = await runRill(code, executor);
 
-    expect(result.value).toEqual({ type: 'done', status: 'success' });
+    expect(result.result).toEqual({ type: 'done', status: 'success' });
   });
 
   it('parses result tag with content', async () => {
@@ -227,7 +260,7 @@ describe('ccr::get_result', () => {
       'ccr::get_result("<ccr:result type=\\"blocked\\" reason=\\"missing\\">Details</ccr:result>")';
     const result = await runRill(code, executor);
 
-    expect(result.value).toEqual({
+    expect(result.result).toEqual({
       type: 'blocked',
       reason: 'missing',
       content: 'Details',
@@ -241,7 +274,7 @@ describe('ccr::get_result', () => {
       executor
     );
 
-    expect(result.value).toEqual({});
+    expect(result.result).toEqual({});
   });
 
   it('handles single quotes in attributes', async () => {
@@ -249,7 +282,7 @@ describe('ccr::get_result', () => {
     const code = "ccr::get_result(\"<ccr:result type='repeat' count='3'/>\")";
     const result = await runRill(code, executor);
 
-    expect(result.value).toEqual({ type: 'repeat', count: '3' });
+    expect(result.result).toEqual({ type: 'repeat', count: '3' });
   });
 });
 
@@ -260,7 +293,7 @@ describe('ccr::has_result', () => {
       'ccr::has_result("Some text <ccr:result type=\\"done\\"/> more")';
     const result = await runRill(code, executor);
 
-    expect(result.value).toBe(true);
+    expect(result.result).toBe(true);
   });
 
   it('returns true for result tag with content', async () => {
@@ -269,7 +302,7 @@ describe('ccr::has_result', () => {
       'ccr::has_result("<ccr:result type=\\"blocked\\">Details</ccr:result>")';
     const result = await runRill(code, executor);
 
-    expect(result.value).toBe(true);
+    expect(result.result).toBe(true);
   });
 
   it('returns false when no result tag found', async () => {
@@ -279,7 +312,7 @@ describe('ccr::has_result', () => {
       executor
     );
 
-    expect(result.value).toBe(false);
+    expect(result.result).toBe(false);
   });
 
   it('returns false for malformed tags', async () => {
@@ -289,7 +322,7 @@ describe('ccr::has_result', () => {
       executor
     );
 
-    expect(result.value).toBe(false);
+    expect(result.result).toBe(false);
   });
 });
 
@@ -301,7 +334,7 @@ describe('ccr::has_frontmatter', () => {
       executor
     );
 
-    expect(result.value).toBe(true);
+    expect(result.result).toBe(true);
   });
 
   it('returns false for file without frontmatter', async () => {
@@ -311,7 +344,7 @@ describe('ccr::has_frontmatter', () => {
       executor
     );
 
-    expect(result.value).toBe(false);
+    expect(result.result).toBe(false);
   });
 
   it('returns false for non-existing file', async () => {
@@ -321,7 +354,7 @@ describe('ccr::has_frontmatter', () => {
       executor
     );
 
-    expect(result.value).toBe(false);
+    expect(result.result).toBe(false);
   });
 });
 
@@ -341,7 +374,7 @@ describe('ccr::get_frontmatter', () => {
       executor
     );
 
-    expect(result.value).toEqual({});
+    expect(result.result).toEqual({});
   });
 
   it('returns frontmatter dict for file with frontmatter', async () => {
@@ -351,7 +384,7 @@ describe('ccr::get_frontmatter', () => {
       executor
     );
 
-    expect(result.value).toEqual(
+    expect(result.result).toEqual(
       expect.objectContaining({
         description: 'Review code for issues',
       })
@@ -376,7 +409,7 @@ describe('ccr::state', () => {
     const executor = createMockExecutor();
     const result = await runRill('ccr::state("text")', executor);
 
-    expect(result.value).toBe(null);
+    expect(result.result).toBe(null);
   });
 
   it('invokes callback with null for empty string (AC-2, BC-1)', async () => {
@@ -550,7 +583,7 @@ describe('ccr::state', () => {
     const result = await execute(ast, ctx);
 
     // Should still return null
-    expect(result.value).toBe(null);
+    expect(result.result).toBe(null);
     // Should not throw
   });
 

@@ -543,7 +543,10 @@ export function formatMessage(
           const indent =
             colorIndex >= 0 ? `${formatTaskMarker(colorIndex)} ` : '';
           // Strip <tool_use_error> tags for cleaner display
-          const cleanError = content.replace(/<\/?tool_use_error>/g, '').trim();
+          const cleanError = content
+            .replace(/<\/?tool_use_error>/g, '')
+            .replace(/[\r\n]+/g, ' ')
+            .trim();
           terminalLog(
             `${timestampPrefix()}${indent}${colors.red}[error]${colors.reset} ${truncate(cleanError, TRUNCATE_ERROR)}`
           );

@@ -30,6 +30,15 @@ jobs:
       - name: Run checks
         run: npm run check
 
+      - name: Verify tag matches package.json version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="${{ github.ref_name }}"
+          if [ "v${VERSION}" != "${TAG}" ]; then
+            echo "::error::Tag ${TAG} does not match package.json version v${VERSION}"
+            exit 1
+          fi
+
       - name: Publish @rcrsr/claude-code-runner
         run: |
           VERSION=$(node -p "require('./package.json').version")
