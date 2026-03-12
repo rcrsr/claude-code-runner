@@ -7,12 +7,12 @@ import {
   createMockLogger,
 } from '../helpers/mocks.js';
 
-// Mock node-pty
+// Mock @lydell/node-pty
 const mockOnData = vi.fn();
 const mockOnExit = vi.fn();
 const mockKill = vi.fn();
 
-vi.mock('node-pty', () => ({
+vi.mock('@lydell/node-pty', () => ({
   spawn: vi.fn(() => ({
     onData: mockOnData,
     onExit: mockOnExit,
@@ -36,7 +36,7 @@ vi.mock('../../src/parsers/stream.js', () => ({
 }));
 
 // Import mocked modules for assertions
-import * as pty from 'node-pty';
+import * as pty from '@lydell/node-pty';
 
 import {
   flushPendingTools,

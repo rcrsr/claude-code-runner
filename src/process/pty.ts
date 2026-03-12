@@ -2,8 +2,8 @@
  * PTY process management for Claude CLI
  */
 
-import type { IPty } from 'node-pty';
-import * as pty from 'node-pty';
+import type { IPty } from '@lydell/node-pty';
+import * as pty from '@lydell/node-pty';
 
 import type { FormatterState } from '../output/formatter.js';
 import {
