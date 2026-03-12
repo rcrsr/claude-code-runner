@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] — 2026-03-11
+
+### Changed
+
+- Replaced `node-pty` with `@lydell/node-pty` for prebuilt binaries (no native compilation required)
+- Upgraded `@rcrsr/rill` from `~0.11.0` to `~0.13.0`
+- Upgraded `eslint` and `@eslint/js` from 9.x to 10.x
+- Upgraded `@types/node` to 25.4.0, `typescript-eslint` to 8.57.0
+- Minimum Node version raised from 18 to 20 (matching `@rcrsr/rill` engine requirement)
+
+### Fixed
+
+- Useless assignment lint error in `formatter.ts` (`no-useless-assignment`)
+- Caught error propagation in `runner.ts` (`preserve-caught-error`)
+
 ## [0.13.0] — 2026-03-10
 
 ### Added
