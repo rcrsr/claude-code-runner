@@ -211,7 +211,7 @@ function formatToolUse(
   const name = tool.name;
   const input = tool.input;
 
-  let summary = '';
+  let summary: string;
   if (name === 'Read') {
     summary = shortenPath((input['file_path'] as string | undefined) ?? '');
   } else if (name === 'Glob') {

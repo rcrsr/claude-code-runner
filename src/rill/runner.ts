@@ -394,7 +394,9 @@ export async function runRillScript(
     }
     const msg =
       setupError instanceof Error ? setupError.message : String(setupError);
-    throw new Error(`Script setup failed for ${scriptFile}: ${msg}`);
+    throw new Error(`Script setup failed for ${scriptFile}: ${msg}`, {
+      cause: setupError,
+    });
   }
 
   // Parse and execute the script

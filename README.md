@@ -20,14 +20,12 @@ Like [Ralph Wiggum](https://awesomeclaude.ai/ralph-wiggum), but smarter.
 
 ## Prerequisites
 
-- Node.js 18 or later
+- Node.js 20 or later
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated
 
 ## Installation
 
-Claude Code Runner depends on `node-pty` for TTY terminal handling. You may need to install build tools first so the native modules can compile. See [node-pty instructions](https://github.com/microsoft/node-pty) for your platform.
-
-Then install Claude Code Runner globally:
+Install Claude Code Runner globally:
 
 ```bash
 npm install -g @rcrsr/claude-code-runner
