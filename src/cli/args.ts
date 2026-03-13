@@ -109,6 +109,7 @@ export function parseArgs(args: string[]): ParsedArgs {
   let scriptFile: string | null = null;
   let scriptArgs: string[] = [];
   let frontmatterModel: string | null = null;
+  let frontmatterEffort: string | null = null;
   let docsOptions:
     | { functionsOnly: boolean; languageOnly: boolean }
     | undefined = undefined;
@@ -127,6 +128,7 @@ export function parseArgs(args: string[]): ParsedArgs {
       );
       prompt = template.prompt;
       frontmatterModel = template.frontmatter.model ?? null;
+      frontmatterEffort = template.frontmatter.effort ?? null;
       displayCommand = positionalArgs.slice(1).join(' ');
       break;
     }
@@ -184,6 +186,7 @@ export function parseArgs(args: string[]): ParsedArgs {
     verbosity,
     enableLog,
     model: model ?? frontmatterModel,
+    effort: frontmatterEffort,
     deaddrop,
   };
 

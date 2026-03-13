@@ -207,6 +207,7 @@ async function main(): Promise<void> {
     formatterState,
     parallelThresholdMs: config.parallelThresholdMs,
     model: config.model,
+    effort: config.effort,
     inactivityTimeoutMs: config.inactivityTimeoutMs,
   });
 

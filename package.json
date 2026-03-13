@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/claude-code-runner",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "Execute Claude CLI with PTY handling, real-time tool visualization, and iterative execution support",
   "type": "module",
   "main": "dist/index.js",
@@ -47,7 +47,7 @@
   "license": "MIT",
   "dependencies": {
     "@lydell/node-pty": "^1.1.0",
-    "@rcrsr/rill": "~0.13.0"
+    "@rcrsr/rill": "~0.15.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

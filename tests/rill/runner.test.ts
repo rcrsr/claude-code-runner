@@ -144,6 +144,21 @@ ccr::prompt("test")`
     expect(result.source).toContain('ccr::prompt("test")');
   });
 
+  it('parses frontmatter effort', () => {
+    const scriptPath = path.join(testDir, 'with-effort.rill');
+    fs.writeFileSync(
+      scriptPath,
+      `---
+effort: low
+---
+ccr::prompt("test")`
+    );
+
+    const result = loadRillScript(scriptPath);
+
+    expect(result.meta.effort).toBe('low');
+  });
+
   it('parses frontmatter args definition', () => {
     const scriptPath = path.join(testDir, 'with-args.rill');
     fs.writeFileSync(

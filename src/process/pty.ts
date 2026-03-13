@@ -28,6 +28,7 @@ export interface ClaudeProcessOptions {
   formatterState: FormatterState;
   parallelThresholdMs: number;
   model: string | null;
+  effort: string | null;
   /** Inactivity timeout in ms — kills the process when no output is received */
   inactivityTimeoutMs?: number;
 }
@@ -44,6 +45,7 @@ export function spawnClaude(options: ClaudeProcessOptions): Promise<RunResult> {
     formatterState,
     parallelThresholdMs,
     model,
+    effort,
     inactivityTimeoutMs = DEFAULT_INACTIVITY_TIMEOUT_MS,
   } = options;
 
@@ -68,6 +70,10 @@ export function spawnClaude(options: ClaudeProcessOptions): Promise<RunResult> {
 
     if (model) {
       args.push('--model', model);
+    }
+
+    if (effort) {
+      args.push('--effort', effort);
     }
 
     const ptyProcess: IPty = pty.spawn('claude', args, {

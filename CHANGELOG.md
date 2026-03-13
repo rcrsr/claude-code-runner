@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] — 2026-03-13
+
+### Added
+
+- `effort` frontmatter setting for commands and scripts; sets `--effort <level>` on Claude CLI (accepts `low`, `medium`, `high`, `max`)
+
+### Changed
+
+- Upgraded `@rcrsr/rill` from `~0.13.0` to `~0.15.0`
+
+### Fixed
+
+- Pre-existing lint errors in test files: replaced `ReturnType<typeof vi.spyOn>` with `MockInstance`, fixed import sort order, suppressed false-positive `unbound-method` on mocked `vi.fn()`
+
 ## [0.13.0] — 2026-03-11
 
 ### Added
