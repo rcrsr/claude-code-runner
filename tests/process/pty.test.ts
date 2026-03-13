@@ -107,6 +107,27 @@ describe('spawnClaude', () => {
       );
     });
 
+    it('includes --effort flag when effort is set', async () => {
+      const effortOptions = { ...options, effort: 'high' };
+      const promise = spawnClaude(effortOptions);
+      onExitCallback({ exitCode: 0 });
+      await promise;
+
+      const args = vi.mocked(pty.spawn).mock.calls[0]?.[1] as string[];
+      expect(args).toContain('--effort');
+      expect(args[args.indexOf('--effort') + 1]).toBe('high');
+    });
+
+    it('omits --effort flag when effort is null', async () => {
+      const noEffortOptions = { ...options, effort: null };
+      const promise = spawnClaude(noEffortOptions);
+      onExitCallback({ exitCode: 0 });
+      await promise;
+
+      const args = vi.mocked(pty.spawn).mock.calls[0]?.[1] as string[];
+      expect(args).not.toContain('--effort');
+    });
+
     it('spawns pty with correct options', async () => {
       const promise = spawnClaude(options);
       onExitCallback({ exitCode: 0 });
