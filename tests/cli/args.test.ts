@@ -1,3 +1,4 @@
+import type { MockInstance } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock template loaders
@@ -14,8 +15,8 @@ import { parseArgs, printUsage } from '../../src/cli/args.js';
 import { loadCommandTemplate } from '../../src/templates/command.js';
 
 describe('parseArgs', () => {
-  let exitSpy: ReturnType<typeof vi.spyOn>;
-  let errorSpy: ReturnType<typeof vi.spyOn>;
+  let exitSpy: MockInstance;
+  let errorSpy: MockInstance;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -136,6 +137,17 @@ describe('parseArgs', () => {
       const result = parseArgs(['command', 'my-cmd']);
 
       expect(result.config.model).toBe('opus');
+    });
+
+    it('uses frontmatter effort from command', () => {
+      vi.mocked(loadCommandTemplate).mockReturnValue({
+        prompt: 'test',
+        frontmatter: { effort: 'high' },
+      });
+
+      const result = parseArgs(['command', 'my-cmd']);
+
+      expect(result.config.effort).toBe('high');
     });
   });
 
@@ -331,7 +343,7 @@ describe('parseArgs', () => {
 });
 
 describe('printUsage', () => {
-  let logSpy: ReturnType<typeof vi.spyOn>;
+  let logSpy: MockInstance;
 
   beforeEach(() => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);

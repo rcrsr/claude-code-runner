@@ -12,6 +12,7 @@ import { parseArgumentHint } from '../utils/arguments.js';
  */
 export interface TemplateFrontmatter {
   model?: string;
+  effort?: string;
   description?: string;
   argumentHint?: string;
   /** Rill named args definition (e.g., "file: string, retries: number = 3") */
@@ -110,6 +111,9 @@ export function parseFrontmatter(content: string): {
     switch (key) {
       case 'model':
         frontmatter.model = trimmedValue;
+        break;
+      case 'effort':
+        frontmatter.effort = trimmedValue;
         break;
       case 'description':
         frontmatter.description = trimmedValue;

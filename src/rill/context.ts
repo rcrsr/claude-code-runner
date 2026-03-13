@@ -7,6 +7,7 @@ import {
   createRuntimeContext,
   type ObservabilityCallbacks,
   type RillFunction,
+  rillTypeToTypeValue,
   type RillValue,
   type RuntimeCallbacks,
   type RuntimeContext,
@@ -115,8 +116,10 @@ export function createRunnerContext(
      * Usage: ccr::prompt("analyze this code", "haiku")
      */
     'ccr::prompt': {
-      description: 'Execute a prompt with Claude and return output',
-      returnType: { type: 'string' },
+      annotations: {
+        description: 'Execute a prompt with Claude and return output',
+      },
+      returnType: rillTypeToTypeValue({ type: 'string' }),
       params: [
         {
           name: 'text',
@@ -157,8 +160,8 @@ export function createRunnerContext(
      * Usage: ccr::command("create-spec", ["arg1", "arg2"])
      */
     'ccr::command': {
-      description: 'Execute a command template by name',
-      returnType: { type: 'string' },
+      annotations: { description: 'Execute a command template by name' },
+      returnType: rillTypeToTypeValue({ type: 'string' }),
       params: [
         {
           name: 'name',
@@ -211,8 +214,10 @@ export function createRunnerContext(
      * Usage: ccr::skill("commit", ["--amend"])
      */
     'ccr::skill': {
-      description: 'Execute a Claude Code skill (slash command)',
-      returnType: { type: 'string' },
+      annotations: {
+        description: 'Execute a Claude Code skill (slash command)',
+      },
+      returnType: rillTypeToTypeValue({ type: 'string' }),
       params: [
         {
           name: 'name',
@@ -261,8 +266,8 @@ export function createRunnerContext(
      * Usage: ccr::file_exists("path/to/file") -> boolean
      */
     'ccr::file_exists': {
-      description: 'Check if a file exists at the given path',
-      returnType: { type: 'bool' },
+      annotations: { description: 'Check if a file exists at the given path' },
+      returnType: rillTypeToTypeValue({ type: 'bool' }),
       params: [
         {
           name: 'path',
@@ -279,8 +284,8 @@ export function createRunnerContext(
      * Usage: ccr::state("Processing file 3/10")
      */
     'ccr::state': {
-      description: 'Set script status line text',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Set script status line text' },
+      returnType: rillTypeToTypeValue({ type: 'dict' }),
       params: [
         {
           name: 'text',
@@ -317,8 +322,8 @@ export function createRunnerContext(
      * Returns empty dict if no result found (Rill doesn't support null)
      */
     'ccr::get_result': {
-      description: 'Extract ccr:result XML tag from text',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Extract ccr:result XML tag from text' },
+      returnType: rillTypeToTypeValue({ type: 'dict' }),
       params: [
         {
           name: 'text',
@@ -371,8 +376,8 @@ export function createRunnerContext(
      * Usage: ccr::has_result(text) -> boolean
      */
     'ccr::has_result': {
-      description: 'Check if text contains a ccr:result tag',
-      returnType: { type: 'bool' },
+      annotations: { description: 'Check if text contains a ccr:result tag' },
+      returnType: rillTypeToTypeValue({ type: 'bool' }),
       params: [
         {
           name: 'text',
@@ -395,8 +400,8 @@ export function createRunnerContext(
      * Usage: ccr::has_frontmatter(path) -> boolean
      */
     'ccr::has_frontmatter': {
-      description: 'Check if a file has YAML frontmatter',
-      returnType: { type: 'bool' },
+      annotations: { description: 'Check if a file has YAML frontmatter' },
+      returnType: rillTypeToTypeValue({ type: 'bool' }),
       params: [
         {
           name: 'path',
@@ -424,8 +429,10 @@ export function createRunnerContext(
      * Usage: ccr::get_frontmatter("path/to/file.md")
      */
     'ccr::get_frontmatter': {
-      description: 'Parse and return YAML frontmatter from a file',
-      returnType: { type: 'dict' },
+      annotations: {
+        description: 'Parse and return YAML frontmatter from a file',
+      },
+      returnType: rillTypeToTypeValue({ type: 'dict' }),
       params: [
         {
           name: 'path',

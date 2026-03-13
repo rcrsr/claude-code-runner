@@ -185,6 +185,7 @@ describe('spawnClaude', () => {
 
       await promise;
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(options.logger.log).toHaveBeenCalledWith(JSON.stringify(msg));
     });
 

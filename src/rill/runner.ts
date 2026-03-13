@@ -77,6 +77,8 @@ export interface RillArgDef {
 export interface RillScriptMeta {
   /** Model from frontmatter */
   model?: string | undefined;
+  /** Effort from frontmatter */
+  effort?: string | undefined;
   /** Description from frontmatter */
   description?: string | undefined;
   /** Named argument definitions */
@@ -165,6 +167,7 @@ export function loadRillScript(scriptFile: string): {
     source: content, // Pass full content - Rill handles frontmatter
     meta: {
       model: frontmatter.model,
+      effort: frontmatter.effort,
       description: frontmatter.description,
       args: argsDefs,
     },
@@ -187,8 +190,9 @@ export async function runRillScript(
   // Load and parse script
   const { source, meta } = loadRillScript(scriptFile);
 
-  // Use frontmatter model if no CLI override
+  // Use frontmatter model/effort if no CLI override
   const effectiveModel = config.model ?? meta.model ?? null;
+  const effectiveEffort = config.effort ?? meta.effort ?? null;
 
   // Map CLI args to named variables based on frontmatter definition
   const namedArgs: Record<string, string | number | boolean> = {};
@@ -252,6 +256,7 @@ export async function runRillScript(
       formatterState,
       parallelThresholdMs: config.parallelThresholdMs,
       model: model ?? effectiveModel,
+      effort: effectiveEffort,
       inactivityTimeoutMs: invocation?.timeoutMs ?? config.inactivityTimeoutMs,
     });
 

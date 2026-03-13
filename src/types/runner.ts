@@ -31,6 +31,7 @@ export interface RunnerConfig {
   logDir: string;
   parallelThresholdMs: number;
   model: string | null;
+  effort: string | null;
   deaddrop: boolean;
   /** Inactivity timeout in ms — kills the process when no output is received */
   inactivityTimeoutMs: number;
@@ -45,6 +46,7 @@ export const DEFAULT_CONFIG: RunnerConfig = {
   logDir: 'logs',
   parallelThresholdMs: DEFAULT_PARALLEL_THRESHOLD_MS,
   model: null,
+  effort: null,
   deaddrop: false,
   inactivityTimeoutMs: DEFAULT_INACTIVITY_TIMEOUT_MS,
 };
