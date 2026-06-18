@@ -284,6 +284,98 @@ describe('ccr::get_result', () => {
 
     expect(result.result).toEqual({ type: 'repeat', count: '3' });
   });
+
+  it('returns last of two self-closing tags', async () => {
+    const executor = createMockExecutor();
+    const code =
+      'ccr::get_result("Some text <ccr:result type=\\"continue\\"/> more text <ccr:result type=\\"done\\"/>")';
+    const result = await runRill(code, executor);
+
+    expect(result.result).toEqual({ type: 'done' });
+  });
+
+  it('returns last of two content tags', async () => {
+    const executor = createMockExecutor();
+    const code =
+      'ccr::get_result("<ccr:result type=\\"first\\">first content</ccr:result> text <ccr:result type=\\"last\\">last content</ccr:result>")';
+    const result = await runRill(code, executor);
+
+    expect(result.result).toEqual({ type: 'last', content: 'last content' });
+  });
+
+  it('returns self-closing tag when it appears after a content tag', async () => {
+    const executor = createMockExecutor();
+    const code =
+      'ccr::get_result("<ccr:result type=\\"example\\">demo</ccr:result> final <ccr:result type=\\"done\\"/>")';
+    const result = await runRill(code, executor);
+
+    expect(result.result).toEqual({ type: 'done' });
+  });
+
+  it('returns content tag when it appears after a self-closing tag', async () => {
+    const executor = createMockExecutor();
+    const code =
+      'ccr::get_result("<ccr:result type=\\"continue\\"/> later <ccr:result type=\\"blocked\\" reason=\\"missing\\">Details</ccr:result>")';
+    const result = await runRill(code, executor);
+
+    expect(result.result).toEqual({
+      type: 'blocked',
+      reason: 'missing',
+      content: 'Details',
+    });
+  });
+
+  it('parses content tag with a slash in an attribute value', async () => {
+    const executor = createMockExecutor();
+    const code =
+      'ccr::get_result("<ccr:result type=\\"blocked\\" reason=\\"src/auth.ts\\">Details</ccr:result>")';
+    const result = await runRill(code, executor);
+
+    expect(result.result).toEqual({
+      type: 'blocked',
+      reason: 'src/auth.ts',
+      content: 'Details',
+    });
+  });
+
+  it('parses content tag with a URL in an attribute value', async () => {
+    const executor = createMockExecutor();
+    const code =
+      'ccr::get_result("<ccr:result type=\\"blocked\\" reason=\\"https://x.com/y\\">Details</ccr:result>")';
+    const result = await runRill(code, executor);
+
+    expect(result.result).toEqual({
+      type: 'blocked',
+      reason: 'https://x.com/y',
+      content: 'Details',
+    });
+  });
+
+  it('returns slash-bearing content tag that follows a self-closing tag', async () => {
+    const executor = createMockExecutor();
+    const code =
+      'ccr::get_result("<ccr:result type=\\"continue\\"/> later <ccr:result type=\\"blocked\\" reason=\\"src/x.ts\\">D</ccr:result>")';
+    const result = await runRill(code, executor);
+
+    expect(result.result).toEqual({
+      type: 'blocked',
+      reason: 'src/x.ts',
+      content: 'D',
+    });
+  });
+
+  it('returns consistent result on repeated calls (no lastIndex leakage)', async () => {
+    const executor = createMockExecutor();
+    const input =
+      '"<ccr:result type=\\"first\\"/> text <ccr:result type=\\"last\\"/>"';
+    const code1 = `ccr::get_result(${input})`;
+    const code2 = `ccr::get_result(${input})`;
+    const result1 = await runRill(code1, executor);
+    const result2 = await runRill(code2, executor);
+
+    expect(result1.result).toEqual({ type: 'last' });
+    expect(result2.result).toEqual({ type: 'last' });
+  });
 });
 
 describe('ccr::has_result', () => {

@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Migrated the bundled example `examples/iterative-review.rill` to rill 0.19.3 syntax (`do { ... } while` loop). ([#8](https://github.com/rcrsr/claude-code-runner/pull/8))
 - Raised the Node.js engine floor from `>=20.0.0` to `>=22.16.0` to match `@rcrsr/rill@0.19.3`'s transitive `engines.node` requirement. ([#8](https://github.com/rcrsr/claude-code-runner/pull/8))
 
+### Fixed
+
+- `ccr::get_result` now returns the **last** `<ccr:result>` tag in a step's output instead of the first, so an earlier tag-shaped string (an example, an echoed instruction, a `Read` of a template) no longer overrides the skill's authoritative terminal tag. ([#7](https://github.com/rcrsr/claude-code-runner/issues/7), [#9](https://github.com/rcrsr/claude-code-runner/pull/9))
+- Fixed `CCR_RESULT_WITH_CONTENT_PATTERN` to exclude `/` from its attribute group, preventing a self-closing tag from being absorbed as the opening of a following content tag. ([#7](https://github.com/rcrsr/claude-code-runner/issues/7), [#9](https://github.com/rcrsr/claude-code-runner/pull/9))
+
 ## [0.14.0] — 2026-03-13
 
 ### Added
