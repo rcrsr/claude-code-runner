@@ -20,7 +20,7 @@ Like [Ralph Wiggum](https://awesomeclaude.ai/ralph-wiggum), but smarter.
 
 ## Prerequisites
 
-- Node.js 20 or later
+- Node.js 22.16 or later
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated
 
 ## Installation
