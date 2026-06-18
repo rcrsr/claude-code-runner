@@ -15,7 +15,7 @@ args: file: string, count: number = 5
 
 # Comments start with #
 
-ccr::prompt("First step") :> $result
+ccr::prompt("First step") => $result
 ccr::prompt("Use previous: {$result}")
 ```
 
@@ -25,33 +25,34 @@ ccr::prompt("Use previous: {$result}")
 |-----|-------------|
 | `description` | What the script does |
 | `model` | Default model for all prompts |
+| `effort` | Reasoning effort for all prompts (`low`, `medium`, `high`, `max`) |
 | `args` | Named arguments with types and defaults |
 
 ## Host Functions
 
 All functions use the `ccr::` namespace prefix.
 
-### ccr::prompt(text, model?) -> string
+### ccr::prompt(text, model?, timeout?) -> string
 
-Execute a prompt with Claude.
+Execute a prompt with Claude. `timeout` is the inactivity timeout in minutes (`0` uses the default).
 
 ```rill
 ccr::prompt("Analyze this code for bugs")
-ccr::prompt("Explain {$file}", "haiku") :> $explanation
+ccr::prompt("Explain {$file}", "haiku") => $explanation
 ```
 
-### ccr::command(name, args?) -> string
+### ccr::command(name, args?, timeout?) -> string
 
-Execute a command template from `.claude/commands/`.
+Execute a command template from `.claude/commands/`. `timeout` is the inactivity timeout in minutes (`0` uses the default).
 
 ```rill
 ccr::command("review-code", ["src/auth.ts"])
-ccr::command("fix-tests", ["src/", "verbose"]) :> $fixes
+ccr::command("fix-tests", ["src/", "verbose"]) => $fixes
 ```
 
-### ccr::skill(name, args?) -> string
+### ccr::skill(name, args?, timeout?) -> string
 
-Execute a slash command directly.
+Execute a slash command directly. `timeout` is the inactivity timeout in minutes (`0` uses the default).
 
 ```rill
 ccr::skill("commit")
@@ -65,7 +66,7 @@ Check if a file exists.
 ```rill
 ccr::file_exists("src/config.ts") ? ccr::prompt("Config exists, analyze it")
 
-ccr::file_exists($1) ? ccr::command("process-file", $1)
+ccr::file_exists($ARGS[0]) ? ccr::command("process-file", $ARGS)
 ```
 
 ### ccr::has_result(text) -> boolean
@@ -73,25 +74,25 @@ ccr::file_exists($1) ? ccr::command("process-file", $1)
 Check if text contains a `<ccr:result>` tag (self-closing or with content).
 
 ```rill
-ccr::prompt("Fix issues. Output <ccr:result type='repeat'/> if more remain.") :> $output
+ccr::prompt("Fix issues. Output <ccr:result type='repeat'/> if more remain.") => $output
 
 # Dispatch on result type
-ccr::get_result($output) :> $result
+ccr::get_result($output) => $result
 $result.type -> [repeat: log("More work needed")] ?? log("No signal")
 ```
 
 ### ccr::get_result(text) -> dict | {}
 
-Extract an XML result from text. Returns empty dict `{}` if no result found. See [Results](results.md).
+Extract an XML result from text. When the text contains multiple `<ccr:result>` tags, the **last** one wins. Returns empty dict `{}` if no result found. See [Results](results.md).
 
 ```rill
-ccr::prompt("Fix issues. Output <ccr:result type='repeat'/> if more remain.") :> $output
-ccr::get_result($output) :> $result
+ccr::prompt("Fix issues. Output <ccr:result type='repeat'/> if more remain.") => $output
+ccr::get_result($output) => $result
 
 # Dispatch on result type
 $result.type -> [
   repeat: log("More work needed"),
-  blocked: error $result.reason,
+  blocked: ($result.reason -> error),
   done: log("Complete")
 ]
 ```
@@ -102,7 +103,7 @@ Check if a file exists and contains YAML frontmatter.
 
 ```rill
 ccr::has_frontmatter("PLAN.md") ? {
-  ccr::get_frontmatter("PLAN.md") :> $meta
+  ccr::get_frontmatter("PLAN.md") => $meta
   log("Found metadata: {$meta}")
 } ! log("No frontmatter in PLAN.md")
 ```
@@ -112,10 +113,10 @@ ccr::has_frontmatter("PLAN.md") ? {
 Get YAML frontmatter from a file. Returns empty dict `{}` if no frontmatter found. Throws error if file doesn't exist.
 
 ```rill
-ccr::get_frontmatter("PLAN.md") :> $meta
+ccr::get_frontmatter("PLAN.md") => $meta
 
-# Set default if key is missing
-($meta.?priority) ! ($meta.priority = "low")
+# Fall back to a default when the key is missing
+($meta.priority ?? "low") => $priority
 ```
 
 ## Variables
@@ -124,21 +125,22 @@ ccr::get_frontmatter("PLAN.md") :> $meta
 
 | Variable | Description |
 |----------|-------------|
-| `$1`, `$2`, `$3` | Positional script arguments |
-| `$ARGUMENTS` | All arguments joined with spaces |
-| `ARGS` | Array of script arguments |
-| `ENV` | Environment variables dictionary |
+| `$ARGS` | List of positional script arguments (`$ARGS[0]`, `$ARGS[1]`, …) |
+| `$ENV` | Environment variables dictionary |
+| `$name` | Each named argument declared in `args` frontmatter |
+
+> Positional placeholders `$1`, `$2`, and `$ARGUMENTS` are template variables for `.claude/commands/` and skill files only. They are **not** valid in `.rill` scripts; use `$ARGS` instead.
 
 ### Variable Capture
 
-Capture output using `:>` (capture operator):
+Capture output using `=>` (capture operator):
 
 ```rill
-ccr::prompt("List files") :> $files
-ccr::command("analyze", $1) :> $analysis
+ccr::prompt("List files") => $files
+ccr::command("analyze", $ARGS) => $analysis
 ```
 
-Note: `->` pipes value to next operation; `:>` stores value AND continues chain.
+Note: `->` pipes value to next operation; `=>` stores value AND continues chain.
 
 ### Variable Interpolation
 
@@ -168,7 +170,7 @@ Given these issues:
 Suggest fixes with code examples.
 For each fix, explain the reasoning.
 """
--> ccr::prompt :> $fixes
+-> ccr::prompt => $fixes
 ```
 
 ## Control Flow
@@ -182,7 +184,7 @@ Rill uses `cond ? then_expr ! else_expr` for conditionals:
 ccr::file_exists("config.ts") ? ccr::prompt("Config found, validate it")
 
 # With else branch
-($count > 10) ? error "Too many items" ! log("Count OK")
+($count > 10) ? ("Too many items" -> error) ! log("Count OK")
 ```
 
 ### Dispatch (Pattern Matching)
@@ -193,7 +195,7 @@ Dispatch matches a value against dict keys—ideal for result handling:
 # Match result type to action
 $result.type -> [
   repeat: log("Continuing..."),
-  blocked: error $result.reason,
+  blocked: ($result.reason -> error),
   done: log("Complete")
 ]
 
@@ -217,7 +219,7 @@ args: path: string
 ---
 
 # Analyze the code
-ccr::prompt("Review the code in {$path} for bugs and issues") :> $issues
+ccr::prompt("Review the code in {$path} for bugs and issues") => $issues
 
 # Get improvement suggestions
 """
@@ -226,7 +228,7 @@ Based on these issues:
 
 Suggest specific fixes with code examples.
 """
--> ccr::prompt :> $fixes
+-> ccr::prompt => $fixes
 
 # Summarize for the developer
 """

@@ -14,7 +14,7 @@ description: Basic variable capture
 ---
 
 # Capture output to named variable
-ccr::prompt("Name three programming languages") :> $languages
+ccr::prompt("Name three programming languages") => $languages
 
 # Reference named variable
 ccr::prompt("Which of these is best for beginners: {$languages}")
@@ -61,7 +61,7 @@ args: path: string
 ---
 
 # Analyze the code
-ccr::prompt("Review the code in {$path} for bugs and issues") :> $issues
+ccr::prompt("Review the code in {$path} for bugs and issues") => $issues
 
 # Get improvement suggestions based on issues found
 """
@@ -70,7 +70,7 @@ Based on these issues:
 
 Suggest specific fixes with code examples.
 """
--> ccr::prompt :> $fixes
+-> ccr::prompt => $fixes
 
 # Summarize for the developer
 """
@@ -105,12 +105,12 @@ Run the test suite for $1.
 Script using the command:
 
 ```rill
-ccr::command("fix-tests", ["src/"]) :> $output
-ccr::get_result($output) :> $result
+ccr::command("fix-tests", ["src/"]) => $output
+ccr::get_result($output) => $result
 
 $result.type -> [
   repeat: log("More fixes needed"),
-  blocked: error $result.reason,
+  blocked: ($result.reason -> error),
   done: log("All tests passing")
 ]
 ```
@@ -153,8 +153,8 @@ If blocked, output <ccr:result type="blocked" reason="...">what you need</ccr:re
 **Script:**
 
 ```rill
-ccr::command("work-plan", ["PLAN.md"]) :> $result
-ccr::get_result($result) :> $result
+ccr::command("work-plan", ["PLAN.md"]) => $result
+ccr::get_result($result) => $result
 
 # Each invocation: find next item -> implement -> mark done -> signal
 # The document becomes persistent state across runs
@@ -173,7 +173,7 @@ args: initiative: string
 ccr::command("create-spec", [$initiative])
 
 # Step 2: Review spec
-ccr::command("review-spec", [$initiative]) :> $spec_review
+ccr::command("review-spec", [$initiative]) => $spec_review
 
 # Step 3: Improve spec if needed
 ccr::command("improve-spec", [$initiative, $spec_review])
@@ -182,7 +182,7 @@ ccr::command("improve-spec", [$initiative, $spec_review])
 ccr::command("create-plan", [$initiative])
 
 # Step 5: Review plan
-ccr::command("review-plan", [$initiative]) :> $plan_review
+ccr::command("review-plan", [$initiative]) => $plan_review
 
 # Step 6: Improve plan if needed
 ccr::command("improve-plan", [$initiative, $plan_review])
@@ -225,9 +225,9 @@ Fix lint errors in {$path}.
 If errors remain: output <ccr:result type="repeat"/>
 If clean: output <ccr:result type="done"/>
 """
--> ccr::prompt :> $result
+-> ccr::prompt => $result
 
-ccr::get_result($result) :> $result
+ccr::get_result($result) => $result
 
 $result.type -> [repeat: log("More lint errors to fix")]
 ```
@@ -243,8 +243,8 @@ ccr::file_exists("tsconfig.json")
 ccr::file_exists("package.json")
   ? ccr::prompt("Check dependencies for security issues")
 
-(!ccr::file_exists($1))
-  ? error "File not found: {$1}"
+(!ccr::file_exists($ARGS[0]))
+  ? ("File not found: {$ARGS[0]}" -> error)
 ```
 
 ## Reading Metadata
@@ -252,7 +252,7 @@ ccr::file_exists("package.json")
 Extract frontmatter from plan files:
 
 ```rill
-ccr::get_frontmatter("PLAN.md") :> $meta
+ccr::get_frontmatter("PLAN.md") => $meta
 
 ($meta.status == "complete")
   ? log("Plan already complete")

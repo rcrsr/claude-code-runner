@@ -4,7 +4,7 @@ Claude Code Runner executes Claude Code workflows deterministically and unattend
 
 ## Prerequisites
 
-- Node.js 18 or later
+- Node.js 22.16 or later
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated
 
 ## Installation
@@ -47,7 +47,7 @@ Create `workflow.rill`:
 description: Analyze and improve code
 ---
 
-ccr::prompt("Review src/ for bugs") :> $issues
+ccr::prompt("Review src/ for bugs") => $issues
 ccr::prompt("Fix these issues: {$issues}")
 ```
 
@@ -63,6 +63,7 @@ claude-code-runner script workflow.rill
 |---------|-------------|
 | **Prompt** | Single Claude execution with one prompt |
 | **Command** | Reusable template stored in `.claude/commands/` |
+| **Skill** | Runs a Claude Code slash command `/<name>` |
 | **Script** | Multi-step workflow chaining multiple prompts/commands |
 | **Result** | XML message Claude outputs to control script flow |
 

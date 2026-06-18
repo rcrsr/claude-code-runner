@@ -29,13 +29,15 @@ Result types are application-defined. Use any types that make sense for your wor
 Use `ccr::get_result(text)` to extract results from Claude's output:
 
 ```rill
-ccr::prompt("Fix issues. Output <ccr:result type='repeat'/> if more remain.") :> $output
-ccr::get_result($output) :> $result
+ccr::prompt("Fix issues. Output <ccr:result type='repeat'/> if more remain.") => $output
+ccr::get_result($output) => $result
 ```
 
 ### Return Value
 
-Returns a dict with all attributes plus a `content` key, or empty dict `{}` if no result found.
+Returns a dict of the tag's attributes, or empty dict `{}` if no result found. A `content` key is included only for with-content tags; self-closing tags produce attributes with no `content` key.
+
+When the output contains multiple `<ccr:result>` tags, `ccr::get_result` returns the **last** one in the text. This lets an earlier tag-shaped string (an example, an echoed instruction, a file read) sit in the output without overriding the authoritative terminal tag.
 
 For `<ccr:result type="blocked" reason="auth">Need API key</ccr:result>`:
 
@@ -43,16 +45,22 @@ For `<ccr:result type="blocked" reason="auth">Need API key</ccr:result>`:
 [type: "blocked", reason: "auth", content: "Need API key"]
 ```
 
+For the self-closing `<ccr:result type="done"/>`:
+
+```rill
+[type: "done"]
+```
+
 ### Handling Results
 
 Use dispatch to match result types to actions:
 
 ```rill
-ccr::get_result($output) :> $result
+ccr::get_result($output) => $result
 
 $result.type -> [
   repeat: log("More work needed"),
-  blocked: error $result.reason,
+  blocked: ($result.reason -> error),
   done: log("Completed: {$result.summary}")
 ]
 ```
@@ -72,9 +80,9 @@ After fixing:
 - If errors remain, output <ccr:result type="repeat"/>
 - If clean, output <ccr:result type="done"/>
 """
--> ccr::prompt :> $output
+-> ccr::prompt => $output
 
-ccr::get_result($output) :> $result
+ccr::get_result($output) => $result
 # Handle $result.type == "repeat" by re-running or looping
 ```
 
@@ -103,7 +111,7 @@ Read PLAN.md. Find the first unchecked item (- [ ]).
 4. If all done, output <ccr:result type="done"/>
 5. If stuck, output <ccr:result type="blocked" reason="..."/>
 """
--> ccr::prompt :> $output
+-> ccr::prompt => $output
 ```
 
 ### Multi-Phase Pipeline
@@ -112,7 +120,7 @@ Different phases with different result handling:
 
 ```rill
 # Phase 1: Analysis (no repeat expected)
-ccr::prompt("Analyze codebase for issues") :> $issues
+ccr::prompt("Analyze codebase for issues") => $issues
 
 # Phase 2: Fixes (may repeat)
 """
@@ -121,9 +129,9 @@ Fix one issue from this list:
 
 Output <ccr:result type="repeat"/> if more issues remain.
 """
--> ccr::prompt :> $output
+-> ccr::prompt => $output
 
-ccr::get_result($output) :> $result
+ccr::get_result($output) => $result
 $result.type -> [repeat: log("More issues to fix")]
 
 # Phase 3: Verification
@@ -142,13 +150,13 @@ If deployment succeeds, output <ccr:result type="done"/>.
 If blocked by permissions, output <ccr:result type="blocked" reason="permissions"/>.
 If blocked by other issues, output <ccr:result type="blocked" reason="...">Details here</ccr:result>.
 """
--> ccr::prompt :> $output
+-> ccr::prompt => $output
 
-ccr::get_result($output) :> $result
+ccr::get_result($output) => $result
 
 $result.type -> [
   done: log("Deployment complete"),
-  blocked: error "Blocked: {$result.reason} - {$result.content}"
+  blocked: ("Blocked: {$result.reason} - {$result.content}" -> error)
 ]
 ```
 

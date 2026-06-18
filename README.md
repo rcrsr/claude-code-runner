@@ -13,7 +13,7 @@ Like [Ralph Wiggum](https://awesomeclaude.ai/ralph-wiggum), but smarter.
 
 - **Rich scripting** — Fully scriptable with variables, conditionals, loops, and functions
 - **Walk away** — Workflows can run unattended for hours if needed
-- **Treat Claude Code Skills as Functions** — Call with arguments and get back return values throgh `<ccr:result type="..."/>`
+- **Treat Claude Code Skills as Functions** — Call with arguments and get back return values through `<ccr:result type="..."/>`
 - **Fresh context** — Each invocation starts with a clean slate
 - **Watch live** — See your calls log activity as they execute
 - **Inspect later** — Full session logs for debugging
@@ -44,7 +44,7 @@ claude-code-runner prompt "Refactor the auth module to use async/await"
 Run skills by name:
 
 ```bash
-claude-code-runner command review-code src/auth.ts
+claude-code-runner skill review-code src/auth.ts
 ```
 
 **Example skill** (`.claude/skills/review-code/SKILL.md`):
@@ -80,9 +80,9 @@ Output findings as a numbered list.
 
 Scripts use [rill](https://rill.run), a scripting language designed for AI workflows. Rill provides:
 
-- **Variables & capture** — Store Claude's output with `:>` operator
+- **Variables & capture** — Store Claude's output with the `=>` operator
 - **Conditionals** — Branch logic with `(condition) ? action`
-- **Loops** — Iterate with `for` and `while`
+- **Loops** — Iterate with `while` and `do-while`
 - **Functions** — Reusable logic blocks
 - **String interpolation** — Embed variables with `{$var}` syntax
 - **Triple-quote strings** — Multi-line prompts with `"""..."""`
@@ -100,7 +100,7 @@ args: path: string
 ---
 
 # Analyze the code
-ccr::prompt("Review the code in {$path} for bugs") :> $issues
+ccr::prompt("Review the code in {$path} for bugs") => $issues
 
 # Get fixes based on issues found
 """
@@ -109,7 +109,7 @@ Based on these issues:
 
 Suggest specific fixes with code examples.
 """
--> ccr::prompt :> $fixes
+-> ccr::prompt => $fixes
 
 # Summarize
 ccr::prompt("Summarize: Issues: {$issues} Fixes: {$fixes}")
@@ -117,16 +117,17 @@ ccr::prompt("Summarize: Issues: {$issues} Fixes: {$fixes}")
 
 **Host functions:**
 
-| Function                     | Description                        |
-| ---------------------------- | ---------------------------------- |
-| `ccr::prompt(text, model?)`  | Execute a Claude prompt            |
-| `ccr::skill(name, args?)`    | Run a Claude Code skill            |
-| `ccr::command(name, args?)`  | Run a Claude Code slash command    |
-| `ccr::has_result(text)`      | Check if text contains ccr:result  |
-| `ccr::get_result(text)`      | Extract `<ccr:result>` from output |
-| `ccr::has_frontmatter(path)` | Check if file has frontmatter      |
-| `ccr::get_frontmatter(path)` | Parse YAML frontmatter             |
-| `ccr::file_exists(path)`     | Check if file exists               |
+| Function                              | Description                                     |
+| ------------------------------------- | ----------------------------------------------- |
+| `ccr::prompt(text, model?, timeout?)` | Execute a Claude prompt                         |
+| `ccr::command(name, args?, timeout?)` | Run a command template from `.claude/commands/` |
+| `ccr::skill(name, args?, timeout?)`   | Run a Claude Code skill (slash command)         |
+| `ccr::state(text)`                    | Set the script status line text                 |
+| `ccr::has_result(text)`               | Check if text contains a ccr:result tag         |
+| `ccr::get_result(text)`               | Extract the last `<ccr:result>` from output     |
+| `ccr::has_frontmatter(path)`          | Check if a file has frontmatter                 |
+| `ccr::get_frontmatter(path)`          | Parse YAML frontmatter                          |
+| `ccr::file_exists(path)`              | Check if a file exists                          |
 
 See [docs/rill-scripting.md](docs/rill-scripting.md) for the full scripting reference.
 
@@ -161,13 +162,13 @@ Results let Claude communicate control flow decisions back to your scripts using
 Result types are application-defined. Your script extracts and handles them:
 
 ```rill
-ccr::prompt("Fix bugs. Signal <ccr:result type='repeat'/> if more remain.") :> $output
-ccr::get_result($output) :> $result
+ccr::prompt("Fix bugs. Signal <ccr:result type='repeat'/> if more remain.") => $output
+ccr::get_result($output) => $result
 
 # Dispatch on result type
 $result.type -> [
   repeat: log("More work needed"),
-  blocked: error $result.reason,
+  blocked: ($result.reason -> error),
   done: log("Complete")
 ]
 ```

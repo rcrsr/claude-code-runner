@@ -14,22 +14,23 @@ npm run build           # Compile TypeScript
 
 ## Architecture
 
-**CLI modes**: `prompt` (single execution), `command` (templates from `.claude/commands/`), `script` (Rill workflows)
+**CLI modes**: `prompt` (single execution), `command` (templates from `.claude/commands/`), `skill` (slash command `/<name>`), `script` (Rill workflows), `docs` (print rill/CCR reference)
 
 **Rill runner** (`src/rill/runner.ts`): Executes `.rill` scripts using the Rill interpreter with CCR host functions.
 
 **Host functions** (provided to Rill via `ccr::` namespace):
 
-- `ccr::prompt(text, model?)` → Execute Claude prompt
-- `ccr::command(name, args?)` → Run command template (args is list)
-- `ccr::skill(name, args?)` → Run slash command (args is list)
-- `ccr::get_result(text)` → Extract XML result from output
+- `ccr::prompt(text, model?, timeout?)` → Execute Claude prompt
+- `ccr::command(name, args?, timeout?)` → Run command template (args is list)
+- `ccr::skill(name, args?, timeout?)` → Run slash command (args is list)
+- `ccr::state(text)` → Set the script status line text
+- `ccr::get_result(text)` → Extract the last XML result from output
+- `ccr::has_result(text)` → Check if text contains ccr:result
 - `ccr::file_exists(path)` → Check file existence
 - `ccr::get_frontmatter(path)` → Parse YAML frontmatter
 - `ccr::has_frontmatter(path)` → Check if file has frontmatter
-- `ccr::has_result(text)` → Check if text contains ccr:result
 
-**Script variables**: `$1`, `$2` (args), `$ARGUMENTS` (all args), `$varname` (captures via `:> $varname`)
+**Script variables**: `$ARGS` (positional args list, `$ARGS[0]`…), `$ENV` (env vars), `$name` (named `args` frontmatter), `$varname` (captures via `=> $varname`). Note: `$1`/`$2`/`$ARGUMENTS` are `.claude/commands/` and skill template variables, not valid in `.rill` scripts.
 
 **Constants**: All magic numbers live in `src/utils/constants.ts`
 
