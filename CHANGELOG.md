@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] — 2026-06-18
+
 ### BREAKING
 
 - **`@rcrsr/rill` upgrade from `~0.15.0` to `~0.19.3` changes the rill language syntax.** Existing `.rill` scripts can fail to parse and need migration before they run. The retry-loop form `^(limit) [...] -> @ { ... } ? (cond)` becomes `do { ... } while (cond)`. The string-slice pipe target `-> /<start:end>` is removed; use string methods such as `.pad_end(n, " ")` instead. Review every `.rill` script against the rill 0.19.3 language reference before upgrading. ([#8](https://github.com/rcrsr/claude-code-runner/pull/8))
