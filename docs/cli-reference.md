@@ -85,7 +85,7 @@ claude-code-runner script workflows/deploy.rill production
 Print the rill language and CCR host-function reference.
 
 ```bash
-claude-code-runner docs [--functions-only | --language-only]
+claude-code-runner docs [--functions-only] [--language-only]
 ```
 
 - `--functions-only` - Print only the `ccr::` host functions
