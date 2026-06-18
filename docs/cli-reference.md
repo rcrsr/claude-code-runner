@@ -41,6 +41,26 @@ Loads `.claude/commands/review-code.md` and substitutes:
 - `$2` = `strict`
 - `$ARGUMENTS` = `src/auth.ts strict`
 
+### skill
+
+Run a Claude Code slash command `/<name>`.
+
+```bash
+claude-code-runner skill <name> [args...]
+```
+
+**Arguments:**
+
+- `name` - Skill name without the leading `/`
+- `args` - Appended to the slash command
+
+**Example:**
+
+```bash
+claude-code-runner skill commit
+claude-code-runner skill conduct:create-language-policy typescript
+```
+
 ### script
 
 Run a multi-step Rill script.
@@ -52,7 +72,7 @@ claude-code-runner script <file.rill> [args...]
 **Arguments:**
 
 - `file.rill` - Path to Rill script file
-- `args` - Available as `$1`, `$2`, `$ARGUMENTS` in script
+- `args` - Available in the script as `$ARGS` (`$ARGS[0]`, `$ARGS[1]`, …)
 
 **Example:**
 
@@ -60,12 +80,23 @@ claude-code-runner script <file.rill> [args...]
 claude-code-runner script workflows/deploy.rill production
 ```
 
+### docs
+
+Print the rill language and CCR host-function reference.
+
+```bash
+claude-code-runner docs [--functions-only | --language-only]
+```
+
+- `--functions-only` - Print only the `ccr::` host functions
+- `--language-only` - Print only the rill language reference
+
 ## Options
 
 | Option | Short | Description |
 |--------|-------|-------------|
 | `--version` | `-V` | Print version number |
-| `--model` | `-m` | Claude model: `sonnet`, `opus`, `haiku` |
+| `--model` | `-m` | Model name forwarded to the `claude` CLI (e.g. `sonnet`, `opus`, `haiku`) |
 | `--quiet` | | Minimal output (errors only) |
 | `--normal` | | Default output level |
 | `--verbose` | | Full output with details |
@@ -138,10 +169,10 @@ Output <ccr:result type="repeat"/> if failures remain after fixing.
 
 ## Logs
 
-When `--log` is specified, sessions are logged to `./logs/` with timestamped filenames:
+When `--log` is specified, sessions are logged to `./logs/` with timestamped filenames prefixed by the subcommand:
 
 ```
-logs/sonnet-2026-01-23T14-30-00.log
+logs/prompt-2026-01-23T14-30-00.log
 ```
 
 Logs contain full session output with ANSI codes stripped for easy reading.

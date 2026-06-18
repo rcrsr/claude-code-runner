@@ -11,17 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### BREAKING
 
-- **`@rcrsr/rill` upgrade from `~0.15.0` to `~0.19.3` changes the rill language syntax.** Existing `.rill` scripts can fail to parse and need migration before they run. The retry-loop form `^(limit) [...] -> @ { ... } ? (cond)` becomes `do { ... } while (cond)`. The string-slice pipe target `-> /<start:end>` is removed; use string methods such as `.pad_end(n, " ")` instead. Review every `.rill` script against the rill 0.19.3 language reference before upgrading. ([#8](https://github.com/rcrsr/claude-code-runner/pull/8))
+- **`@rcrsr/rill` upgrade from `~0.15.0` to `~0.19.3` changes the rill language syntax.** Existing `.rill` scripts can fail to parse and need migration before they run. The retry-loop form `^(limit) [...] -> @ { ... } ? (cond)` becomes `do<limit: N> { ... } while (cond)`. The string-slice pipe target `-> /<start:end>` is removed; use string methods such as `.pad_end(n, " ")` instead. Review every `.rill` script against the rill 0.19.3 language reference before upgrading. ([#8](https://github.com/rcrsr/claude-code-runner/pull/8))
 
 ### Changed
 
-- Migrated the bundled example `examples/iterative-review.rill` to rill 0.19.3 syntax (`do { ... } while` loop). ([#8](https://github.com/rcrsr/claude-code-runner/pull/8))
+- Migrated the bundled example `examples/iterative-review.rill` to rill 0.19.3 syntax (`do<limit: N> { ... } while` loop). ([#8](https://github.com/rcrsr/claude-code-runner/pull/8))
 - Raised the Node.js engine floor from `>=20.0.0` to `>=22.16.0` to match `@rcrsr/rill@0.19.3`'s transitive `engines.node` requirement. ([#8](https://github.com/rcrsr/claude-code-runner/pull/8))
 
 ### Fixed
 
 - `ccr::get_result` now returns the **last** `<ccr:result>` tag in a step's output instead of the first, so an earlier tag-shaped string (an example, an echoed instruction, a `Read` of a template) no longer overrides the skill's authoritative terminal tag. ([#7](https://github.com/rcrsr/claude-code-runner/issues/7), [#9](https://github.com/rcrsr/claude-code-runner/pull/9))
-- Fixed `CCR_RESULT_WITH_CONTENT_PATTERN` to exclude `/` from its attribute group, preventing a self-closing tag from being absorbed as the opening of a following content tag. ([#7](https://github.com/rcrsr/claude-code-runner/issues/7), [#9](https://github.com/rcrsr/claude-code-runner/pull/9))
+- Fixed `CCR_RESULT_WITH_CONTENT_PATTERN` to allow `/` inside attribute values (paths, URLs, dates) while still excluding the self-closing `/>` form, so a with-content result tag whose `reason` carries a slash is no longer silently dropped and a preceding self-closing tag is no longer absorbed as its opener. ([#7](https://github.com/rcrsr/claude-code-runner/issues/7), [#9](https://github.com/rcrsr/claude-code-runner/pull/9))
 
 ## [0.14.0] — 2026-03-13
 
