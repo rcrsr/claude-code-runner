@@ -325,6 +325,45 @@ describe('ccr::get_result', () => {
     });
   });
 
+  it('parses content tag with a slash in an attribute value', async () => {
+    const executor = createMockExecutor();
+    const code =
+      'ccr::get_result("<ccr:result type=\\"blocked\\" reason=\\"src/auth.ts\\">Details</ccr:result>")';
+    const result = await runRill(code, executor);
+
+    expect(result.result).toEqual({
+      type: 'blocked',
+      reason: 'src/auth.ts',
+      content: 'Details',
+    });
+  });
+
+  it('parses content tag with a URL in an attribute value', async () => {
+    const executor = createMockExecutor();
+    const code =
+      'ccr::get_result("<ccr:result type=\\"blocked\\" reason=\\"https://x.com/y\\">Details</ccr:result>")';
+    const result = await runRill(code, executor);
+
+    expect(result.result).toEqual({
+      type: 'blocked',
+      reason: 'https://x.com/y',
+      content: 'Details',
+    });
+  });
+
+  it('returns slash-bearing content tag that follows a self-closing tag', async () => {
+    const executor = createMockExecutor();
+    const code =
+      'ccr::get_result("<ccr:result type=\\"continue\\"/> later <ccr:result type=\\"blocked\\" reason=\\"src/x.ts\\">D</ccr:result>")';
+    const result = await runRill(code, executor);
+
+    expect(result.result).toEqual({
+      type: 'blocked',
+      reason: 'src/x.ts',
+      content: 'D',
+    });
+  });
+
   it('returns consistent result on repeated calls (no lastIndex leakage)', async () => {
     const executor = createMockExecutor();
     const input =
