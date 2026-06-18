@@ -7,10 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- **Documentation corrections:** Updated all docs, examples, and host function references for rill 0.19.3 and current host functions. ([#10](https://github.com/rcrsr/claude-code-runner/pull/10))
-
 ## [0.15.0] — 2026-06-18
 
 ### BREAKING
@@ -19,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Documentation corrections:** Updated all docs, examples, and host function references for rill 0.19.3 and current host functions. ([#10](https://github.com/rcrsr/claude-code-runner/pull/10))
 - Migrated the bundled example `examples/iterative-review.rill` to rill 0.19.3 syntax (`do<limit: N> { ... } while` loop). ([#8](https://github.com/rcrsr/claude-code-runner/pull/8))
 - Raised the Node.js engine floor from `>=20.0.0` to `>=22.16.0` to match `@rcrsr/rill@0.19.3`'s transitive `engines.node` requirement. ([#8](https://github.com/rcrsr/claude-code-runner/pull/8))
 
