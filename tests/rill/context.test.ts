@@ -2,7 +2,7 @@
  * Tests for Rill runtime context and host functions
  */
 
-import { execute, parse } from '@rcrsr/rill';
+import { execute, getStatus, isInvalid, parse } from '@rcrsr/rill';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -393,14 +393,20 @@ describe('ccr::get_frontmatter', () => {
 });
 
 describe('ccr::command', () => {
-  it('throws error when command file not found', async () => {
+  it('surfaces command-not-found as an invalid result', async () => {
+    // rill 0.19.x converts an async host-function throw into an invalid
+    // top-level result (status atom #R999) carrying the error message,
+    // instead of rejecting execute().
     const executor = createMockExecutor();
 
-    await expect(
-      runRill('ccr::command("non-existent-cmd")', executor, {
-        commandsDir: '.claude/commands',
-      })
-    ).rejects.toThrow('Command not found');
+    const { result } = await runRill(
+      'ccr::command("non-existent-cmd")',
+      executor,
+      { commandsDir: '.claude/commands' }
+    );
+
+    expect(isInvalid(result)).toBe(true);
+    expect(getStatus(result).message).toContain('Command not found');
   });
 });
 

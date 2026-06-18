@@ -7,10 +7,10 @@ import {
   createRuntimeContext,
   type ObservabilityCallbacks,
   type RillFunction,
-  rillTypeToTypeValue,
   type RillValue,
   type RuntimeCallbacks,
   type RuntimeContext,
+  structureToTypeValue,
 } from '@rcrsr/rill';
 import * as fs from 'fs';
 
@@ -119,23 +119,23 @@ export function createRunnerContext(
       annotations: {
         description: 'Execute a prompt with Claude and return output',
       },
-      returnType: rillTypeToTypeValue({ type: 'string' }),
+      returnType: structureToTypeValue({ kind: 'string' }),
       params: [
         {
           name: 'text',
-          type: { type: 'string' },
+          type: { kind: 'string' },
           defaultValue: undefined,
           annotations: { description: 'Prompt text to send to Claude' },
         },
         {
           name: 'model',
-          type: { type: 'string' },
+          type: { kind: 'string' },
           defaultValue: '',
           annotations: { description: 'Model override (sonnet, opus, haiku)' },
         },
         {
           name: 'timeout',
-          type: { type: 'number' },
+          type: { kind: 'number' },
           defaultValue: 0,
           annotations: {
             description: 'Inactivity timeout in minutes (0 = use default)',
@@ -143,9 +143,9 @@ export function createRunnerContext(
         },
       ],
       fn: async (args) => {
-        const text = args[0] as string;
-        const model = (args[1] as string) || defaultModel;
-        const timeoutMin = args[2] as number;
+        const text = args['text'] as string;
+        const model = (args['model'] as string) || defaultModel;
+        const timeoutMin = args['timeout'] as number;
         const result = await executeClause(text, model, {
           method: 'ccr::prompt',
           model: model ?? undefined,
@@ -161,23 +161,23 @@ export function createRunnerContext(
      */
     'ccr::command': {
       annotations: { description: 'Execute a command template by name' },
-      returnType: rillTypeToTypeValue({ type: 'string' }),
+      returnType: structureToTypeValue({ kind: 'string' }),
       params: [
         {
           name: 'name',
-          type: { type: 'string' },
+          type: { kind: 'string' },
           defaultValue: undefined,
           annotations: { description: 'Command template name' },
         },
         {
           name: 'args',
-          type: { type: 'list' },
+          type: { kind: 'list' },
           defaultValue: [],
           annotations: { description: 'Arguments to pass to template' },
         },
         {
           name: 'timeout',
-          type: { type: 'number' },
+          type: { kind: 'number' },
           defaultValue: 0,
           annotations: {
             description: 'Inactivity timeout in minutes (0 = use default)',
@@ -185,11 +185,11 @@ export function createRunnerContext(
         },
       ],
       fn: async (args, ctx) => {
-        const name = args[0] as string;
-        const cmdArgs = (args[1] as RillValue[]).map((a) =>
+        const name = args['name'] as string;
+        const cmdArgs = (args['args'] as RillValue[]).map((a) =>
           formatRillValue(a ?? null)
         );
-        const timeoutMin = args[2] as number;
+        const timeoutMin = args['timeout'] as number;
 
         const template = loadCommandTemplateFile(
           name,
@@ -217,23 +217,23 @@ export function createRunnerContext(
       annotations: {
         description: 'Execute a Claude Code skill (slash command)',
       },
-      returnType: rillTypeToTypeValue({ type: 'string' }),
+      returnType: structureToTypeValue({ kind: 'string' }),
       params: [
         {
           name: 'name',
-          type: { type: 'string' },
+          type: { kind: 'string' },
           defaultValue: undefined,
           annotations: { description: 'Skill name (without leading /)' },
         },
         {
           name: 'args',
-          type: { type: 'list' },
+          type: { kind: 'list' },
           defaultValue: [],
           annotations: { description: 'Arguments to pass to skill' },
         },
         {
           name: 'timeout',
-          type: { type: 'number' },
+          type: { kind: 'number' },
           defaultValue: 0,
           annotations: {
             description: 'Inactivity timeout in minutes (0 = use default)',
@@ -241,11 +241,11 @@ export function createRunnerContext(
         },
       ],
       fn: async (args, ctx) => {
-        const name = args[0] as string;
-        const skillArgs = (args[1] as RillValue[]).map((a) =>
+        const name = args['name'] as string;
+        const skillArgs = (args['args'] as RillValue[]).map((a) =>
           formatRillValue(a ?? null)
         );
-        const timeoutMin = args[2] as number;
+        const timeoutMin = args['timeout'] as number;
 
         const promptText =
           skillArgs.length > 0 ? `/${name} ${skillArgs.join(' ')}` : `/${name}`;
@@ -267,16 +267,16 @@ export function createRunnerContext(
      */
     'ccr::file_exists': {
       annotations: { description: 'Check if a file exists at the given path' },
-      returnType: rillTypeToTypeValue({ type: 'bool' }),
+      returnType: structureToTypeValue({ kind: 'bool' }),
       params: [
         {
           name: 'path',
-          type: { type: 'string' },
+          type: { kind: 'string' },
           defaultValue: undefined,
           annotations: { description: 'File path to check' },
         },
       ],
-      fn: (args) => fs.existsSync(args[0] as string),
+      fn: (args) => fs.existsSync(args['path'] as string),
     },
 
     /**
@@ -285,17 +285,17 @@ export function createRunnerContext(
      */
     'ccr::state': {
       annotations: { description: 'Set script status line text' },
-      returnType: rillTypeToTypeValue({ type: 'dict' }),
+      returnType: structureToTypeValue({ kind: 'dict' }),
       params: [
         {
           name: 'text',
-          type: { type: 'string' },
+          type: { kind: 'string' },
           defaultValue: undefined,
           annotations: {},
         },
       ],
       fn: (args) => {
-        let text = args[0] as string;
+        let text = args['text'] as string;
 
         // Strip ANSI escape sequences
         text = stripAnsi(text);
@@ -323,17 +323,17 @@ export function createRunnerContext(
      */
     'ccr::get_result': {
       annotations: { description: 'Extract ccr:result XML tag from text' },
-      returnType: rillTypeToTypeValue({ type: 'dict' }),
+      returnType: structureToTypeValue({ kind: 'dict' }),
       params: [
         {
           name: 'text',
-          type: { type: 'string' },
+          type: { kind: 'string' },
           defaultValue: undefined,
           annotations: { description: 'Text containing ccr:result tag' },
         },
       ],
       fn: (args) => {
-        const text = args[0] as string;
+        const text = args['text'] as string;
 
         let attrs: string;
         let content: string | undefined;
@@ -377,17 +377,17 @@ export function createRunnerContext(
      */
     'ccr::has_result': {
       annotations: { description: 'Check if text contains a ccr:result tag' },
-      returnType: rillTypeToTypeValue({ type: 'bool' }),
+      returnType: structureToTypeValue({ kind: 'bool' }),
       params: [
         {
           name: 'text',
-          type: { type: 'string' },
+          type: { kind: 'string' },
           defaultValue: undefined,
           annotations: { description: 'Text to search for ccr:result tag' },
         },
       ],
       fn: (args) => {
-        const text = args[0] as string;
+        const text = args['text'] as string;
         return (
           CCR_RESULT_SELF_CLOSING_PATTERN.test(text) ||
           CCR_RESULT_WITH_CONTENT_PATTERN.test(text)
@@ -401,17 +401,17 @@ export function createRunnerContext(
      */
     'ccr::has_frontmatter': {
       annotations: { description: 'Check if a file has YAML frontmatter' },
-      returnType: rillTypeToTypeValue({ type: 'bool' }),
+      returnType: structureToTypeValue({ kind: 'bool' }),
       params: [
         {
           name: 'path',
-          type: { type: 'string' },
+          type: { kind: 'string' },
           defaultValue: undefined,
           annotations: { description: 'File path to check' },
         },
       ],
       fn: (args) => {
-        const filePath = args[0] as string;
+        const filePath = args['path'] as string;
 
         if (!fs.existsSync(filePath)) {
           return false;
@@ -432,17 +432,17 @@ export function createRunnerContext(
       annotations: {
         description: 'Parse and return YAML frontmatter from a file',
       },
-      returnType: rillTypeToTypeValue({ type: 'dict' }),
+      returnType: structureToTypeValue({ kind: 'dict' }),
       params: [
         {
           name: 'path',
-          type: { type: 'string' },
+          type: { kind: 'string' },
           defaultValue: undefined,
           annotations: { description: 'File path to parse' },
         },
       ],
       fn: (args) => {
-        const filePath = args[0] as string;
+        const filePath = args['path'] as string;
 
         if (!fs.existsSync(filePath)) {
           throw new Error(`File not found: ${filePath}`);

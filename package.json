@@ -47,7 +47,7 @@
   "license": "MIT",
   "dependencies": {
     "@lydell/node-pty": "^1.1.0",
-    "@rcrsr/rill": "~0.15.0"
+    "@rcrsr/rill": "~0.19.3"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
