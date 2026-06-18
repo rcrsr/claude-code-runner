@@ -7,9 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### BREAKING
+
+- **`@rcrsr/rill` upgrade from `~0.15.0` to `~0.19.3` changes the rill language syntax.** Existing `.rill` scripts can fail to parse and need migration before they run. The retry-loop form `^(limit) [...] -> @ { ... } ? (cond)` becomes `do { ... } while (cond)`. The string-slice pipe target `-> /<start:end>` is removed; use string methods such as `.pad_end(n, " ")` instead. Review every `.rill` script against the rill 0.19.3 language reference before upgrading. ([#8](https://github.com/rcrsr/claude-code-runner/pull/8))
+
 ### Changed
 
-- **BREAKING: `@rcrsr/rill` upgrade from `~0.15.0` to `~0.19.3`.** Rill changed its language syntax across this range. Existing `.rill` scripts can fail to parse and need migration. The retry-loop form `^(limit) [...] -> @ { ... } ? (cond)` becomes `do { ... } while (cond)`. The string-slice pipe target `-> /<start:end>` is no longer valid. Review every `.rill` script against the rill 0.19.3 language reference before upgrading. ([#8](https://github.com/rcrsr/claude-code-runner/pull/8))
+- Migrated the bundled example `examples/iterative-review.rill` to rill 0.19.3 syntax (`do { ... } while` loop). ([#8](https://github.com/rcrsr/claude-code-runner/pull/8))
 - Raised the Node.js engine floor from `>=20.0.0` to `>=22.16.0` to match `@rcrsr/rill@0.19.3`'s transitive `engines.node` requirement. ([#8](https://github.com/rcrsr/claude-code-runner/pull/8))
 
 ## [0.14.0] — 2026-03-13

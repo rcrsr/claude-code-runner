@@ -4,8 +4,8 @@ args: text: string
 ---
 
 # Do-while pattern: review at least once, accumulate with $
-^(limit: 3) [iter: 0, max: 3, text: $text, done: false]
-  -> @ {
+[iter: 0, max: 3, text: $text, done: false]
+  -> do<limit: 3> {
     $.iter + 1 => $i
     log("Iteration {$i}")
 
@@ -33,7 +33,7 @@ args: text: string
           [iter: $i, max: $.max, text: $.text, done: true] 
         }
       ! [iter: $i, max: $.max, text: $response, done: false]
-  } ? (!$.done && $.iter < $.max)
+  } while (!$.done && $.iter < $.max)
   => $final
 
 log("=== Final Result ===")
