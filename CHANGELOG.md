@@ -18,8 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `ccr::get_result` now returns the **last** `<ccr:result>` tag in a step's output instead of the first, so an earlier tag-shaped string (an example, an echoed instruction, a `Read` of a template) no longer overrides the skill's authoritative terminal tag. ([#7](https://github.com/rcrsr/claude-code-runner/issues/7))
-- Fixed `CCR_RESULT_WITH_CONTENT_PATTERN` to exclude `/` from its attribute group, preventing a self-closing tag from being absorbed as the opening of a following content tag. ([#7](https://github.com/rcrsr/claude-code-runner/issues/7))
+- `ccr::get_result` now returns the **last** `<ccr:result>` tag in a step's output instead of the first, so an earlier tag-shaped string (an example, an echoed instruction, a `Read` of a template) no longer overrides the skill's authoritative terminal tag. ([#7](https://github.com/rcrsr/claude-code-runner/issues/7), [#9](https://github.com/rcrsr/claude-code-runner/pull/9))
+- Fixed `CCR_RESULT_WITH_CONTENT_PATTERN` to exclude `/` from its attribute group, preventing a self-closing tag from being absorbed as the opening of a following content tag. ([#7](https://github.com/rcrsr/claude-code-runner/issues/7), [#9](https://github.com/rcrsr/claude-code-runner/pull/9))
 
 ## [0.14.0] — 2026-03-13
 
