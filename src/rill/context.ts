@@ -84,6 +84,57 @@ export interface RunnerContextOptions {
   onStateChange?: ((text: string | null) => void) | undefined;
 }
 
+/**
+ * Find the last ccr:result tag in the text, preferring the match that appears
+ * latest in the input regardless of whether it is self-closing or has content.
+ */
+function findLastResultMatch(
+  text: string
+): { attrs: string; content?: string } | undefined {
+  const withContentGlobal = new RegExp(
+    CCR_RESULT_WITH_CONTENT_PATTERN.source,
+    'g'
+  );
+  const selfClosingGlobal = new RegExp(
+    CCR_RESULT_SELF_CLOSING_PATTERN.source,
+    'g'
+  );
+
+  let lastWithContent: RegExpMatchArray | undefined;
+  for (const m of text.matchAll(withContentGlobal)) {
+    lastWithContent = m;
+  }
+
+  let lastSelfClosing: RegExpMatchArray | undefined;
+  for (const m of text.matchAll(selfClosingGlobal)) {
+    lastSelfClosing = m;
+  }
+
+  if (!lastWithContent && !lastSelfClosing) {
+    return undefined;
+  }
+
+  const useContent =
+    lastWithContent &&
+    (!lastSelfClosing ||
+      (lastWithContent.index ?? 0) >= (lastSelfClosing.index ?? 0));
+
+  if (useContent && lastWithContent) {
+    const attrs = lastWithContent[1];
+    const content = lastWithContent[2];
+    if (attrs !== undefined && content !== undefined) {
+      return { attrs, content: content.trim() };
+    }
+  }
+  if (lastSelfClosing) {
+    const attrs = lastSelfClosing[1];
+    if (attrs !== undefined) {
+      return { attrs };
+    }
+  }
+  return undefined;
+}
+
 // ============================================================
 // RUNTIME CONTEXT FACTORY
 // ============================================================
@@ -335,29 +386,19 @@ export function createRunnerContext(
       fn: (args) => {
         const text = args['text'] as string;
 
-        let attrs: string;
-        let content: string | undefined;
-
-        const withContentMatch = CCR_RESULT_WITH_CONTENT_PATTERN.exec(text);
-        if (withContentMatch?.[1] && withContentMatch[2]) {
-          attrs = withContentMatch[1];
-          content = withContentMatch[2].trim();
-        } else {
-          const selfClosingMatch = CCR_RESULT_SELF_CLOSING_PATTERN.exec(text);
-          if (selfClosingMatch?.[1]) {
-            attrs = selfClosingMatch[1];
-          } else {
-            return {};
-          }
+        const match = findLastResultMatch(text);
+        if (!match) {
+          return {};
         }
+        const { attrs, content } = match;
 
         // Parse attributes: key="value" or key='value'
         const result: Record<string, string> = {};
         const attrPattern = /(\w+)=["']([^"']*)["']/g;
-        let match;
-        while ((match = attrPattern.exec(attrs)) !== null) {
-          const key = match[1];
-          const value = match[2];
+        let attrMatch;
+        while ((attrMatch = attrPattern.exec(attrs)) !== null) {
+          const key = attrMatch[1];
+          const value = attrMatch[2];
           if (key && value !== undefined) {
             result[key] = value;
           }

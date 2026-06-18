@@ -70,4 +70,4 @@ export const STATUS_LINE_MIN_WIDTH = 20;
 export const CCR_RESULT_SELF_CLOSING_PATTERN = /<ccr:result\s+([^>]*?)\/>/;
 /** Regex pattern for ccr:result tags with content */
 export const CCR_RESULT_WITH_CONTENT_PATTERN =
-  /<ccr:result\s+([^>]*)>([\s\S]*?)<\/ccr:result>/;
+  /<ccr:result\s+([^>/]*)>([\s\S]*?)<\/ccr:result>/;
