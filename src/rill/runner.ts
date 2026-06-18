@@ -7,11 +7,14 @@
 
 import type { RillValue, RuntimeCallbacks } from '@rcrsr/rill';
 import {
-  AbortError,
+  atomName,
   execute,
+  getStatus,
+  isInvalid,
   parse,
   ParseError,
   RuntimeError,
+  RuntimeHaltSignal,
   TimeoutError,
 } from '@rcrsr/rill';
 import * as fs from 'fs';
@@ -412,6 +415,30 @@ export async function runRillScript(
     const ast = parse(source);
     const result = await execute(ast, ctx);
 
+    // rill 0.19.x surfaces unhandled async host-function failures as an invalid
+    // top-level result (status atom #R999) rather than a thrown error. Treat an
+    // invalid final result as a runtime failure so unattended scripts do not
+    // silently report success when a ccr:: call failed.
+    if (isInvalid(result.result)) {
+      if (config.verbosity !== 'quiet') {
+        clearStatusInterval();
+        clearStatusLine(process.stderr);
+      }
+      const status = getStatus(result.result);
+      const msg = `Runtime error: ${status.message}`;
+      printRunner(`${colors.red}${msg}${colors.reset}`);
+      logger.logEvent({
+        event: 'rill_script_runtime_error',
+        runId,
+        error: msg,
+      });
+      unbindFormatterState();
+      if (config.verbosity !== 'quiet') {
+        process.stderr.off('resize', handleResize);
+      }
+      return { success: false, lastOutput: state.lastOutput };
+    }
+
     // Update last output from final result
     if (result.result !== null) {
       state.lastOutput = formatRillValue(result.result);
@@ -442,8 +469,15 @@ export async function runRillScript(
       process.stderr.off('resize', handleResize);
     }
 
-    // Handle specific Rill error types
-    if (error instanceof AbortError) {
+    // Handle specific Rill error types.
+    // Cancellation via AbortSignal surfaces as a non-catchable RuntimeHaltSignal
+    // carrying the #DISPOSED atom (rill 0.19.x). Check before RuntimeError —
+    // RuntimeHaltSignal is a separate class, but the DISPOSED guard keeps this
+    // branch scoped to aborts only.
+    if (
+      error instanceof RuntimeHaltSignal &&
+      atomName(getStatus(error.value).code) === 'DISPOSED'
+    ) {
       if (config.verbosity !== 'quiet') {
         clearStatusInterval();
         clearStatusLine(process.stderr);

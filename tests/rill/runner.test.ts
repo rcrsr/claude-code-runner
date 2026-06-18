@@ -48,6 +48,17 @@ vi.mock('../../src/output/colors.js', () => ({
   ),
 }));
 
+// Mock @rcrsr/rill so `execute` can be overridden per-test while every other
+// export (parse, RuntimeHaltSignal, getStatus, atomName, createRuntimeContext)
+// stays real. The default implementation is the real execute, so untouched
+// tests behave normally.
+vi.mock('@rcrsr/rill', async (importOriginal) => {
+  const actual = await importOriginal<typeof rill>();
+  return { ...actual, execute: vi.fn(actual.execute) };
+});
+
+import * as rill from '@rcrsr/rill';
+
 import { spawnClaude } from '../../src/process/pty.js';
 
 function createMockFormatterState(): FormatterState {
@@ -443,6 +454,47 @@ this is not valid {{ syntax`
     const result = await runRillScript(createRunnerOptions(scriptPath));
 
     expect(result.success).toBe(false);
+  });
+
+  it('returns success false and logs cancellation on abort halt', async () => {
+    // An aborted execution surfaces as a non-catchable RuntimeHaltSignal
+    // carrying the #DISPOSED atom. Build a genuine one via the real rill API,
+    // then make the runner's execute reject with it.
+    const actualRill = await vi.importActual<typeof rill>('@rcrsr/rill');
+    const controller = new AbortController();
+    const abortCtx = actualRill.createRuntimeContext({
+      variables: {},
+      functions: {},
+      signal: controller.signal,
+    });
+    controller.abort();
+    let abortHalt: unknown;
+    try {
+      await actualRill.execute(actualRill.parse('1 + 1'), abortCtx);
+    } catch (caught) {
+      abortHalt = caught;
+    }
+    expect(abortHalt).toBeInstanceOf(actualRill.RuntimeHaltSignal);
+
+    vi.mocked(rill.execute).mockRejectedValueOnce(abortHalt);
+
+    const scriptPath = path.join(testDir, 'cancelled.rill');
+    fs.writeFileSync(scriptPath, 'log("hello")');
+    const logger = createMockLogger();
+
+    const result = await runRillScript(
+      createRunnerOptions(scriptPath, { logger })
+    );
+
+    expect(result.success).toBe(false);
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const logEventCalls = vi.mocked(logger.logEvent).mock.calls;
+    expect(logEventCalls).toContainEqual([
+      expect.objectContaining({ event: 'rill_script_cancelled' }),
+    ]);
+    expect(logEventCalls).not.toContainEqual([
+      expect.objectContaining({ event: 'rill_script_runtime_error' }),
+    ]);
   });
 
   it('logs events to logger', async () => {
