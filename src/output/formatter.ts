@@ -155,9 +155,21 @@ export function finalizeStepStats(
  */
 export function getRunStatsSummary(
   state: FormatterState,
-  runDurationMs: number
+  runDurationMs: number,
+  activeMs?: number
 ): string {
-  return formatStatsSummary(state.runStats, runDurationMs);
+  return formatStatsSummary(state.runStats, runDurationMs, activeMs);
+}
+
+/**
+ * Active runtime as of `now`: accumulated ticks plus the delta since the
+ * last tick. Excludes gaps where the process was not running (crash/resume).
+ */
+export function getActiveElapsedMs(state: FormatterState, now: number): number {
+  return (
+    state.elapsedMs +
+    (state.lastTickTime !== null ? now - state.lastTickTime : 0)
+  );
 }
 
 /**
