@@ -22,6 +22,7 @@ import {
 import {
   createFormatterState,
   finalizeStepStats,
+  getActiveElapsedMs,
   getRunStatsSummary,
 } from './output/formatter.js';
 import { createLogger } from './output/logger.js';
@@ -169,8 +170,12 @@ async function main(): Promise<void> {
     });
 
     // Print run completion
-    const totalDuration = Date.now() - totalStart;
-    const runSummary = getRunStatsSummary(formatterState, totalDuration);
+    const now = Date.now();
+    const runSummary = getRunStatsSummary(
+      formatterState,
+      now - totalStart,
+      getActiveElapsedMs(formatterState, now)
+    );
     printRunner(`Run ${runId} complete: ${runSummary}`);
 
     logger.close();
@@ -219,8 +224,12 @@ async function main(): Promise<void> {
   printRunner(`Step 1 complete: ${stepSummary}`);
 
   // Print run completion
-  const totalDuration = Date.now() - totalStart;
-  const runSummary = getRunStatsSummary(formatterState, totalDuration);
+  const now = Date.now();
+  const runSummary = getRunStatsSummary(
+    formatterState,
+    now - totalStart,
+    getActiveElapsedMs(formatterState, now)
+  );
   printRunner(`Run ${runId} complete: ${runSummary}`);
 
   logger.logEvent({ event: 'run_complete', runId, exit: result.exitCode });

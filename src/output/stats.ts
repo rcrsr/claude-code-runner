@@ -156,17 +156,36 @@ function formatNumber(n: number): string {
 }
 
 /**
+ * Wall clock and active time are the same for a run that never went down;
+ * only a crash/resume gap makes them diverge enough to be worth two numbers.
+ */
+const ACTIVE_TIME_DIVERGENCE_MS = 1000;
+
+/**
  * Format stats summary for display
  * Example: 33s | 14 msgs | 319,449 in (32 p / 6,579 cw5m / 312,838 cr) | 931 out | 3 tools (Bash, Edit, Read)
+ *
+ * When activeMs is provided and materially less than durationMs (a resumed
+ * run with dead time), the duration shows both: "2h 10m 0s active / 18h 38m 57s wall"
  */
 export function formatStatsSummary(
   stats: RunStats,
-  durationMs: number
+  durationMs: number,
+  activeMs?: number
 ): string {
   const parts: string[] = [];
 
   // Duration
-  parts.push(formatDuration(durationMs));
+  if (
+    activeMs !== undefined &&
+    durationMs - activeMs > ACTIVE_TIME_DIVERGENCE_MS
+  ) {
+    parts.push(
+      `${formatDuration(activeMs)} active / ${formatDuration(durationMs)} wall`
+    );
+  } else {
+    parts.push(formatDuration(durationMs));
+  }
 
   // Message count
   parts.push(`${stats.messageCount} msgs`);
