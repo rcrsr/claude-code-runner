@@ -293,6 +293,36 @@ describe('formatMessage', () => {
     });
   });
 
+  describe('tool line width truncation', () => {
+    it('keeps truncated tool lines within the terminal width', () => {
+      const state = createMockFormatterState();
+      const logger = createMockLogger();
+      const longCmd = 'node scripts/conduct.mjs plan-status ' + 'x'.repeat(400);
+      const msg = createToolUseMessage('Bash', { command: longCmd });
+
+      formatMessage(msg, state, 'normal', logger, 100);
+      flushPendingTools(state, 'normal');
+
+      // displayWidth() falls back to 120 when stdout is not a TTY
+      const line = consoleSpy.mock.calls[0]?.[0] as string;
+      expect(stripAnsi(line)).toContain('...');
+      expect(stripAnsi(line).length).toBeLessThanOrEqual(120);
+    });
+
+    it('does not truncate summaries that already fit', () => {
+      const state = createMockFormatterState();
+      const logger = createMockLogger();
+      const msg = createToolUseMessage('Bash', { command: 'ls -la' });
+
+      formatMessage(msg, state, 'normal', logger, 100);
+      flushPendingTools(state, 'normal');
+
+      const line = consoleSpy.mock.calls[0]?.[0] as string;
+      expect(stripAnsi(line)).toContain('ls -la');
+      expect(stripAnsi(line)).not.toContain('...');
+    });
+  });
+
   describe('context tracking', () => {
     it('captures context tokens from assistant message usage', () => {
       const state = createMockFormatterState();

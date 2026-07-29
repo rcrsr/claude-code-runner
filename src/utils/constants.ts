@@ -32,6 +32,8 @@ export const TRUNCATE_ANSWER = 500;
 export const TRUNCATE_TASK_VERBOSE = 500;
 /** Minimum width for tool summary display (floor when terminal is narrow) */
 export const TOOL_SUMMARY_MIN_WIDTH = 40;
+/** Columns reserved when width-truncating: truncate() appends '...' beyond the given length, plus one column so lines never wrap */
+export const TRUNCATE_ELLIPSIS_RESERVE = 4;
 /** Fallback display width when stdout is not a TTY */
 export const DISPLAY_FALLBACK_WIDTH = 120;
 
