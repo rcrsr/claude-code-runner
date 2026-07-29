@@ -23,6 +23,7 @@ import { getToolInputString } from '../types/tools.js';
 import {
   MAX_RESULT_LINES,
   TOOL_SUMMARY_MIN_WIDTH,
+  TRUNCATE_ELLIPSIS_RESERVE,
   TRUNCATE_ERROR,
   TRUNCATE_MESSAGE,
   TRUNCATE_TASK_DESC,
@@ -252,9 +253,13 @@ function formatToolUse(tool: PendingTool, indented: boolean, state: FormatterSta
   const nameDisplay = indented
     ? `${colors.cyan}${name}${colors.reset}`
     : `${colors.blue}[${name}]${colors.reset}`;
-  // Truncate the summary to fit the terminal width (floor for narrow terminals)
+  // Truncate the summary to fit the terminal width (floor for narrow terminals).
+  // Reserve room for the '...' truncate() appends, so the line never wraps.
   const lineStart = `${prefix}${nameDisplay} `;
-  const available = Math.max(TOOL_SUMMARY_MIN_WIDTH, displayWidth() - stripAnsi(lineStart).length);
+  const available = Math.max(
+    TOOL_SUMMARY_MIN_WIDTH,
+    displayWidth() - stripAnsi(lineStart).length - TRUNCATE_ELLIPSIS_RESERVE
+  );
   terminalLog(`${lineStart}${truncate(summary, available)}`);
 }
 
