@@ -54,6 +54,8 @@ export function createMockFormatterState(): FormatterState {
     taskReadyQueue: [],
     taskPendingQueue: [],
     currentStatusText: null,
+    currentModel: null,
+    contextTokens: null,
     elapsedMs: 0,
     lastTickTime: null,
   };

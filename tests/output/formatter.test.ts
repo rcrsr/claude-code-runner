@@ -100,6 +100,17 @@ describe('resetFormatterState', () => {
 
     expect(state.currentStatusText).toBe('Processing...');
   });
+
+  it('clears contextTokens but preserves currentModel', () => {
+    const state = createMockFormatterState();
+    state.currentModel = 'claude-opus-4-5-20250929';
+    state.contextTokens = 84_000;
+
+    resetFormatterState(state);
+
+    expect(state.contextTokens).toBeNull();
+    expect(state.currentModel).toBe('claude-opus-4-5-20250929');
+  });
 });
 
 describe('flushPendingTools', () => {
@@ -269,6 +280,77 @@ describe('formatMessage', () => {
       formatMessage(msg, state, 'quiet', logger, 100);
 
       expect(consoleSpy).not.toHaveBeenCalled();
+    });
+
+    it('captures the model for the status line', () => {
+      const state = createMockFormatterState();
+      const logger = createMockLogger();
+      const msg = createSystemInitMessage('claude-opus-4-5-20250929');
+
+      formatMessage(msg, state, 'normal', logger, 100);
+
+      expect(state.currentModel).toBe('claude-opus-4-5-20250929');
+    });
+  });
+
+  describe('tool line width truncation', () => {
+    it('keeps truncated tool lines within the terminal width', () => {
+      const state = createMockFormatterState();
+      const logger = createMockLogger();
+      const longCmd = 'node scripts/conduct.mjs plan-status ' + 'x'.repeat(400);
+      const msg = createToolUseMessage('Bash', { command: longCmd });
+
+      formatMessage(msg, state, 'normal', logger, 100);
+      flushPendingTools(state, 'normal');
+
+      // displayWidth() falls back to 120 when stdout is not a TTY
+      const line = consoleSpy.mock.calls[0]?.[0] as string;
+      expect(stripAnsi(line)).toContain('...');
+      expect(stripAnsi(line).length).toBeLessThanOrEqual(120);
+    });
+
+    it('does not truncate summaries that already fit', () => {
+      const state = createMockFormatterState();
+      const logger = createMockLogger();
+      const msg = createToolUseMessage('Bash', { command: 'ls -la' });
+
+      formatMessage(msg, state, 'normal', logger, 100);
+      flushPendingTools(state, 'normal');
+
+      const line = consoleSpy.mock.calls[0]?.[0] as string;
+      expect(stripAnsi(line)).toContain('ls -la');
+      expect(stripAnsi(line)).not.toContain('...');
+    });
+  });
+
+  describe('context tracking', () => {
+    it('captures context tokens from assistant message usage', () => {
+      const state = createMockFormatterState();
+      const logger = createMockLogger();
+      const msg = createTextMessage('Hello');
+      msg.message.usage = {
+        input_tokens: 100,
+        output_tokens: 50,
+        cache_read_input_tokens: 60_000,
+        cache_creation: {
+          ephemeral_5m_input_tokens: 2_000,
+          ephemeral_1h_input_tokens: 1_000,
+        },
+      };
+
+      formatMessage(msg, state, 'normal', logger, 100);
+
+      expect(state.contextTokens).toBe(63_100);
+    });
+
+    it('leaves contextTokens null when usage is absent', () => {
+      const state = createMockFormatterState();
+      const logger = createMockLogger();
+      const msg = createTextMessage('Hello');
+
+      formatMessage(msg, state, 'normal', logger, 100);
+
+      expect(state.contextTokens).toBeNull();
     });
   });
 
