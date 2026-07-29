@@ -22,28 +22,29 @@ import {
 import { getToolInputString } from '../types/tools.js';
 import {
   MAX_RESULT_LINES,
-  TRUNCATE_BASH_CMD,
+  TOOL_SUMMARY_MIN_WIDTH,
   TRUNCATE_ERROR,
-  TRUNCATE_GREP_PATTERN,
   TRUNCATE_MESSAGE,
   TRUNCATE_TASK_DESC,
-  TRUNCATE_TOOL_JSON,
   TRUNCATE_VERBOSE_LINE,
 } from '../utils/constants.js';
 import {
   agentMarker,
   colors,
+  displayWidth,
   formatDuration,
   hashAgentId,
   printClaude,
   printRunner,
   shortenPath,
+  stripAnsi,
   terminalLog,
   timestampPrefix,
   truncate,
 } from './colors.js';
 import type { Logger } from './logger.js';
 import {
+  contextTokensFromUsage,
   createRunStats,
   formatStatsSummary,
   incrementMessageCount,
@@ -89,6 +90,10 @@ export interface FormatterState {
   taskPendingQueue: string[];
   /** Current state text from ccr::state() */
   currentStatusText: string | null;
+  /** Model reported by the most recent system init message */
+  currentModel: string | null;
+  /** Context size in tokens from the latest top-level assistant message */
+  contextTokens: number | null;
   /** Called after each processed message; used for state persistence */
   onUpdate?: () => void;
   /** Accumulated active runtime in ms (excludes crash gaps) */
@@ -116,6 +121,8 @@ export function createFormatterState(): FormatterState {
     taskReadyQueue: [],
     taskPendingQueue: [],
     currentStatusText: null,
+    currentModel: null,
+    contextTokens: null,
     elapsedMs: 0,
     lastTickTime: null,
   };
@@ -134,7 +141,11 @@ export function resetFormatterState(state: FormatterState): void {
   state.taskStartTimes.clear();
   state.taskReadyQueue = [];
   state.taskPendingQueue = [];
+  // Each step spawns a fresh Claude context, so the previous step's context
+  // size is stale; the new step's first assistant message repopulates it.
+  state.contextTokens = null;
   // Note: currentStatusText is NOT reset - it persists across steps (set by ccr::state)
+  // Note: currentModel is NOT reset - the next init message overwrites it
   // Note: runStats is NOT reset - it accumulates across steps
 }
 
@@ -220,10 +231,9 @@ function formatToolUse(tool: PendingTool, indented: boolean, state: FormatterSta
   } else if (name === 'Glob') {
     summary = getToolInputString(input, 'pattern');
   } else if (name === 'Grep') {
-    summary = `"${truncate(getToolInputString(input, 'pattern'), TRUNCATE_GREP_PATTERN)}"`;
+    summary = `"${getToolInputString(input, 'pattern')}"`;
   } else if (name === 'Bash') {
-    const cmd = getToolInputString(input, 'command').replace(/[\r\n]+/g, ' ');
-    summary = truncate(cmd, TRUNCATE_BASH_CMD);
+    summary = getToolInputString(input, 'command').replace(/[\r\n]+/g, ' ');
   } else if (name === 'Task' || name === 'Agent') {
     // Task state already initialized in pre-scan, just print header
     const task = state.activeTasks.get(tool.id);
@@ -236,13 +246,16 @@ function formatToolUse(tool: PendingTool, indented: boolean, state: FormatterSta
   } else if (name === 'Write' || name === 'Edit') {
     summary = shortenPath(getToolInputString(input, 'file_path'));
   } else {
-    summary = truncate(JSON.stringify(input), TRUNCATE_TOOL_JSON);
+    summary = JSON.stringify(input);
   }
 
   const nameDisplay = indented
     ? `${colors.cyan}${name}${colors.reset}`
     : `${colors.blue}[${name}]${colors.reset}`;
-  terminalLog(`${prefix}${nameDisplay} ${summary}`);
+  // Truncate the summary to fit the terminal width (floor for narrow terminals)
+  const lineStart = `${prefix}${nameDisplay} `;
+  const available = Math.max(TOOL_SUMMARY_MIN_WIDTH, displayWidth() - stripAnsi(lineStart).length);
+  terminalLog(`${lineStart}${truncate(summary, available)}`);
 }
 
 /**
@@ -370,7 +383,8 @@ export function formatMessage(
   let claudeText = '';
 
   if (isSystemInitMessage(msg)) {
-    // Skip init messages - config is shown by runner
+    // Config is shown by runner; capture the model for the status line
+    state.currentModel = msg.model;
   } else if (isAssistantMessage(msg)) {
     flushPendingTools(state, verbosity);
 
@@ -425,6 +439,11 @@ export function formatMessage(
     incrementMessageCount(stats);
     if (msg.message.usage) {
       updateTokenStats(stats, msg.message.usage);
+      // Subagent messages carry their own (smaller) context; only top-level
+      // messages reflect the main conversation's context size
+      if (messageTaskId === null) {
+        state.contextTokens = contextTokensFromUsage(msg.message.usage);
+      }
     }
 
     for (const block of msg.message.content) {

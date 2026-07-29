@@ -16,8 +16,12 @@ import {
   formatTimestamp,
   printRunner,
   renderStatusLine,
+  contextWindowForModel,
   shortenPath,
   type StatusStream,
+  shortModelName,
+  statusDisplayText,
+  statusInfoSegment,
   stripAnsi,
   terminalLog,
   timestampPrefix,
@@ -25,6 +29,7 @@ import {
   unbindFormatterState,
 } from '../../src/output/colors.js';
 import type { FormatterState } from '../../src/output/formatter.js';
+import { createFormatterState } from '../../src/output/formatter.js';
 import { STATUS_LINE_MIN_WIDTH } from '../../src/utils/constants.js';
 import { callArg, createMockFormatterState } from '../helpers/mocks.js';
 
@@ -584,5 +589,103 @@ describe('bindFormatterState / unbindFormatterState', () => {
 
     expect(consoleSpy).toHaveBeenCalledWith('No status');
     expect(stderrWriteSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('shortModelName', () => {
+  it('strips claude- prefix and date suffix', () => {
+    expect(shortModelName('claude-opus-4-5-20250929')).toBe('opus-4-5');
+  });
+
+  it('handles alias-style names', () => {
+    expect(shortModelName('sonnet')).toBe('sonnet');
+  });
+
+  it('strips only the prefix when no date suffix', () => {
+    expect(shortModelName('claude-sonnet-4-5')).toBe('sonnet-4-5');
+  });
+});
+
+describe('statusInfoSegment', () => {
+  it('returns null when neither model nor context is known', () => {
+    const state = createFormatterState();
+    expect(statusInfoSegment(state)).toBeNull();
+  });
+
+  it('shows model alone when context is unknown', () => {
+    const state = createFormatterState();
+    state.currentModel = 'claude-opus-4-5-20250929';
+    expect(statusInfoSegment(state)).toBe('[opus-4-5]');
+  });
+
+  it('shows context percent alone when model is unknown', () => {
+    const state = createFormatterState();
+    state.contextTokens = 100_000;
+    expect(statusInfoSegment(state)).toBe('[ctx 50%]');
+  });
+
+  it('shows model and context percent together', () => {
+    const state = createFormatterState();
+    state.currentModel = 'claude-opus-4-5-20250929';
+    state.contextTokens = 84_000;
+    expect(statusInfoSegment(state)).toBe('[opus-4-5 · ctx 42%]');
+  });
+
+  it('caps context percent at 100', () => {
+    const state = createFormatterState();
+    state.contextTokens = 500_000;
+    expect(statusInfoSegment(state)).toBe('[ctx 100%]');
+  });
+});
+
+describe('statusDisplayText', () => {
+  it('returns null without status text', () => {
+    const state = createFormatterState();
+    state.currentModel = 'claude-opus-4-5-20250929';
+    expect(statusDisplayText(state)).toBeNull();
+  });
+
+  it('renders elapsed and status text without model info', () => {
+    const state = createFormatterState();
+    state.currentStatusText = 'reviewing implementation';
+    expect(statusDisplayText(state)).toBe('[00:00:00] reviewing implementation');
+  });
+
+  it('includes model and context segment when available', () => {
+    const state = createFormatterState();
+    state.currentStatusText = 'reviewing implementation';
+    state.currentModel = 'claude-opus-4-5-20250929';
+    state.contextTokens = 84_000;
+    expect(statusDisplayText(state)).toBe(
+      '[00:00:00] [opus-4-5 · ctx 42%] reviewing implementation'
+    );
+  });
+});
+
+describe('contextWindowForModel', () => {
+  it('returns 200k default when model is unknown', () => {
+    expect(contextWindowForModel(null)).toBe(200_000);
+  });
+
+  it('returns 1M for current large-context models', () => {
+    expect(contextWindowForModel('claude-opus-5')).toBe(1_000_000);
+    expect(contextWindowForModel('claude-fable-5')).toBe(1_000_000);
+    expect(contextWindowForModel('claude-opus-4-8')).toBe(1_000_000);
+    expect(contextWindowForModel('claude-sonnet-5')).toBe(1_000_000);
+    expect(contextWindowForModel('claude-sonnet-4-6')).toBe(1_000_000);
+  });
+
+  it('returns 200k for smaller-context models', () => {
+    expect(contextWindowForModel('claude-haiku-4-5-20251001')).toBe(200_000);
+    expect(contextWindowForModel('claude-sonnet-4-5-20250929')).toBe(200_000);
+    expect(contextWindowForModel('claude-opus-4-5-20251101')).toBe(200_000);
+  });
+
+  it('does not confuse sonnet-4-5 with sonnet-5', () => {
+    expect(contextWindowForModel('claude-sonnet-4-5-20250929')).toBe(200_000);
+  });
+
+  it('honors the [1m] beta suffix on any model', () => {
+    expect(contextWindowForModel('claude-sonnet-4-5[1m]')).toBe(1_000_000);
   });
 });
