@@ -3,6 +3,10 @@
  */
 
 import {
+  CONTEXT_WINDOW_1M_MODEL_PREFIXES,
+  CONTEXT_WINDOW_1M_TOKENS,
+  CONTEXT_WINDOW_DEFAULT_TOKENS,
+  DISPLAY_FALLBACK_WIDTH,
   STATUS_LINE_ELLIPSIS,
   STATUS_LINE_MIN_WIDTH,
 } from '../utils/constants.js';
@@ -155,7 +159,52 @@ export function formatElapsed(ms: number): string {
 }
 
 /**
- * Build display text for the status line, prepending accumulated runtime.
+ * Shorten a model ID to Anthropic's alias shorthand without the claude- prefix.
+ * Current-generation IDs are dateless ("claude-opus-5" → "opus-5"); older IDs
+ * carry a date suffix that gets stripped ("claude-sonnet-4-5-20250929" → "sonnet-4-5").
+ */
+export function shortModelName(model: string): string {
+  return model.replace(/^claude-/, '').replace(/-\d{8}$/, '');
+}
+
+/**
+ * Context window in tokens for a model ID.
+ * 1M for the current large-context families, 200k otherwise (and when unknown).
+ */
+export function contextWindowForModel(model: string | null): number {
+  if (model === null) return CONTEXT_WINDOW_DEFAULT_TOKENS;
+  // Explicit 1M-context beta suffix (e.g. "sonnet-4-5[1m]")
+  if (model.includes('[1m]')) return CONTEXT_WINDOW_1M_TOKENS;
+  const short = shortModelName(model);
+  return CONTEXT_WINDOW_1M_MODEL_PREFIXES.some((prefix) =>
+    short.startsWith(prefix)
+  )
+    ? CONTEXT_WINDOW_1M_TOKENS
+    : CONTEXT_WINDOW_DEFAULT_TOKENS;
+}
+
+/**
+ * Build the "[model · ctx N%]" status segment.
+ * Returns null when neither model nor context info is available.
+ */
+export function statusInfoSegment(state: FormatterState): string | null {
+  const parts: string[] = [];
+  if (state.currentModel !== null) {
+    parts.push(shortModelName(state.currentModel));
+  }
+  if (state.contextTokens !== null) {
+    const window = contextWindowForModel(state.currentModel);
+    const pct = Math.min(100, Math.round((state.contextTokens / window) * 100));
+    parts.push(`ctx ${pct}%`);
+  }
+  if (parts.length === 0) return null;
+  return `[${parts.join(' · ')}]`;
+}
+
+/**
+ * Build display text for the status line, prepending accumulated runtime
+ * and model/context info when available.
+ * Example: "[00:12:34] [opus-4-5 · ctx 42%] reviewing implementation"
  * Returns null when there is no active status text.
  */
 export function statusDisplayText(state: FormatterState): string | null {
@@ -164,7 +213,23 @@ export function statusDisplayText(state: FormatterState): string | null {
     state.lastTickTime !== null
       ? state.elapsedMs + (Date.now() - state.lastTickTime)
       : state.elapsedMs;
-  return `[${formatElapsed(liveElapsed)}] ${state.currentStatusText}`;
+  const segments = [`[${formatElapsed(liveElapsed)}]`];
+  const info = statusInfoSegment(state);
+  if (info !== null) {
+    segments.push(info);
+  }
+  segments.push(state.currentStatusText);
+  return segments.join(' ');
+}
+
+/**
+ * Current terminal width for display truncation.
+ * Falls back to a fixed width when stdout is not a TTY (piped/CI).
+ */
+export function displayWidth(): number {
+  // Types claim columns is always defined, but it's undefined when not a TTY
+  const columns = process.stdout.columns as number | undefined;
+  return columns ?? DISPLAY_FALLBACK_WIDTH;
 }
 
 /**

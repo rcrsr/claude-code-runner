@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The status line (set via `ccr::state`) now shows the active model and context usage alongside the elapsed timer, e.g. `[00:12:34] [opus-4-8 · ctx 42%] reviewing implementation`. The model comes from each step's init message; context % is computed from the latest top-level assistant message's token usage against the model's actual context window (1M for Fable 5 / Mythos 5 / Opus 5 / 4.8 / 4.7 / 4.6 / Sonnet 5 / 4.6, 200k for Haiku 4.5 and older — verified against Anthropic's models overview, July 2026) and resets with each fresh-context step. Model IDs display in Anthropic's alias shorthand (`opus-5`, `sonnet-4-6`, date suffixes stripped).
+
+### Changed
+
+- Tool call lines (`[Bash]`, `[Grep]`, etc.) now truncate to the actual terminal width instead of fixed 30–60 character limits, so long commands and patterns are no longer cut short on wide terminals.
+
 ## [0.15.0] — 2026-06-18
 
 ### BREAKING

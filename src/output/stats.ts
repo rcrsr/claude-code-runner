@@ -88,6 +88,24 @@ export function updateTokenStats(stats: RunStats, usage: TokenUsage): void {
 }
 
 /**
+ * Compute the current context size in tokens from a single message's usage.
+ * Context = non-cached input + cache reads + cache writes for that request.
+ * Prefers the cache_creation breakdown; falls back to the aggregate field.
+ */
+export function contextTokensFromUsage(usage: TokenUsage): number {
+  const cacheWrite =
+    usage.cache_creation !== undefined
+      ? (usage.cache_creation.ephemeral_5m_input_tokens ?? 0) +
+        (usage.cache_creation.ephemeral_1h_input_tokens ?? 0)
+      : (usage.cache_creation_input_tokens ?? 0);
+  return (
+    (usage.input_tokens ?? 0) +
+    (usage.cache_read_input_tokens ?? 0) +
+    cacheWrite
+  );
+}
+
+/**
  * Record a tool use
  */
 export function recordToolUse(stats: RunStats, toolName: string): void {
