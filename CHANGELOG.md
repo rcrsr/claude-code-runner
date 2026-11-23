@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Cleared all 23 open Dependabot alerts (1 critical, 8 high). All were in dev-only packages: `vitest`, `vite`, `postcss`, `nanoid`, `source-map-js`, `brace-expansion`, `minimatch`, `@humanfs/node`, and `@vitest/mocker`. `npm audit` reports 0 vulnerabilities.
+
+### Changed
+
+- Bumped `@rcrsr/rill` from `0.19.3` to `0.19.6`, staying inside the `~0.19` range.
+- Upgraded dev tooling: `vitest` and `@vitest/coverage-v8` from `4.0` to `5.1`, and `typescript` from `5.9` to `6.0`. Also `@types/node` from `25` to `26`, `eslint-plugin-simple-import-sort` from `12` to `14`, plus in-range bumps of `eslint`, `typescript-eslint`, `prettier`, and `react`.
+- Added `"types": ["node"]` to `tsconfig.json`, because TypeScript 6 no longer loads `@types/*` packages automatically.
+
 ## [0.15.0] — 2026-06-18
 
 ### BREAKING

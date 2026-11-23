@@ -111,8 +111,7 @@ export function parseArgs(args: string[]): ParsedArgs {
   let frontmatterModel: string | null = null;
   let frontmatterEffort: string | null = null;
   let docsOptions:
-    | { functionsOnly: boolean; languageOnly: boolean }
-    | undefined = undefined;
+    { functionsOnly: boolean; languageOnly: boolean } | undefined = undefined;
 
   switch (subcommand) {
     case 'command': {
