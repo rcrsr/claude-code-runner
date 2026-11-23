@@ -2,15 +2,8 @@
  * ANSI color codes for terminal output
  */
 
-import {
-  STATUS_LINE_ELLIPSIS,
-  STATUS_LINE_MIN_WIDTH,
-} from '../utils/constants.js';
-import {
-  configureDeadDrop,
-  flushDeadDrop,
-  sendToDeadDrop,
-} from './deaddrop-queue.js';
+import { STATUS_LINE_ELLIPSIS, STATUS_LINE_MIN_WIDTH } from '../utils/constants.js';
+import { configureDeadDrop, flushDeadDrop, sendToDeadDrop } from './deaddrop-queue.js';
 import type { FormatterState } from './formatter.js';
 
 // Re-export deaddrop functions for backward compatibility
@@ -88,7 +81,7 @@ export function agentMarker(index: number): string {
 /**
  * Strip ANSI escape codes from a string
  */
-// eslint-disable-next-line no-control-regex -- ANSI escape codes require control characters
+// oxlint-disable-next-line no-control-regex -- ANSI escape codes require control characters
 const ANSI_REGEX = /\x1b\[[0-9;]*[a-zA-Z]/g;
 
 export function stripAnsi(str: string): string {
@@ -231,10 +224,7 @@ const ANSI_CLEAR_LINE_CR = '\x1b[2K\r';
  * @param text - Status text to display, or null to clear
  * @param stream - Output stream (expected: process.stderr)
  */
-export function renderStatusLine(
-  text: string | null,
-  stream: NodeJS.WriteStream
-): void {
+export function renderStatusLine(text: string | null, stream: NodeJS.WriteStream): void {
   // No-op when not a TTY
   if (!stream.isTTY) {
     return;
@@ -265,8 +255,7 @@ export function renderStatusLine(
       // Truncate if exceeds terminal width
       if (sanitized.length > terminalWidth) {
         sanitized =
-          sanitized.slice(0, terminalWidth - STATUS_LINE_ELLIPSIS.length) +
-          STATUS_LINE_ELLIPSIS;
+          sanitized.slice(0, terminalWidth - STATUS_LINE_ELLIPSIS.length) + STATUS_LINE_ELLIPSIS;
       }
 
       // Write dim text, then \r to park cursor at column 0
@@ -303,19 +292,14 @@ export type DeadDropUser = 'Runner' | 'Claude Code';
 /**
  * Deaddrop send function type (to avoid circular imports)
  */
-export type DeadDropSender = (
-  content: string,
-  user: DeadDropUser
-) => Promise<void>;
+export type DeadDropSender = (content: string, user: DeadDropUser) => Promise<void>;
 
 /**
  * Print a [RUNNER] operational message with timestamp
  * Automatically sends to Deaddrop if configured (without prefix)
  */
 export function printRunner(message: string): void {
-  terminalLog(
-    `${timestampPrefix()}${colors.magenta}[runner]${colors.reset} ${message}`
-  );
+  terminalLog(`${timestampPrefix()}${colors.magenta}[runner]${colors.reset} ${message}`);
   sendToDeadDrop(stripAnsi(message), 'Runner');
 }
 
@@ -324,9 +308,7 @@ export function printRunner(message: string): void {
  * Does NOT send to Deaddrop (used for startup config, debug info)
  */
 export function printRunnerInfo(message: string): void {
-  terminalLog(
-    `${timestampPrefix()}${colors.magenta}[runner]${colors.reset} ${message}`
-  );
+  terminalLog(`${timestampPrefix()}${colors.magenta}[runner]${colors.reset} ${message}`);
 }
 
 /**
@@ -336,8 +318,6 @@ export function printRunnerInfo(message: string): void {
  * @param rawForDeaddrop - Original unmodified text to send to deaddrop (preserves newlines)
  */
 export function printClaude(message: string, rawForDeaddrop?: string): void {
-  terminalLog(
-    `${timestampPrefix()}${colors.green}[claude]${colors.reset} ${message}`
-  );
+  terminalLog(`${timestampPrefix()}${colors.green}[claude]${colors.reset} ${message}`);
   sendToDeadDrop(stripAnsi(rawForDeaddrop ?? message), 'Claude Code');
 }

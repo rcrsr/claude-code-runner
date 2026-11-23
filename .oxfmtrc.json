@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 100,
+  "singleQuote": true,
+  "trailingComma": "es5",
+  "sortImports": true,
+  "ignorePatterns": [
+    "package-lock.json",
+    "CHANGELOG.md",
+    "conduct/",
+    "docs/",
+    "prototypes/",
+    "logs/",
+    "coverage/",
+    "dist/",
+    ".claude/",
+    ".codanna/"
+  ]
+}

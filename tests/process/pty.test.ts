@@ -2,10 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ClaudeProcessOptions } from '../../src/process/pty.js';
 import { spawnClaude } from '../../src/process/pty.js';
-import {
-  createMockFormatterState,
-  createMockLogger,
-} from '../helpers/mocks.js';
+import { createMockFormatterState, createMockLogger } from '../helpers/mocks.js';
 
 // Mock @lydell/node-pty
 const mockOnData = vi.fn();
@@ -81,11 +78,7 @@ describe('spawnClaude', () => {
       onExitCallback({ exitCode: 0 });
       await promise;
 
-      expect(pty.spawn).toHaveBeenCalledWith(
-        'claude',
-        expect.any(Array),
-        expect.any(Object)
-      );
+      expect(pty.spawn).toHaveBeenCalledWith('claude', expect.any(Array), expect.any(Object));
     });
 
     it('spawns pty with correct arguments', async () => {
@@ -175,9 +168,7 @@ describe('spawnClaude', () => {
     });
 
     it('formats parsed messages', async () => {
-      mockParserProcess.mockReturnValueOnce([
-        { type: 'system', subtype: 'init' },
-      ]);
+      mockParserProcess.mockReturnValueOnce([{ type: 'system', subtype: 'init' }]);
 
       const promise = spawnClaude(options);
 
@@ -206,14 +197,12 @@ describe('spawnClaude', () => {
 
       await promise;
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+      // oxlint-disable-next-line typescript/unbound-method
       expect(options.logger.log).toHaveBeenCalledWith(JSON.stringify(msg));
     });
 
     it('accumulates claudeText from formatMessage', async () => {
-      vi.mocked(formatMessage)
-        .mockReturnValueOnce('Hello ')
-        .mockReturnValueOnce('world');
+      vi.mocked(formatMessage).mockReturnValueOnce('Hello ').mockReturnValueOnce('world');
       mockParserProcess
         .mockReturnValueOnce([{ type: 'assistant' }])
         .mockReturnValueOnce([{ type: 'assistant' }]);
@@ -283,10 +272,7 @@ describe('spawnClaude', () => {
       onExitCallback({ exitCode: 0 });
       await promise;
 
-      expect(flushPendingTools).toHaveBeenCalledWith(
-        options.formatterState,
-        'normal'
-      );
+      expect(flushPendingTools).toHaveBeenCalledWith(options.formatterState, 'normal');
     });
 
     it('returns accumulated claudeText', async () => {
@@ -330,13 +316,8 @@ describe('spawnClaude', () => {
     });
 
     it('handles multiple messages in one data chunk', async () => {
-      mockParserProcess.mockReturnValueOnce([
-        { type: 'system' },
-        { type: 'assistant' },
-      ]);
-      vi.mocked(formatMessage)
-        .mockReturnValueOnce('')
-        .mockReturnValueOnce('text');
+      mockParserProcess.mockReturnValueOnce([{ type: 'system' }, { type: 'assistant' }]);
+      vi.mocked(formatMessage).mockReturnValueOnce('').mockReturnValueOnce('text');
 
       const promise = spawnClaude(options);
 

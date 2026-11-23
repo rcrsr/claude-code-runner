@@ -13,11 +13,7 @@ import type {
   SystemInitMessage,
   UserMessage,
 } from '../../src/types/claude.js';
-import type {
-  RunnerConfig,
-  RunResult,
-  Verbosity,
-} from '../../src/types/runner.js';
+import type { RunnerConfig, RunResult, Verbosity } from '../../src/types/runner.js';
 import { DEFAULT_INACTIVITY_TIMEOUT_MS } from '../../src/utils/constants.js';
 
 /**
@@ -62,9 +58,7 @@ export function createMockFormatterState(): FormatterState {
 /**
  * Create a mock runner config with optional overrides
  */
-export function createMockConfig(
-  overrides?: Partial<RunnerConfig>
-): RunnerConfig {
+export function createMockConfig(overrides?: Partial<RunnerConfig>): RunnerConfig {
   return {
     verbosity: 'normal',
     enableLog: false,

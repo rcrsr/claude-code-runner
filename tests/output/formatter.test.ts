@@ -19,7 +19,7 @@ import {
 
 /** Strip ANSI escape codes from a string */
 function stripAnsi(str: string): string {
-  // eslint-disable-next-line no-control-regex
+  // oxlint-disable-next-line no-control-regex
   return str.replace(/\x1b\[[0-9;]*m/g, '');
 }
 
@@ -133,9 +133,7 @@ describe('flushPendingTools', () => {
 
   it('prints single tool with name', () => {
     const state = createMockFormatterState();
-    state.pendingTools = [
-      { name: 'Read', input: { file_path: '/path/to/file.ts' }, id: 'tool-1' },
-    ];
+    state.pendingTools = [{ name: 'Read', input: { file_path: '/path/to/file.ts' }, id: 'tool-1' }];
 
     flushPendingTools(state, 'normal');
 
@@ -162,9 +160,7 @@ describe('flushPendingTools', () => {
 
   it('formats Glob tool with pattern', () => {
     const state = createMockFormatterState();
-    state.pendingTools = [
-      { name: 'Glob', input: { pattern: '**/*.ts' }, id: 'tool-1' },
-    ];
+    state.pendingTools = [{ name: 'Glob', input: { pattern: '**/*.ts' }, id: 'tool-1' }];
 
     flushPendingTools(state, 'normal');
 
@@ -174,9 +170,7 @@ describe('flushPendingTools', () => {
 
   it('formats Grep tool with quoted pattern', () => {
     const state = createMockFormatterState();
-    state.pendingTools = [
-      { name: 'Grep', input: { pattern: 'searchTerm' }, id: 'tool-1' },
-    ];
+    state.pendingTools = [{ name: 'Grep', input: { pattern: 'searchTerm' }, id: 'tool-1' }];
 
     flushPendingTools(state, 'normal');
 
@@ -186,9 +180,7 @@ describe('flushPendingTools', () => {
 
   it('formats Bash tool with truncated command', () => {
     const state = createMockFormatterState();
-    state.pendingTools = [
-      { name: 'Bash', input: { command: 'npm install' }, id: 'tool-1' },
-    ];
+    state.pendingTools = [{ name: 'Bash', input: { command: 'npm install' }, id: 'tool-1' }];
 
     flushPendingTools(state, 'normal');
 
@@ -322,11 +314,7 @@ describe('formatMessage', () => {
     it('records tool start time', () => {
       const state = createMockFormatterState();
       const logger = createMockLogger();
-      const msg = createToolUseMessage(
-        'Read',
-        { file_path: '/test.ts' },
-        'tool-1'
-      );
+      const msg = createToolUseMessage('Read', { file_path: '/test.ts' }, 'tool-1');
       mockTime = 5000;
 
       formatMessage(msg, state, 'normal', logger, 100);
@@ -337,11 +325,7 @@ describe('formatMessage', () => {
     it('adds tool to pending batch', () => {
       const state = createMockFormatterState();
       const logger = createMockLogger();
-      const msg = createToolUseMessage(
-        'Read',
-        { file_path: '/test.ts' },
-        'tool-1'
-      );
+      const msg = createToolUseMessage('Read', { file_path: '/test.ts' }, 'tool-1');
 
       formatMessage(msg, state, 'normal', logger, 100);
 
@@ -533,9 +517,7 @@ describe('formatMessage', () => {
 
       const calls = consoleSpy.mock.calls.map((c) => stripAnsi(c[0] as string));
       // Check task header contains marker and [Explore]
-      const hasTaskHeader = calls.some(
-        (c) => c.includes('[Explore]') && c.includes('●')
-      );
+      const hasTaskHeader = calls.some((c) => c.includes('[Explore]') && c.includes('●'));
 
       expect(hasTaskHeader).toBe(true);
     });
@@ -575,9 +557,7 @@ describe('formatMessage', () => {
 
       const calls = consoleSpy.mock.calls.map((c) => stripAnsi(c[0] as string));
       // Check task header contains marker and [Explore]
-      const hasTaskHeader = calls.some(
-        (c) => c.includes('[Explore]') && c.includes('●')
-      );
+      const hasTaskHeader = calls.some((c) => c.includes('[Explore]') && c.includes('●'));
 
       expect(hasTaskHeader).toBe(true);
     });
@@ -621,11 +601,7 @@ describe('formatMessage', () => {
       formatMessage(taskMsg, state, 'normal', logger, 100);
 
       // Tool call while in task A
-      const toolMsg = createToolUseMessage(
-        'Read',
-        { file_path: '/test.ts' },
-        'tool-1'
-      );
+      const toolMsg = createToolUseMessage('Read', { file_path: '/test.ts' }, 'tool-1');
       formatMessage(toolMsg, state, 'normal', logger, 100);
 
       expect(state.toolToTaskId.get('tool-1')).toBe('task-1');
@@ -645,11 +621,7 @@ describe('formatMessage', () => {
       flushPendingTools(state, 'normal');
 
       // Tool call while in task A
-      const toolMsg = createToolUseMessage(
-        'Read',
-        { file_path: '/test.ts' },
-        'tool-1'
-      );
+      const toolMsg = createToolUseMessage('Read', { file_path: '/test.ts' }, 'tool-1');
       formatMessage(toolMsg, state, 'normal', logger, 100);
       flushPendingTools(state, 'normal');
 
@@ -799,9 +771,7 @@ describe('formatMessage', () => {
 
       // Verify all tools got markers (dots) in output
       const calls = consoleSpy.mock.calls.map((c) => stripAnsi(c[0] as string));
-      const toolCalls = calls.filter(
-        (c) => c.includes('[Read]') || c.includes('[Edit]')
-      );
+      const toolCalls = calls.filter((c) => c.includes('[Read]') || c.includes('[Edit]'));
       for (const call of toolCalls) {
         expect(call).toContain('●');
       }
@@ -839,24 +809,12 @@ describe('formatMessage', () => {
       expect(state.activeTasks.size).toBe(2);
 
       // Complete task A
-      formatMessage(
-        createToolResultMessage('task-1', 'Done'),
-        state,
-        'normal',
-        logger,
-        100
-      );
+      formatMessage(createToolResultMessage('task-1', 'Done'), state, 'normal', logger, 100);
       expect(state.activeTasks.size).toBe(1);
       expect(state.activeTasks.has('task-2')).toBe(true);
 
       // Complete task B
-      formatMessage(
-        createToolResultMessage('task-2', 'Done'),
-        state,
-        'normal',
-        logger,
-        100
-      );
+      formatMessage(createToolResultMessage('task-2', 'Done'), state, 'normal', logger, 100);
       expect(state.activeTasks.size).toBe(0);
 
       const calls = consoleSpy.mock.calls.map((c) => stripAnsi(c[0] as string));

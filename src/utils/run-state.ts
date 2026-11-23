@@ -66,11 +66,7 @@ export function getStateFilePath(stableId: string): string {
 function isPersistedRunState(value: unknown): value is PersistedRunState {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
-  return (
-    v['version'] === 1 &&
-    typeof v['pid'] === 'number' &&
-    typeof v['elapsedMs'] === 'number'
-  );
+  return v['version'] === 1 && typeof v['pid'] === 'number' && typeof v['elapsedMs'] === 'number';
 }
 
 /**

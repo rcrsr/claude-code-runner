@@ -3,6 +3,8 @@
  * Provides prompt, command, and utility functions for orchestrating Claude workflows
  */
 
+import * as fs from 'fs';
+
 import {
   createRuntimeContext,
   type ObservabilityCallbacks,
@@ -12,7 +14,6 @@ import {
   type RuntimeContext,
   structureToTypeValue,
 } from '@rcrsr/rill';
-import * as fs from 'fs';
 
 import { printRunner, stripAnsi } from '../output/colors.js';
 import {
@@ -88,17 +89,9 @@ export interface RunnerContextOptions {
  * Find the last ccr:result tag in the text, preferring the match that appears
  * latest in the input regardless of whether it is self-closing or has content.
  */
-function findLastResultMatch(
-  text: string
-): { attrs: string; content?: string } | undefined {
-  const withContentGlobal = new RegExp(
-    CCR_RESULT_WITH_CONTENT_PATTERN.source,
-    'g'
-  );
-  const selfClosingGlobal = new RegExp(
-    CCR_RESULT_SELF_CLOSING_PATTERN.source,
-    'g'
-  );
+function findLastResultMatch(text: string): { attrs: string; content?: string } | undefined {
+  const withContentGlobal = new RegExp(CCR_RESULT_WITH_CONTENT_PATTERN.source, 'g');
+  const selfClosingGlobal = new RegExp(CCR_RESULT_SELF_CLOSING_PATTERN.source, 'g');
 
   let lastWithContent: RegExpMatchArray | undefined;
   for (const m of text.matchAll(withContentGlobal)) {
@@ -116,8 +109,7 @@ function findLastResultMatch(
 
   const useContent =
     lastWithContent &&
-    (!lastSelfClosing ||
-      (lastWithContent.index ?? 0) >= (lastSelfClosing.index ?? 0));
+    (!lastSelfClosing || (lastWithContent.index ?? 0) >= (lastSelfClosing.index ?? 0));
 
   if (useContent && lastWithContent) {
     const attrs = lastWithContent[1];
@@ -142,9 +134,7 @@ function findLastResultMatch(
 /**
  * Create a Rill runtime context for Claude Code Runner workflows
  */
-export function createRunnerContext(
-  options: RunnerContextOptions
-): RuntimeContext {
+export function createRunnerContext(options: RunnerContextOptions): RuntimeContext {
   const {
     executeClause,
     namedArgs = {},
@@ -237,9 +227,7 @@ export function createRunnerContext(
       ],
       fn: async (args, ctx) => {
         const name = args['name'] as string;
-        const cmdArgs = (args['args'] as RillValue[]).map((a) =>
-          formatRillValue(a ?? null)
-        );
+        const cmdArgs = (args['args'] as RillValue[]).map((a) => formatRillValue(a ?? null));
         const timeoutMin = args['timeout'] as number;
 
         const template = loadCommandTemplateFile(
@@ -293,13 +281,10 @@ export function createRunnerContext(
       ],
       fn: async (args, ctx) => {
         const name = args['name'] as string;
-        const skillArgs = (args['args'] as RillValue[]).map((a) =>
-          formatRillValue(a ?? null)
-        );
+        const skillArgs = (args['args'] as RillValue[]).map((a) => formatRillValue(a ?? null));
         const timeoutMin = args['timeout'] as number;
 
-        const promptText =
-          skillArgs.length > 0 ? `/${name} ${skillArgs.join(' ')}` : `/${name}`;
+        const promptText = skillArgs.length > 0 ? `/${name} ${skillArgs.join(' ')}` : `/${name}`;
 
         const result = await executeClause(promptText, defaultModel, {
           method: 'ccr::skill',
@@ -430,8 +415,7 @@ export function createRunnerContext(
       fn: (args) => {
         const text = args['text'] as string;
         return (
-          CCR_RESULT_SELF_CLOSING_PATTERN.test(text) ||
-          CCR_RESULT_WITH_CONTENT_PATTERN.test(text)
+          CCR_RESULT_SELF_CLOSING_PATTERN.test(text) || CCR_RESULT_WITH_CONTENT_PATTERN.test(text)
         );
       },
     },

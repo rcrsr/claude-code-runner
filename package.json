@@ -2,64 +2,64 @@
   "name": "@rcrsr/claude-code-runner",
   "version": "0.15.0",
   "description": "Execute Claude CLI with PTY handling, real-time tool visualization, and iterative execution support",
-  "type": "module",
-  "main": "dist/index.js",
+  "keywords": [
+    "automation",
+    "claude",
+    "cli",
+    "runner"
+  ],
+  "homepage": "https://github.com/rcrsr/claude-code-runner#readme",
+  "bugs": {
+    "url": "https://github.com/rcrsr/claude-code-runner/issues"
+  },
+  "license": "MIT",
+  "author": "Andre Bremer",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rcrsr/claude-code-runner.git"
+  },
   "bin": {
     "claude-code-runner": "./dist/index.js"
   },
   "files": [
     "dist"
   ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/rcrsr/claude-code-runner.git"
-  },
-  "bugs": {
-    "url": "https://github.com/rcrsr/claude-code-runner/issues"
-  },
-  "homepage": "https://github.com/rcrsr/claude-code-runner#readme",
+  "type": "module",
+  "main": "dist/index.js",
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
+    "prepare": "lefthook install",
     "build": "tsc",
     "build:watch": "tsc --watch",
     "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint src/",
-    "lint:fix": "eslint src/ --fix",
-    "format": "prettier --write src/ tests/",
-    "format:check": "prettier --check src/ tests/",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "check": "npm run typecheck && npm run lint && npm run format:check && npm run test",
+    "check": "npm run check:types && npm run check:lint && npm run check:format && npm run check:deps && npm run test",
+    "check:types": "tsc --noEmit",
+    "check:lint": "oxlint --deny-warnings",
+    "check:format": "oxfmt --check",
+    "check:deps": "knip",
+    "fix:lint": "oxlint --fix",
+    "fix:format": "oxfmt",
     "clean": "rm -rf dist coverage",
     "prepublishOnly": "npm run check && npm run build"
   },
-  "keywords": [
-    "claude",
-    "cli",
-    "runner",
-    "automation"
-  ],
-  "author": "Andre Bremer",
-  "license": "MIT",
   "dependencies": {
     "@lydell/node-pty": "^1.1.0",
-    "@rcrsr/rill": "^0.19.6"
+    "@rcrsr/rill": "~0.19.6"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
     "@types/node": "^26.6.6",
     "@vitest/coverage-v8": "^5.1.1",
-    "eslint": "^10.15.0",
-    "eslint-plugin-simple-import-sort": "^14.0.0",
-    "prettier": "^3.10.1",
-    "react": "^19.3.1",
-    "tsc-files": "^1.1.4",
-    "typescript": "~6.0.0",
-    "typescript-eslint": "^8.74.0",
+    "knip": "^6.45.1",
+    "lefthook": "^2.2.2",
+    "oxfmt": "^0.78.0",
+    "oxlint": "^1.93.0",
+    "oxlint-tsgolint": "^7.0.2007",
+    "typescript": "^7.0.2",
     "vitest": "^5.1.1"
   },
   "engines": {

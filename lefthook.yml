@@ -1,0 +1,16 @@
+min_version: 2.2.0
+pre-commit:
+  parallel: true
+  jobs:
+    - name: oxfmt
+      glob: '*.{js,mjs,ts,json,yaml,yml,md}'
+      run: npx oxfmt --no-error-on-unmatched-pattern {staged_files}
+      stage_fixed: true
+    - name: oxlint
+      glob: '*.{js,mjs,ts}'
+      run: npx oxlint --deny-warnings --fix {staged_files}
+      stage_fixed: true
+pre-push:
+  jobs:
+    - name: check
+      run: npm run check

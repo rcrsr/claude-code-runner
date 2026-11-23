@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+
 import { afterEach, describe, expect, it } from 'vitest';
 
 import type { PersistedRunState } from '../../src/utils/run-state.js';

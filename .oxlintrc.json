@@ -1,0 +1,26 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["unicorn", "typescript", "oxc", "import"],
+  "categories": { "correctness": "error", "suspicious": "warn" },
+  "options": { "typeAware": true, "reportUnusedDisableDirectives": "error" },
+  "rules": {
+    "max-lines": ["error", { "max": 1000, "skipBlankLines": true, "skipComments": true }],
+    "no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+    "prefer-const": "error",
+    "no-var": "error",
+    "arrow-body-style": ["error", "as-needed"],
+    "typescript/consistent-type-imports": ["error", { "prefer": "type-imports" }],
+    "typescript/explicit-function-return-type": [
+      "error",
+      { "allowExpressions": true, "allowTypedFunctionExpressions": true }
+    ],
+    "typescript/prefer-nullish-coalescing": "error",
+    "typescript/prefer-optional-chain": "error",
+    "typescript/no-explicit-any": "warn",
+    "typescript/no-non-null-assertion": "warn",
+    // Off: 74 findings on 2026-11-23 (33 src, 41 tests), mostly `as string` on mock-call args.
+    // The ESLint preset this replaced (typescript-eslint strictTypeChecked) did not enable it.
+    "typescript/no-unsafe-type-assertion": "off"
+  },
+  "ignorePatterns": ["**/dist/**", "**/coverage/**"]
+}

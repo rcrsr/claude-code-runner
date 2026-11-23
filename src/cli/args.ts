@@ -9,12 +9,7 @@ import { loadCommandTemplate } from '../templates/command.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
-import type {
-  ParsedArgs,
-  RunnerConfig,
-  Subcommand,
-  Verbosity,
-} from '../types/index.js';
+import type { ParsedArgs, RunnerConfig, Subcommand, Verbosity } from '../types/index.js';
 
 interface RawArgs {
   positionalArgs: string[];
@@ -67,39 +62,28 @@ function extractOptions(args: string[]): RawArgs {
 /**
  * Parse CLI arguments
  */
-const VALID_SUBCOMMANDS = [
-  'prompt',
-  'command',
-  'script',
-  'skill',
-  'docs',
-] as const;
+const VALID_SUBCOMMANDS = ['prompt', 'command', 'script', 'skill', 'docs'] as const;
 
 function isValidSubcommand(value: string): value is Subcommand {
   return VALID_SUBCOMMANDS.includes(value as Subcommand);
 }
 
 export function parseArgs(args: string[]): ParsedArgs {
-  const { positionalArgs, verbosity, enableLog, model, deaddrop } =
-    extractOptions(args);
+  const { positionalArgs, verbosity, enableLog, model, deaddrop } = extractOptions(args);
 
   const firstArg = positionalArgs[0];
 
   // Validate subcommand
   if (!firstArg) {
     console.error('Error: subcommand required');
-    console.error(
-      'Usage: claude-code-runner <prompt|command|skill|script|docs> [args...]'
-    );
+    console.error('Usage: claude-code-runner <prompt|command|skill|script|docs> [args...]');
     process.exit(1);
   }
 
   if (!isValidSubcommand(firstArg)) {
     console.error(`Error: unknown subcommand '${firstArg}'`);
     console.error('Valid subcommands: prompt, command, skill, script, docs');
-    console.error(
-      'Usage: claude-code-runner <prompt|command|skill|script|docs> [args...]'
-    );
+    console.error('Usage: claude-code-runner <prompt|command|skill|script|docs> [args...]');
     process.exit(1);
   }
 
@@ -110,8 +94,7 @@ export function parseArgs(args: string[]): ParsedArgs {
   let scriptArgs: string[] = [];
   let frontmatterModel: string | null = null;
   let frontmatterEffort: string | null = null;
-  let docsOptions:
-    { functionsOnly: boolean; languageOnly: boolean } | undefined = undefined;
+  let docsOptions: { functionsOnly: boolean; languageOnly: boolean } | undefined = undefined;
 
   switch (subcommand) {
     case 'command': {
@@ -121,10 +104,7 @@ export function parseArgs(args: string[]): ParsedArgs {
         console.error('Usage: claude-code-runner command <name> [args...]');
         process.exit(1);
       }
-      const template = loadCommandTemplate(
-        commandName,
-        positionalArgs.slice(2)
-      );
+      const template = loadCommandTemplate(commandName, positionalArgs.slice(2));
       prompt = template.prompt;
       frontmatterModel = template.frontmatter.model ?? null;
       frontmatterEffort = template.frontmatter.effort ?? null;
@@ -139,10 +119,7 @@ export function parseArgs(args: string[]): ParsedArgs {
         process.exit(1);
       }
       const skillArgs = positionalArgs.slice(2);
-      prompt =
-        skillArgs.length > 0
-          ? `/${skillName} ${skillArgs.join(' ')}`
-          : `/${skillName}`;
+      prompt = skillArgs.length > 0 ? `/${skillName} ${skillArgs.join(' ')}` : `/${skillName}`;
       displayCommand = positionalArgs.slice(1).join(' ');
       break;
     }

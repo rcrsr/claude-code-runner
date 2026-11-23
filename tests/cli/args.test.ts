@@ -42,9 +42,7 @@ describe('parseArgs', () => {
 
     it('exits with error for unknown subcommand', () => {
       expect(() => parseArgs(['--invalid'])).toThrow('process.exit(1)');
-      expect(errorSpy).toHaveBeenCalledWith(
-        "Error: unknown subcommand '--invalid'"
-      );
+      expect(errorSpy).toHaveBeenCalledWith("Error: unknown subcommand '--invalid'");
     });
 
     it('parses prompt subcommand', () => {
@@ -74,12 +72,8 @@ describe('parseArgs', () => {
     });
 
     it('rejects non-.rill script files', () => {
-      expect(() => parseArgs(['script', 'test.txt'])).toThrow(
-        'process.exit(1)'
-      );
-      expect(errorSpy).toHaveBeenCalledWith(
-        'Error: script must be a .rill file'
-      );
+      expect(() => parseArgs(['script', 'test.txt'])).toThrow('process.exit(1)');
+      expect(errorSpy).toHaveBeenCalledWith('Error: script must be a .rill file');
     });
   });
 
@@ -117,10 +111,7 @@ describe('parseArgs', () => {
 
       parseArgs(['command', 'my-cmd', 'arg1', 'arg2']);
 
-      expect(loadCommandTemplate).toHaveBeenCalledWith('my-cmd', [
-        'arg1',
-        'arg2',
-      ]);
+      expect(loadCommandTemplate).toHaveBeenCalledWith('my-cmd', ['arg1', 'arg2']);
     });
 
     it('exits with error when name missing', () => {

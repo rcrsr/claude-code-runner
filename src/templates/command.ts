@@ -144,9 +144,7 @@ function processTemplate(content: string, args: string[]): ProcessedTemplate {
   const { frontmatter, body } = parseFrontmatter(content);
 
   // Validate required arguments
-  const { requiredCount, optionalPositions } = parseArgumentHint(
-    frontmatter.argumentHint
-  );
+  const { requiredCount, optionalPositions } = parseArgumentHint(frontmatter.argumentHint);
 
   if (args.length < requiredCount) {
     const missing = [];
@@ -156,12 +154,8 @@ function processTemplate(content: string, args: string[]): ProcessedTemplate {
       }
     }
     if (missing.length > 0) {
-      const hint = frontmatter.argumentHint
-        ? ` (usage: ${frontmatter.argumentHint})`
-        : '';
-      throw new Error(
-        `Missing required arguments: ${missing.join(', ')}${hint}`
-      );
+      const hint = frontmatter.argumentHint ? ` (usage: ${frontmatter.argumentHint})` : '';
+      throw new Error(`Missing required arguments: ${missing.join(', ')}${hint}`);
     }
   }
 
@@ -201,12 +195,7 @@ export function loadCommandTemplate(
   cmdArgs: string[],
   cwd: string = process.cwd()
 ): CommandTemplate {
-  const commandFile = path.join(
-    cwd,
-    '.claude',
-    'commands',
-    `${commandName}.md`
-  );
+  const commandFile = path.join(cwd, '.claude', 'commands', `${commandName}.md`);
   return loadTemplate(commandFile, 'Command', cmdArgs);
 }
 
@@ -225,10 +214,7 @@ export function loadSkillTemplate(
 /**
  * Load a script template and substitute arguments
  */
-export function loadScriptTemplate(
-  scriptFile: string,
-  scriptArgs: string[]
-): ScriptTemplate {
+export function loadScriptTemplate(scriptFile: string, scriptArgs: string[]): ScriptTemplate {
   if (!fs.existsSync(scriptFile)) {
     throw new Error(`Script not found: ${scriptFile}`);
   }
