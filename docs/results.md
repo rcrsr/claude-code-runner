@@ -65,6 +65,32 @@ $result.type -> [
 ]
 ```
 
+## Runner-reserved result: timeout
+
+When the inactivity watchdog kills a session, the runner discards any partial output and returns this tag instead:
+
+```xml
+<ccr:result type="timeout" source="ccr" minutes="10" method="ccr::skill" name="long-task" model="..."/>
+```
+
+| Attribute | Description |
+|-----------|-------------|
+| `type` | Always `timeout` |
+| `source` | Always `ccr`; marks the tag as written by the runner |
+| `minutes` | Inactivity timeout actually used (the per-call `timeout` or the 10-minute default) |
+| `method` | Host function that was running (`ccr::prompt`, `ccr::command` or `ccr::skill`) |
+| `name` | Command or skill name; set for `ccr::command` and `ccr::skill` only |
+| `model` | Model the call used; present only when a model was set |
+
+`source="ccr"` is reserved for the runner. Skills must not print it. Branch on it to tell a runner timeout from a result Claude emitted:
+
+```rill
+ccr::skill("long-task") => $output
+ccr::get_result($output) => $result
+
+(($result.source ?? "") == "ccr") ? log("Timed out after {$result.minutes} minutes")
+```
+
 ## Workflow Patterns
 
 ### Self-Correcting Loop

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ClaudeProcessOptions } from '../../src/process/pty.js';
 import { spawnClaude } from '../../src/process/pty.js';
 import type { ClaudeMessage } from '../../src/types/claude.js';
+import { DEFAULT_INACTIVITY_TIMEOUT_MS } from '../../src/utils/constants.js';
 import { createMockFormatterState, createMockLogger } from '../helpers/mocks.js';
 
 // Mock @lydell/node-pty
@@ -396,6 +397,28 @@ describe('spawnClaude', () => {
       vi.advanceTimersByTime(10000);
       expect(mockKill).not.toHaveBeenCalled();
       expect(result.timedOut).toBeUndefined();
+    });
+
+    it('honors a per-call timeout longer than the default', async () => {
+      const customTimeoutMs = 30 * 60_000;
+      const promise = spawnClaude({ ...options, inactivityTimeoutMs: customTimeoutMs });
+
+      // Silence for the default duration must not trigger the watchdog
+      vi.advanceTimersByTime(DEFAULT_INACTIVITY_TIMEOUT_MS);
+      expect(mockKill).not.toHaveBeenCalled();
+
+      // One millisecond before the custom timeout
+      vi.advanceTimersByTime(customTimeoutMs - DEFAULT_INACTIVITY_TIMEOUT_MS - 1);
+      expect(mockKill).not.toHaveBeenCalled();
+
+      // Reaching the custom timeout kills the process
+      vi.advanceTimersByTime(1);
+      expect(mockKill).toHaveBeenCalledTimes(1);
+
+      onExitCallback({ exitCode: 1 });
+      const result = await promise;
+
+      expect(result.timedOut).toBe(true);
     });
 
     it('does not set timedOut on normal exit', async () => {
