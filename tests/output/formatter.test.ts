@@ -8,6 +8,7 @@ import {
 } from '../../src/output/formatter.js';
 import type { AssistantMessage } from '../../src/types/claude.js';
 import {
+  callArg,
   createMockFormatterState,
   createMockLogger,
   createResultMessage,
@@ -138,7 +139,7 @@ describe('flushPendingTools', () => {
     flushPendingTools(state, 'normal');
 
     expect(consoleSpy).toHaveBeenCalled();
-    const output = consoleSpy.mock.calls[0]?.[0] as string;
+    const output = callArg(consoleSpy.mock.calls[0]);
     expect(output).toContain('[Read]');
   });
 
@@ -154,7 +155,7 @@ describe('flushPendingTools', () => {
 
     flushPendingTools(state, 'normal');
 
-    const output = consoleSpy.mock.calls[0]?.[0] as string;
+    const output = callArg(consoleSpy.mock.calls[0]);
     expect(output).toContain('src/file.ts');
   });
 
@@ -164,7 +165,7 @@ describe('flushPendingTools', () => {
 
     flushPendingTools(state, 'normal');
 
-    const output = consoleSpy.mock.calls[0]?.[0] as string;
+    const output = callArg(consoleSpy.mock.calls[0]);
     expect(output).toContain('**/*.ts');
   });
 
@@ -174,7 +175,7 @@ describe('flushPendingTools', () => {
 
     flushPendingTools(state, 'normal');
 
-    const output = consoleSpy.mock.calls[0]?.[0] as string;
+    const output = callArg(consoleSpy.mock.calls[0]);
     expect(output).toContain('"searchTerm"');
   });
 
@@ -184,7 +185,7 @@ describe('flushPendingTools', () => {
 
     flushPendingTools(state, 'normal');
 
-    const output = consoleSpy.mock.calls[0]?.[0] as string;
+    const output = callArg(consoleSpy.mock.calls[0]);
     expect(output).toContain('npm install');
   });
 
@@ -197,7 +198,7 @@ describe('flushPendingTools', () => {
 
     flushPendingTools(state, 'normal');
 
-    const output = consoleSpy.mock.calls[0]?.[0] as string;
+    const output = callArg(consoleSpy.mock.calls[0]);
     expect(output).toContain('[×2]');
     expect(output).toContain('parallel');
   });
@@ -213,7 +214,7 @@ describe('flushPendingTools', () => {
 
     // First call is header, subsequent are indented tools
     expect(consoleSpy).toHaveBeenCalledTimes(3);
-    const tool1Output = consoleSpy.mock.calls[1]?.[0] as string;
+    const tool1Output = callArg(consoleSpy.mock.calls[1]);
     expect(tool1Output).toContain('→');
     expect(tool1Output).toContain('Read');
   });
@@ -282,7 +283,7 @@ describe('formatMessage', () => {
 
       formatMessage(msg, state, 'normal', logger, 100);
 
-      const output = consoleSpy.mock.calls[0]?.[0] as string;
+      const output = callArg(consoleSpy.mock.calls[0]);
       expect(output).toContain('[claude]');
       expect(output).toContain('Hello world');
     });
@@ -304,7 +305,7 @@ describe('formatMessage', () => {
 
       formatMessage(msg, state, 'quiet', logger, 100);
 
-      const output = consoleSpy.mock.calls[0]?.[0] as string;
+      const output = callArg(consoleSpy.mock.calls[0]);
       expect(output).toContain('[answer]');
       expect(output).toContain('The answer is 42');
     });
@@ -353,7 +354,7 @@ describe('formatMessage', () => {
 
       formatMessage(msg, state, 'normal', logger, 100);
 
-      const output = consoleSpy.mock.calls[0]?.[0] as string;
+      const output = callArg(consoleSpy.mock.calls[0]);
       expect(output).toContain('[error]');
     });
 
@@ -367,7 +368,7 @@ describe('formatMessage', () => {
 
       formatMessage(msg, state, 'normal', logger, 100);
 
-      const output = consoleSpy.mock.calls[0]?.[0] as string;
+      const output = callArg(consoleSpy.mock.calls[0]);
       expect(output).toContain('[error]');
     });
   });
@@ -392,7 +393,7 @@ describe('formatMessage', () => {
 
       formatMessage(msg, state, 'normal', logger, 100);
 
-      const output = consoleSpy.mock.calls[0]?.[0] as string;
+      const output = callArg(consoleSpy.mock.calls[0]);
       expect(output).toContain('[runner]');
       expect(output).toContain('Completed step 1 in 5.0s');
     });
@@ -515,7 +516,7 @@ describe('formatMessage', () => {
       formatMessage(msg, state, 'normal', logger, 100);
       flushPendingTools(state, 'normal');
 
-      const calls = consoleSpy.mock.calls.map((c) => stripAnsi(c[0] as string));
+      const calls = consoleSpy.mock.calls.map((c) => stripAnsi(callArg(c)));
       // Check task header contains marker and [Explore]
       const hasTaskHeader = calls.some((c) => c.includes('[Explore]') && c.includes('●'));
 
@@ -555,7 +556,7 @@ describe('formatMessage', () => {
       formatMessage(msg, state, 'normal', logger, 100);
       flushPendingTools(state, 'normal');
 
-      const calls = consoleSpy.mock.calls.map((c) => stripAnsi(c[0] as string));
+      const calls = consoleSpy.mock.calls.map((c) => stripAnsi(callArg(c)));
       // Check task header contains marker and [Explore]
       const hasTaskHeader = calls.some((c) => c.includes('[Explore]') && c.includes('●'));
 
@@ -625,7 +626,7 @@ describe('formatMessage', () => {
       formatMessage(toolMsg, state, 'normal', logger, 100);
       flushPendingTools(state, 'normal');
 
-      const calls = consoleSpy.mock.calls.map((c) => stripAnsi(c[0] as string));
+      const calls = consoleSpy.mock.calls.map((c) => stripAnsi(callArg(c)));
       const toolCall = calls.find((c) => c.includes('[Read]'));
       // Check tool call has marker
       expect(toolCall).toContain('●');
@@ -670,7 +671,7 @@ describe('formatMessage', () => {
       const resultMsg = createToolResultMessage('task-1', 'Task completed');
       formatMessage(resultMsg, state, 'normal', logger, 100);
 
-      const calls = consoleSpy.mock.calls.map((c) => stripAnsi(c[0] as string));
+      const calls = consoleSpy.mock.calls.map((c) => stripAnsi(callArg(c)));
       const completionLine = calls.find((c) => c.includes('Complete'));
       // Check completion has marker and type
       expect(completionLine).toContain('●');
@@ -770,7 +771,7 @@ describe('formatMessage', () => {
       expect(state.toolToTaskId.get('edit-b')).toBe('task-2');
 
       // Verify all tools got markers (dots) in output
-      const calls = consoleSpy.mock.calls.map((c) => stripAnsi(c[0] as string));
+      const calls = consoleSpy.mock.calls.map((c) => stripAnsi(callArg(c)));
       const toolCalls = calls.filter((c) => c.includes('[Read]') || c.includes('[Edit]'));
       for (const call of toolCalls) {
         expect(call).toContain('●');
@@ -817,7 +818,7 @@ describe('formatMessage', () => {
       formatMessage(createToolResultMessage('task-2', 'Done'), state, 'normal', logger, 100);
       expect(state.activeTasks.size).toBe(0);
 
-      const calls = consoleSpy.mock.calls.map((c) => stripAnsi(c[0] as string));
+      const calls = consoleSpy.mock.calls.map((c) => stripAnsi(callArg(c)));
       const completions = calls.filter((c) => c.includes('Complete'));
       expect(completions).toHaveLength(2);
       // Check both completions have markers

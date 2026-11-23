@@ -102,6 +102,13 @@ export type ClaudeMessage =
   | ResultMessage
   | GenericMessage;
 
+/** Narrow parsed stream-json to a message: any object with a string `type` */
+export function isClaudeMessage(value: unknown): value is ClaudeMessage {
+  return (
+    typeof value === 'object' && value !== null && 'type' in value && typeof value.type === 'string'
+  );
+}
+
 /**
  * Type guard functions
  */

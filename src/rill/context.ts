@@ -24,7 +24,9 @@ import {
   CCR_RESULT_SELF_CLOSING_PATTERN,
   CCR_RESULT_WITH_CONTENT_PATTERN,
 } from '../utils/constants.js';
+import { definedEnv } from '../utils/env.js';
 import { formatRillValue } from '../utils/formatting.js';
+import { argList, argNumber, argString } from './host-args.js';
 
 // ============================================================
 // TYPES
@@ -139,7 +141,7 @@ export function createRunnerContext(options: RunnerContextOptions): RuntimeConte
     executeClause,
     namedArgs = {},
     rawArgs = [],
-    env = process.env as Record<string, string>,
+    env = definedEnv(),
     commandsDir = '.claude/commands',
     defaultModel,
     callbacks = {},
@@ -184,9 +186,9 @@ export function createRunnerContext(options: RunnerContextOptions): RuntimeConte
         },
       ],
       fn: async (args) => {
-        const text = args['text'] as string;
-        const model = (args['model'] as string) || defaultModel;
-        const timeoutMin = args['timeout'] as number;
+        const text = argString(args, 'text');
+        const model = argString(args, 'model') || defaultModel;
+        const timeoutMin = argNumber(args, 'timeout');
         const result = await executeClause(text, model, {
           method: 'ccr::prompt',
           model: model ?? undefined,
@@ -226,9 +228,9 @@ export function createRunnerContext(options: RunnerContextOptions): RuntimeConte
         },
       ],
       fn: async (args, ctx) => {
-        const name = args['name'] as string;
-        const cmdArgs = (args['args'] as RillValue[]).map((a) => formatRillValue(a ?? null));
-        const timeoutMin = args['timeout'] as number;
+        const name = argString(args, 'name');
+        const cmdArgs = argList(args, 'args').map((a) => formatRillValue(a ?? null));
+        const timeoutMin = argNumber(args, 'timeout');
 
         const template = loadCommandTemplateFile(
           name,
@@ -280,9 +282,9 @@ export function createRunnerContext(options: RunnerContextOptions): RuntimeConte
         },
       ],
       fn: async (args, ctx) => {
-        const name = args['name'] as string;
-        const skillArgs = (args['args'] as RillValue[]).map((a) => formatRillValue(a ?? null));
-        const timeoutMin = args['timeout'] as number;
+        const name = argString(args, 'name');
+        const skillArgs = argList(args, 'args').map((a) => formatRillValue(a ?? null));
+        const timeoutMin = argNumber(args, 'timeout');
 
         const promptText = skillArgs.length > 0 ? `/${name} ${skillArgs.join(' ')}` : `/${name}`;
 
@@ -312,7 +314,7 @@ export function createRunnerContext(options: RunnerContextOptions): RuntimeConte
           annotations: { description: 'File path to check' },
         },
       ],
-      fn: (args) => fs.existsSync(args['path'] as string),
+      fn: (args) => fs.existsSync(argString(args, 'path')),
     },
 
     /**
@@ -331,7 +333,7 @@ export function createRunnerContext(options: RunnerContextOptions): RuntimeConte
         },
       ],
       fn: (args) => {
-        let text = args['text'] as string;
+        let text = argString(args, 'text');
 
         // Strip ANSI escape sequences
         text = stripAnsi(text);
@@ -369,7 +371,7 @@ export function createRunnerContext(options: RunnerContextOptions): RuntimeConte
         },
       ],
       fn: (args) => {
-        const text = args['text'] as string;
+        const text = argString(args, 'text');
 
         const match = findLastResultMatch(text);
         if (!match) {
@@ -413,7 +415,7 @@ export function createRunnerContext(options: RunnerContextOptions): RuntimeConte
         },
       ],
       fn: (args) => {
-        const text = args['text'] as string;
+        const text = argString(args, 'text');
         return (
           CCR_RESULT_SELF_CLOSING_PATTERN.test(text) || CCR_RESULT_WITH_CONTENT_PATTERN.test(text)
         );
@@ -436,7 +438,7 @@ export function createRunnerContext(options: RunnerContextOptions): RuntimeConte
         },
       ],
       fn: (args) => {
-        const filePath = args['path'] as string;
+        const filePath = argString(args, 'path');
 
         if (!fs.existsSync(filePath)) {
           return false;
@@ -467,7 +469,7 @@ export function createRunnerContext(options: RunnerContextOptions): RuntimeConte
         },
       ],
       fn: (args) => {
-        const filePath = args['path'] as string;
+        const filePath = argString(args, 'path');
 
         if (!fs.existsSync(filePath)) {
           throw new Error(`File not found: ${filePath}`);

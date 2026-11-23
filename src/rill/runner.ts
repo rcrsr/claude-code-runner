@@ -35,6 +35,7 @@ import { spawnClaude } from '../process/pty.js';
 import { parseFrontmatter } from '../templates/command.js';
 import type { RunnerConfig } from '../types/runner.js';
 import { STATUS_TIMER_INTERVAL_MS } from '../utils/constants.js';
+import { definedEnv } from '../utils/env.js';
 import { formatRillValue } from '../utils/formatting.js';
 import { createRunnerContext, type ExecutionResult, type InvocationContext } from './context.js';
 
@@ -66,10 +67,19 @@ export interface RillRunResult {
   lastOutput: string;
 }
 
+const RILL_ARG_TYPES = ['string', 'number', 'bool'] as const;
+
+/** Type names allowed in an `args` frontmatter definition */
+type RillArgType = (typeof RILL_ARG_TYPES)[number];
+
+function isRillArgType(value: string): value is RillArgType {
+  return (RILL_ARG_TYPES as readonly string[]).includes(value);
+}
+
 /** Parsed argument definition from frontmatter */
 export interface RillArgDef {
   name: string;
-  type: 'string' | 'number' | 'bool';
+  type: RillArgType;
   required: boolean;
   defaultValue?: string | number | boolean | undefined;
 }
@@ -120,11 +130,11 @@ function parseArgsDefinition(argsStr: string): RillArgDef[] {
     }
 
     const [, name, type, defaultStr] = match;
-    if (!name || !type) continue;
+    if (!name || !type || !isRillArgType(type)) continue;
 
     const def: RillArgDef = {
       name,
-      type: type as 'string' | 'number' | 'bool',
+      type,
       required: defaultStr === undefined,
     };
 
@@ -375,7 +385,7 @@ export async function runRillScript(options: RillRunnerOptions): Promise<RillRun
       executeClause,
       namedArgs,
       rawArgs: args,
-      env: process.env as Record<string, string>,
+      env: definedEnv(),
       commandsDir: '.claude/commands',
       defaultModel: effectiveModel ?? undefined,
       callbacks,

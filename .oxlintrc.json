@@ -17,10 +17,7 @@
     "typescript/prefer-nullish-coalescing": "error",
     "typescript/prefer-optional-chain": "error",
     "typescript/no-explicit-any": "warn",
-    "typescript/no-non-null-assertion": "warn",
-    // Off: 74 findings on 2026-11-23 (33 src, 41 tests), mostly `as string` on mock-call args.
-    // The ESLint preset this replaced (typescript-eslint strictTypeChecked) did not enable it.
-    "typescript/no-unsafe-type-assertion": "off"
+    "typescript/no-non-null-assertion": "warn"
   },
   "ignorePatterns": ["**/dist/**", "**/coverage/**"]
 }

@@ -65,8 +65,14 @@ export function getStateFilePath(stableId: string): string {
  */
 function isPersistedRunState(value: unknown): value is PersistedRunState {
   if (typeof value !== 'object' || value === null) return false;
-  const v = value as Record<string, unknown>;
-  return v['version'] === 1 && typeof v['pid'] === 'number' && typeof v['elapsedMs'] === 'number';
+  return (
+    'version' in value &&
+    value.version === 1 &&
+    'pid' in value &&
+    typeof value.pid === 'number' &&
+    'elapsedMs' in value &&
+    typeof value.elapsedMs === 'number'
+  );
 }
 
 /**
@@ -93,8 +99,7 @@ export function loadRunState(stableId: string): PersistedRunState | null {
       // Signal 0 succeeded — process is still alive — concurrent run, do not corrupt it
       return null;
     } catch (err: unknown) {
-      const nodeErr = err as NodeJS.ErrnoException;
-      if (nodeErr.code === 'ESRCH') {
+      if (err instanceof Error && 'code' in err && err.code === 'ESRCH') {
         // Process is dead — this is a recovery scenario
         return parsed;
       }

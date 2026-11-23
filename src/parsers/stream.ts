@@ -4,7 +4,7 @@
  */
 
 import { stripAnsi } from '../output/colors.js';
-import type { ClaudeMessage } from '../types/claude.js';
+import { type ClaudeMessage, isClaudeMessage } from '../types/claude.js';
 
 export interface StreamParser {
   /** Process incoming data chunk, returns parsed messages */
@@ -41,8 +41,10 @@ export function createStreamParser(): StreamParser {
         }
 
         try {
-          const msg = JSON.parse(cleaned) as ClaudeMessage;
-          messages.push(msg);
+          const msg: unknown = JSON.parse(cleaned);
+          if (isClaudeMessage(msg)) {
+            messages.push(msg);
+          }
         } catch {
           // Not valid JSON - skip terminal control codes
         }

@@ -19,6 +19,7 @@ import {
   type PendingTool,
   type Verbosity,
 } from '../types/runner.js';
+import { getToolInputString } from '../types/tools.js';
 import {
   MAX_RESULT_LINES,
   TRUNCATE_BASH_CMD,
@@ -203,13 +204,13 @@ function formatToolUse(tool: PendingTool, indented: boolean, state: FormatterSta
 
   let summary: string;
   if (name === 'Read') {
-    summary = shortenPath((input['file_path'] as string | undefined) ?? '');
+    summary = shortenPath(getToolInputString(input, 'file_path'));
   } else if (name === 'Glob') {
-    summary = (input['pattern'] as string | undefined) ?? '';
+    summary = getToolInputString(input, 'pattern');
   } else if (name === 'Grep') {
-    summary = `"${truncate((input['pattern'] as string | undefined) ?? '', TRUNCATE_GREP_PATTERN)}"`;
+    summary = `"${truncate(getToolInputString(input, 'pattern'), TRUNCATE_GREP_PATTERN)}"`;
   } else if (name === 'Bash') {
-    const cmd = ((input['command'] as string | undefined) ?? '').replace(/[\r\n]+/g, ' ');
+    const cmd = getToolInputString(input, 'command').replace(/[\r\n]+/g, ' ');
     summary = truncate(cmd, TRUNCATE_BASH_CMD);
   } else if (name === 'Task' || name === 'Agent') {
     // Task state already initialized in pre-scan, just print header
@@ -221,7 +222,7 @@ function formatToolUse(tool: PendingTool, indented: boolean, state: FormatterSta
     }
     return;
   } else if (name === 'Write' || name === 'Edit') {
-    summary = shortenPath((input['file_path'] as string | undefined) ?? '');
+    summary = shortenPath(getToolInputString(input, 'file_path'));
   } else {
     summary = truncate(JSON.stringify(input), TRUNCATE_TOOL_JSON);
   }
@@ -366,11 +367,10 @@ export function formatMessage(
     for (const block of msg.message.content) {
       if (isToolUseBlock(block) && (block.name === 'Task' || block.name === 'Agent')) {
         const input = block.input;
-        const taskType = (input['subagent_type'] as string | undefined) ?? 'agent';
+        const taskType = getToolInputString(input, 'subagent_type', 'agent');
+        const description = getToolInputString(input, 'description');
         const taskDesc = truncate(
-          (input['description'] as string | undefined) ??
-            (input['prompt'] as string | undefined) ??
-            '',
+          description !== '' ? description : getToolInputString(input, 'prompt'),
           TRUNCATE_TASK_DESC
         );
         // Assign stable color from agent ID hash

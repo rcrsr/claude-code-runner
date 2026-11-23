@@ -2,14 +2,10 @@
  * CLI argument parsing
  */
 
-import { createRequire } from 'module';
-
 import { isRillScript } from '../rill/index.js';
 import { loadCommandTemplate } from '../templates/command.js';
-
-const require = createRequire(import.meta.url);
-const pkg = require('../../package.json') as { version: string };
 import type { ParsedArgs, RunnerConfig, Subcommand, Verbosity } from '../types/index.js';
+import { getPackageVersion } from '../utils/version.js';
 
 interface RawArgs {
   positionalArgs: string[];
@@ -25,7 +21,7 @@ interface RawArgs {
 function extractOptions(args: string[]): RawArgs {
   // Handle --version early
   if (args.includes('--version') || args.includes('-V')) {
-    console.log(pkg.version);
+    console.log(getPackageVersion());
     process.exit(0);
   }
 
@@ -65,7 +61,7 @@ function extractOptions(args: string[]): RawArgs {
 const VALID_SUBCOMMANDS = ['prompt', 'command', 'script', 'skill', 'docs'] as const;
 
 function isValidSubcommand(value: string): value is Subcommand {
-  return VALID_SUBCOMMANDS.includes(value as Subcommand);
+  return (VALID_SUBCOMMANDS as readonly string[]).includes(value);
 }
 
 export function parseArgs(args: string[]): ParsedArgs {

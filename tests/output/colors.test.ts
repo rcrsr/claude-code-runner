@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 import {
   bindFormatterState,
@@ -8,6 +8,7 @@ import {
   printRunner,
   renderStatusLine,
   shortenPath,
+  type StatusStream,
   stripAnsi,
   terminalLog,
   timestampPrefix,
@@ -16,6 +17,7 @@ import {
 } from '../../src/output/colors.js';
 import type { FormatterState } from '../../src/output/formatter.js';
 import { STATUS_LINE_MIN_WIDTH } from '../../src/utils/constants.js';
+import { callArg } from '../helpers/mocks.js';
 
 describe('stripAnsi', () => {
   it('removes ANSI color codes', () => {
@@ -134,7 +136,7 @@ describe('printRunner', () => {
     printRunner('Test message');
 
     expect(consoleSpy).toHaveBeenCalledTimes(1);
-    const output = consoleSpy.mock.calls[0]?.[0] as string;
+    const output = callArg(consoleSpy.mock.calls[0]);
     expect(output).toContain('[runner]');
     expect(output).toContain('Test message');
     expect(output).toMatch(/\d{2}:\d{2}:\d{2}\.\d{3}/);
@@ -143,22 +145,22 @@ describe('printRunner', () => {
   it('uses magenta color for [RUNNER] label', () => {
     printRunner('Test');
 
-    const output = consoleSpy.mock.calls[0]?.[0] as string;
+    const output = callArg(consoleSpy.mock.calls[0]);
     expect(output).toContain('\x1b[35m'); // magenta
   });
 });
 
 describe('renderStatusLine', () => {
-  let mockStream: NodeJS.WriteStream;
-  let writeSpy: ReturnType<typeof vi.fn>;
+  let mockStream: StatusStream;
+  let writeSpy: Mock<(chunk: string) => boolean>;
 
   beforeEach(() => {
-    writeSpy = vi.fn();
+    writeSpy = vi.fn<(chunk: string) => boolean>();
     mockStream = {
       isTTY: true,
       columns: 80,
       write: writeSpy,
-    } as unknown as NodeJS.WriteStream;
+    };
   });
 
   it('renders text with dim styling', () => {
@@ -166,7 +168,7 @@ describe('renderStatusLine', () => {
 
     // Should write: save cursor, newline, clear line, dim text, reset, restore cursor
     expect(writeSpy).toHaveBeenCalled();
-    const allWrites = writeSpy.mock.calls.map((call) => call[0] as string).join('');
+    const allWrites = writeSpy.mock.calls.map((call) => callArg(call)).join('');
     expect(allWrites).toContain('\x1b[2m'); // dim
     expect(allWrites).toContain('Status text');
     expect(allWrites).toContain('\x1b[0m'); // reset
@@ -177,7 +179,7 @@ describe('renderStatusLine', () => {
 
     // Should write: clear line + \r (no text)
     expect(writeSpy).toHaveBeenCalled();
-    const allWrites = writeSpy.mock.calls.map((call) => call[0] as string).join('');
+    const allWrites = writeSpy.mock.calls.map((call) => callArg(call)).join('');
     expect(allWrites).toContain('\x1b[2K'); // clear line
     expect(allWrites).toContain('\r'); // carriage return
     expect(allWrites).not.toContain('Status'); // no text
@@ -187,7 +189,7 @@ describe('renderStatusLine', () => {
     renderStatusLine('', mockStream);
 
     expect(writeSpy).toHaveBeenCalled();
-    const allWrites = writeSpy.mock.calls.map((call) => call[0] as string).join('');
+    const allWrites = writeSpy.mock.calls.map((call) => callArg(call)).join('');
     expect(allWrites).toContain('\x1b[2K'); // clear line
     expect(allWrites).not.toContain('\x1b[2m'); // no dim styling (no text)
   });
@@ -219,7 +221,7 @@ describe('renderStatusLine', () => {
 
     renderStatusLine(longText, mockStream);
 
-    const allWrites = writeSpy.mock.calls.map((call) => call[0] as string).join('');
+    const allWrites = writeSpy.mock.calls.map((call) => callArg(call)).join('');
     expect(allWrites).toContain('...');
     // Text should be truncated to fit within 20 columns
     // oxlint-disable-next-line no-control-regex -- Testing ANSI escape codes
@@ -233,7 +235,7 @@ describe('renderStatusLine', () => {
     const textWithAnsi = '\x1b[31mRed text\x1b[0m with codes';
     renderStatusLine(textWithAnsi, mockStream);
 
-    const allWrites = writeSpy.mock.calls.map((call) => call[0] as string).join('');
+    const allWrites = writeSpy.mock.calls.map((call) => callArg(call)).join('');
     // Should contain dim styling we add, but not the red color from input
     // oxlint-disable-next-line no-control-regex -- Testing ANSI escape codes
     const dimMatch = /\x1b\[2m(.*?)\x1b\[0m/.exec(allWrites);
@@ -244,7 +246,7 @@ describe('renderStatusLine', () => {
     const textWithNewlines = 'Line 1\nLine 2\r\nLine 3';
     renderStatusLine(textWithNewlines, mockStream);
 
-    const allWrites = writeSpy.mock.calls.map((call) => call[0] as string).join('');
+    const allWrites = writeSpy.mock.calls.map((call) => callArg(call)).join('');
     // oxlint-disable-next-line no-control-regex -- Testing ANSI escape codes
     const dimMatch = /\x1b\[2m(.*?)\x1b\[0m/.exec(allWrites);
     expect(dimMatch?.[1]).toBe('Line 1 Line 2 Line 3');
@@ -266,22 +268,22 @@ describe('renderStatusLine', () => {
   it('handles whitespace-only text as empty', () => {
     renderStatusLine('   ', mockStream);
 
-    const allWrites = writeSpy.mock.calls.map((call) => call[0] as string).join('');
+    const allWrites = writeSpy.mock.calls.map((call) => callArg(call)).join('');
     expect(allWrites).not.toContain('\x1b[2m'); // no dim styling
   });
 
   it('falls back to 80 columns when stream.columns is undefined (EC-5)', () => {
     // Create stream with undefined columns (edge case for misconfigured TTY)
-    const streamWithUndefinedCols = {
+    const streamWithUndefinedCols: StatusStream = {
       isTTY: true,
       columns: undefined,
       write: writeSpy,
-    } as unknown as NodeJS.WriteStream;
+    };
 
     const text = 'A'.repeat(100); // Text longer than 80 chars
     renderStatusLine(text, streamWithUndefinedCols);
 
-    const allWrites = writeSpy.mock.calls.map((call) => call[0] as string).join('');
+    const allWrites = writeSpy.mock.calls.map((call) => callArg(call)).join('');
     // oxlint-disable-next-line no-control-regex -- Testing ANSI escape codes
     const dimMatch = /\x1b\[2m(.*?)\x1b\[0m/.exec(allWrites);
     expect(dimMatch).toBeTruthy();
@@ -319,12 +321,12 @@ describe('renderStatusLine', () => {
     // Last set of writes should contain latest status
     const lastWrites = writeSpy.mock.calls
       .slice(-5) // Get last 5 calls (enough to capture one complete render)
-      .map((call) => call[0] as string)
+      .map((call) => callArg(call))
       .join('');
     expect(lastWrites).toContain('Status 3');
 
     // Verify each call replaces previous by checking all writes contain all statuses
-    const allWrites = writeSpy.mock.calls.map((call) => call[0] as string).join('');
+    const allWrites = writeSpy.mock.calls.map((call) => callArg(call)).join('');
     expect(allWrites).toContain('Status 1');
     expect(allWrites).toContain('Status 2');
     expect(allWrites).toContain('Status 3');
@@ -332,16 +334,16 @@ describe('renderStatusLine', () => {
 });
 
 describe('clearStatusLine', () => {
-  let mockStream: NodeJS.WriteStream;
-  let writeSpy: ReturnType<typeof vi.fn>;
+  let mockStream: StatusStream;
+  let writeSpy: Mock<(chunk: string) => boolean>;
 
   beforeEach(() => {
-    writeSpy = vi.fn();
+    writeSpy = vi.fn<(chunk: string) => boolean>();
     mockStream = {
       isTTY: true,
       columns: 80,
       write: writeSpy,
-    } as unknown as NodeJS.WriteStream;
+    };
   });
 
   it('erases status line using clear-line + carriage return', () => {
@@ -372,12 +374,12 @@ describe('clearStatusLine', () => {
   it('is idempotent - clearing twice produces same result', () => {
     clearStatusLine(mockStream);
     const firstCallCount = writeSpy.mock.calls.length;
-    const firstWrites = writeSpy.mock.calls.map((call) => call[0] as string).join('');
+    const firstWrites = writeSpy.mock.calls.map((call) => callArg(call)).join('');
 
     writeSpy.mockClear();
     clearStatusLine(mockStream);
     const secondCallCount = writeSpy.mock.calls.length;
-    const secondWrites = writeSpy.mock.calls.map((call) => call[0] as string).join('');
+    const secondWrites = writeSpy.mock.calls.map((call) => callArg(call)).join('');
 
     expect(firstCallCount).toBe(secondCallCount);
     expect(firstWrites).toBe(secondWrites);
@@ -519,7 +521,7 @@ describe('terminalLog', () => {
     expect(consoleSpy).toHaveBeenCalledWith('Test message');
     // Should call renderStatusLine with the status text
     expect(stderrWriteSpy).toHaveBeenCalled();
-    const allWrites = stderrWriteSpy.mock.calls.map((call) => call[0] as string).join('');
+    const allWrites = stderrWriteSpy.mock.calls.map((call) => callArg(call)).join('');
     expect(allWrites).toContain('Current status text');
   });
 

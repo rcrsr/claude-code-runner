@@ -19,6 +19,18 @@ import { DEFAULT_INACTIVITY_TIMEOUT_MS } from '../../src/utils/constants.js';
 /**
  * Create a mock logger
  */
+/**
+ * Read one argument of a recorded mock call as a string.
+ * Throws when the call is missing or the argument is not a string, so the test fails clearly.
+ */
+export function callArg(call: readonly unknown[] | undefined, index = 0): string {
+  const value = call?.[index];
+  if (typeof value !== 'string') {
+    throw new TypeError(`Expected string mock-call argument ${index}, got ${typeof value}`);
+  }
+  return value;
+}
+
 export function createMockLogger(): Logger {
   return {
     log: vi.fn(),

@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added knip (`npm run check:deps`) for unused files and dependencies, and lefthook hooks: oxfmt and oxlint on pre-commit, `npm run check` on pre-push.
 - Renamed scripts to `check:types`, `check:lint`, `check:format`, `check:deps`, `fix:lint`, and `fix:format`. Removed `typecheck`, `lint`, `lint:fix`, `format`, and `format:check`.
 - Removed unused dev dependencies `react` and `tsc-files`.
+- Enabled oxlint `typescript/no-unsafe-type-assertion` and removed all 74 unchecked type assertions (33 in `src`, 41 in tests). Host-function arguments now go through checked readers (`src/rill/host-args.ts`). Stream-json lines go through `isClaudeMessage`, and `package.json` is read by `getPackageVersion`. `renderStatusLine` and `clearStatusLine` take a narrow `StatusStream` type, and tests read spy arguments through a checked `callArg` helper.
+
+### Fixed
+
+- The stream parser now skips JSON lines that are not message objects (for example a bare number), where before it passed them on as messages.
 
 ## [0.15.0] — 2026-06-18
 

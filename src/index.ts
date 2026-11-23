@@ -5,14 +5,10 @@
  */
 
 import { randomBytes } from 'crypto';
-import { createRequire } from 'module';
 
 import { VERSION as RILL_VERSION } from '@rcrsr/rill';
 
 import { generateDocs, parseArgs } from './cli/index.js';
-
-const require = createRequire(import.meta.url);
-const pkg = require('../package.json') as { version: string };
 import { createDeadDropClientFromEnv } from './deaddrop/index.js';
 import { configureDeadDrop, flushDeadDrop, printRunner, printRunnerInfo } from './output/colors.js';
 import { createFormatterState, finalizeStepStats, getRunStatsSummary } from './output/formatter.js';
@@ -29,6 +25,7 @@ import {
   type PersistedRunStats,
   saveRunState,
 } from './utils/run-state.js';
+import { getPackageVersion } from './utils/version.js';
 
 /**
  * Generate a short unique run ID (8 chars, uppercase)
@@ -122,7 +119,7 @@ async function main(): Promise<void> {
   };
 
   // Print version info
-  printRunnerInfo(`v${pkg.version} (rill v${RILL_VERSION})`);
+  printRunnerInfo(`v${getPackageVersion()} (rill v${RILL_VERSION})`);
 
   // Emit starting run message (operational, sent to deaddrop)
   printRunner(`Starting run ${runId}`);

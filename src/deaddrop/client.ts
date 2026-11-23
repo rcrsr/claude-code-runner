@@ -56,7 +56,7 @@ export function createDeadDropClient(config: DeadDropConfig): DeadDropClient {
           console.warn(`[DEADDROP] Warning: Failed to send message (${response.status})`);
         }
       } catch (err) {
-        console.warn(`[DEADDROP] Warning: ${(err as Error).message}`);
+        console.warn(`[DEADDROP] Warning: ${err instanceof Error ? err.message : String(err)}`);
       }
     },
   };

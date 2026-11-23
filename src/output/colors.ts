@@ -224,7 +224,14 @@ const ANSI_CLEAR_LINE_CR = '\x1b[2K\r';
  * @param text - Status text to display, or null to clear
  * @param stream - Output stream (expected: process.stderr)
  */
-export function renderStatusLine(text: string | null, stream: NodeJS.WriteStream): void {
+/** The parts of a TTY stream the status line uses; process.stderr satisfies it */
+export interface StatusStream {
+  isTTY?: boolean | undefined;
+  columns?: number | undefined;
+  write(chunk: string): unknown;
+}
+
+export function renderStatusLine(text: string | null, stream: StatusStream): void {
   // No-op when not a TTY
   if (!stream.isTTY) {
     return;
@@ -233,7 +240,7 @@ export function renderStatusLine(text: string | null, stream: NodeJS.WriteStream
   // Get terminal width with fallback to 80 for misconfigured TTYs (EC-5)
   // TypeScript types guarantee columns is defined when isTTY is true,
   // but handle edge case where it might be undefined at runtime
-  const terminalWidth = (stream.columns as number | undefined) ?? 80;
+  const terminalWidth = stream.columns ?? 80;
 
   // Suppress display if terminal too narrow
   if (terminalWidth < STATUS_LINE_MIN_WIDTH) {
@@ -271,7 +278,7 @@ export function renderStatusLine(text: string | null, stream: NodeJS.WriteStream
  *
  * @param stream - Output stream (expected: process.stderr)
  */
-export function clearStatusLine(stream: NodeJS.WriteStream): void {
+export function clearStatusLine(stream: StatusStream): void {
   // No-op when not a TTY
   if (!stream.isTTY) {
     return;

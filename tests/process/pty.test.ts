@@ -106,7 +106,8 @@ describe('spawnClaude', () => {
       onExitCallback({ exitCode: 0 });
       await promise;
 
-      const args = vi.mocked(pty.spawn).mock.calls[0]?.[1] as string[];
+      const args = vi.mocked(pty.spawn).mock.calls[0]?.[1];
+      if (!Array.isArray(args)) throw new TypeError('pty.spawn was not called with an args array');
       expect(args).toContain('--effort');
       expect(args[args.indexOf('--effort') + 1]).toBe('high');
     });
@@ -117,7 +118,8 @@ describe('spawnClaude', () => {
       onExitCallback({ exitCode: 0 });
       await promise;
 
-      const args = vi.mocked(pty.spawn).mock.calls[0]?.[1] as string[];
+      const args = vi.mocked(pty.spawn).mock.calls[0]?.[1];
+      if (!Array.isArray(args)) throw new TypeError('pty.spawn was not called with an args array');
       expect(args).not.toContain('--effort');
     });
 
