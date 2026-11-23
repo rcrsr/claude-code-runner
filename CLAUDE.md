@@ -16,12 +16,14 @@ npm run fix:format      # oxfmt
 
 ## Tooling
 
-TypeScript 7, oxlint with type-aware rules via oxlint-tsgolint (`.oxlintrc.json`), oxfmt (`.oxfmtrc.json`, sorts imports), knip (`knip.json`), Vitest, and lefthook (`lefthook.yml`; `npm install` wires the hooks). There is no ESLint or Prettier.
+TypeScript 7, oxlint with type-aware rules via oxlint-tsgolint (`.oxlintrc.json`), oxfmt (`.oxfmtrc.json`, sorts imports), knip (`knip.json`), Vitest, and lefthook (`lefthook.yml`; `npm install` wires the hooks). There is no ESLint or Prettier. No rule is set to `warn`; every finding fails `npm run check`.
+
+`tsconfig.json` typechecks `src/` and `tests/` with `noEmit`. `npm run build` uses `tsconfig.build.json`, which emits `src/` only.
 
 This repo borrows the TypeScript tooling from `APP-MONOREPO-STANDARDS.md`. As a single-package npm CLI it is out of that standard's scope. Deliberate deviations:
 
 - APP-SQ-4: `tsconfig.json` keeps `module`/`moduleResolution` `NodeNext`, not `bundler`, because `tsc` emits the published Node ESM package directly.
-- APP-SQ-8: sherif does not apply (one `package.json`). knip reports unused exports and types as warnings, not errors.
+- APP-SQ-8: sherif does not apply (one `package.json`).
 - APP-TS-2: one Vitest project, so no `test.projects`.
 - Not adopted: Nx, pnpm, mise, Makefile (monorepo layers L0–L2).
 

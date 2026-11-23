@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ClaudeProcessOptions } from '../../src/process/pty.js';
 import { spawnClaude } from '../../src/process/pty.js';
+import type { ClaudeMessage } from '../../src/types/claude.js';
 import { createMockFormatterState, createMockLogger } from '../helpers/mocks.js';
 
 // Mock @lydell/node-pty
@@ -25,7 +26,7 @@ vi.mock('../../src/output/formatter.js', () => ({
 }));
 
 // Mock stream parser
-const mockParserProcess = vi.fn(() => []);
+const mockParserProcess = vi.fn<(data: string) => ClaudeMessage[]>(() => []);
 vi.mock('../../src/parsers/stream.js', () => ({
   createStreamParser: vi.fn(() => ({
     process: mockParserProcess,
@@ -65,6 +66,8 @@ describe('spawnClaude', () => {
       logger: createMockLogger(),
       formatterState: createMockFormatterState(),
       parallelThresholdMs: 100,
+      model: null,
+      effort: null,
     };
   });
 

@@ -3,13 +3,13 @@
     // Language & Environment
     "target": "ES2022",
     "lib": ["ES2023"],
-    "types": ["node"],
+    "types": ["node", "vitest/globals"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
 
     // Output
-    "outDir": "./dist",
-    "rootDir": "./src",
+    "noEmit": true,
+    "rootDir": ".",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
@@ -37,6 +37,6 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "tests/**/*", "vitest.config.ts"],
   "exclude": ["node_modules", "dist"]
 }

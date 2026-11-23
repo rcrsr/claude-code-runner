@@ -1,4 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type MockInstance,
+  type Mock,
+  vi,
+} from 'vitest';
 
 import {
   bindFormatterState,
@@ -17,7 +26,7 @@ import {
 } from '../../src/output/colors.js';
 import type { FormatterState } from '../../src/output/formatter.js';
 import { STATUS_LINE_MIN_WIDTH } from '../../src/utils/constants.js';
-import { callArg } from '../helpers/mocks.js';
+import { callArg, createMockFormatterState } from '../helpers/mocks.js';
 
 describe('stripAnsi', () => {
   it('removes ANSI color codes', () => {
@@ -122,7 +131,7 @@ describe('timestampPrefix', () => {
 });
 
 describe('printRunner', () => {
-  let consoleSpy: ReturnType<typeof vi.spyOn<typeof console, 'log'>>;
+  let consoleSpy: MockInstance<typeof console.log>;
 
   beforeEach(() => {
     consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
@@ -387,13 +396,12 @@ describe('clearStatusLine', () => {
 });
 
 describe('terminalLog', () => {
-  let consoleSpy: ReturnType<typeof vi.spyOn<typeof console, 'log'>>;
-  let stderrWriteSpy: ReturnType<typeof vi.fn>;
+  let consoleSpy: MockInstance<typeof console.log>;
+  let stderrWriteSpy: MockInstance<typeof process.stderr.write>;
 
   beforeEach(() => {
     consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    stderrWriteSpy = vi.fn().mockReturnValue(true) as ReturnType<typeof vi.fn>;
-    vi.spyOn(process.stderr, 'write').mockImplementation(stderrWriteSpy);
+    stderrWriteSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     // Make stderr appear as TTY for testing
     Object.defineProperty(process.stderr, 'isTTY', {
       value: true,
@@ -426,44 +434,9 @@ describe('terminalLog', () => {
 
   it('logs without re-rendering when state.currentStatusText is null', () => {
     const state: FormatterState = {
+      ...createMockFormatterState(),
       currentStatusText: null,
-      pendingTools: [],
-      lastToolTime: null,
-      activeTasks: new Map(),
-      toolToTaskId: new Map(),
-
-      currentTaskId: null,
-      toolStartTimes: new Map(),
-      currentStep: 1,
       suppressStepCompletion: false,
-      lastStepDurationMs: null,
-      stats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      runStats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      stepStartTime: null,
-      taskStatsMap: new Map(),
-      taskStartTimes: new Map(),
-      taskReadyQueue: [],
-      taskPendingQueue: [],
     };
 
     terminalLog('Test message', state);
@@ -475,44 +448,9 @@ describe('terminalLog', () => {
 
   it('re-renders status line when state.currentStatusText is non-null', () => {
     const state: FormatterState = {
+      ...createMockFormatterState(),
       currentStatusText: 'Current status text',
-      pendingTools: [],
-      lastToolTime: null,
-      activeTasks: new Map(),
-      toolToTaskId: new Map(),
-
-      currentTaskId: null,
-      toolStartTimes: new Map(),
-      currentStep: 1,
       suppressStepCompletion: false,
-      lastStepDurationMs: null,
-      stats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      runStats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      stepStartTime: null,
-      taskStatsMap: new Map(),
-      taskStartTimes: new Map(),
-      taskReadyQueue: [],
-      taskPendingQueue: [],
     };
 
     terminalLog('Test message', state);
@@ -534,44 +472,9 @@ describe('terminalLog', () => {
 
   it('clears status line before log and re-renders after', () => {
     const state: FormatterState = {
+      ...createMockFormatterState(),
       currentStatusText: 'Active status',
-      pendingTools: [],
-      lastToolTime: null,
-      activeTasks: new Map(),
-      toolToTaskId: new Map(),
-
-      currentTaskId: null,
-      toolStartTimes: new Map(),
-      currentStep: 1,
       suppressStepCompletion: false,
-      lastStepDurationMs: null,
-      stats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      runStats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      stepStartTime: null,
-      taskStatsMap: new Map(),
-      taskStartTimes: new Map(),
-      taskReadyQueue: [],
-      taskPendingQueue: [],
     };
 
     terminalLog('Log line', state);
@@ -579,7 +482,7 @@ describe('terminalLog', () => {
     // stderr writes happen in order: clear (before log), render (after log)
     // clear = \x1b[2K\r (1 write)
     // render = \x1b[2K\r + dim-text\r (2 writes)
-    const calls = stderrWriteSpy.mock.calls.map((call: [string]) => call[0]);
+    const calls = stderrWriteSpy.mock.calls.map((call) => callArg(call));
 
     // First: clearStatusLine (1 write)
     expect(calls[0]).toBe('\x1b[2K\r');
@@ -595,13 +498,12 @@ describe('terminalLog', () => {
 });
 
 describe('bindFormatterState / unbindFormatterState', () => {
-  let consoleSpy: ReturnType<typeof vi.spyOn<typeof console, 'log'>>;
-  let stderrWriteSpy: ReturnType<typeof vi.fn>;
+  let consoleSpy: MockInstance<typeof console.log>;
+  let stderrWriteSpy: MockInstance<typeof process.stderr.write>;
 
   beforeEach(() => {
     consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    stderrWriteSpy = vi.fn().mockReturnValue(true) as ReturnType<typeof vi.fn>;
-    vi.spyOn(process.stderr, 'write').mockImplementation(stderrWriteSpy);
+    stderrWriteSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     Object.defineProperty(process.stderr, 'isTTY', {
       value: true,
       configurable: true,
@@ -620,94 +522,24 @@ describe('bindFormatterState / unbindFormatterState', () => {
 
   it('bound state causes terminalLog to re-render without explicit state param', () => {
     const state: FormatterState = {
+      ...createMockFormatterState(),
       currentStatusText: 'Bound status',
-      pendingTools: [],
-      lastToolTime: null,
-      activeTasks: new Map(),
-      toolToTaskId: new Map(),
-
-      currentTaskId: null,
-      toolStartTimes: new Map(),
-      currentStep: 1,
       suppressStepCompletion: false,
-      lastStepDurationMs: null,
-      stats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      runStats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      stepStartTime: null,
-      taskStatsMap: new Map(),
-      taskStartTimes: new Map(),
-      taskReadyQueue: [],
-      taskPendingQueue: [],
     };
 
     bindFormatterState(state);
     terminalLog('Test line');
 
     expect(consoleSpy).toHaveBeenCalledWith('Test line');
-    const allWrites = stderrWriteSpy.mock.calls.map((call: [string]) => call[0]).join('');
+    const allWrites = stderrWriteSpy.mock.calls.map((call) => callArg(call)).join('');
     expect(allWrites).toContain('Bound status');
   });
 
   it('unbind stops re-rendering on subsequent terminalLog calls', () => {
     const state: FormatterState = {
+      ...createMockFormatterState(),
       currentStatusText: 'Will unbind',
-      pendingTools: [],
-      lastToolTime: null,
-      activeTasks: new Map(),
-      toolToTaskId: new Map(),
-
-      currentTaskId: null,
-      toolStartTimes: new Map(),
-      currentStep: 1,
       suppressStepCompletion: false,
-      lastStepDurationMs: null,
-      stats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      runStats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      stepStartTime: null,
-      taskStatsMap: new Map(),
-      taskStartTimes: new Map(),
-      taskReadyQueue: [],
-      taskPendingQueue: [],
     };
 
     bindFormatterState(state);
@@ -722,44 +554,9 @@ describe('bindFormatterState / unbindFormatterState', () => {
 
   it('explicit state param takes precedence over bound state', () => {
     const boundState: FormatterState = {
+      ...createMockFormatterState(),
       currentStatusText: 'Bound text',
-      pendingTools: [],
-      lastToolTime: null,
-      activeTasks: new Map(),
-      toolToTaskId: new Map(),
-
-      currentTaskId: null,
-      toolStartTimes: new Map(),
-      currentStep: 1,
       suppressStepCompletion: false,
-      lastStepDurationMs: null,
-      stats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      runStats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      stepStartTime: null,
-      taskStatsMap: new Map(),
-      taskStartTimes: new Map(),
-      taskReadyQueue: [],
-      taskPendingQueue: [],
     };
 
     const explicitState: FormatterState = {
@@ -770,51 +567,16 @@ describe('bindFormatterState / unbindFormatterState', () => {
     bindFormatterState(boundState);
     terminalLog('Test', explicitState);
 
-    const allWrites = stderrWriteSpy.mock.calls.map((call: [string]) => call[0]).join('');
+    const allWrites = stderrWriteSpy.mock.calls.map((call) => callArg(call)).join('');
     expect(allWrites).toContain('Explicit text');
     expect(allWrites).not.toContain('Bound text');
   });
 
   it('no-op when bound state has null currentStatusText', () => {
     const state: FormatterState = {
+      ...createMockFormatterState(),
       currentStatusText: null,
-      pendingTools: [],
-      lastToolTime: null,
-      activeTasks: new Map(),
-      toolToTaskId: new Map(),
-
-      currentTaskId: null,
-      toolStartTimes: new Map(),
-      currentStep: 1,
       suppressStepCompletion: false,
-      lastStepDurationMs: null,
-      stats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      runStats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      stepStartTime: null,
-      taskStatsMap: new Map(),
-      taskStartTimes: new Map(),
-      taskReadyQueue: [],
-      taskPendingQueue: [],
     };
 
     bindFormatterState(state);

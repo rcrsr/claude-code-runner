@@ -7,16 +7,13 @@ import * as path from 'path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { FormatterState } from '../../src/output/formatter.js';
-import { createRunStats } from '../../src/output/stats.js';
 import {
   isRillScript,
   loadRillScript,
   type RillRunnerOptions,
   runRillScript,
 } from '../../src/rill/runner.js';
-import type { RunnerConfig } from '../../src/types/runner.js';
-import { createMockLogger } from '../helpers/mocks.js';
+import { createMockConfig, createMockFormatterState, createMockLogger } from '../helpers/mocks.js';
 
 // Mock the PTY module
 vi.mock('../../src/process/pty.js', () => ({
@@ -62,41 +59,6 @@ import * as rill from '@rcrsr/rill';
 
 import { spawnClaude } from '../../src/process/pty.js';
 
-function createMockFormatterState(): FormatterState {
-  return {
-    pendingTools: [],
-    lastToolTime: null,
-    activeTasks: new Map(),
-    toolToTaskId: new Map(),
-    currentTaskId: null,
-    toolStartTimes: new Map(),
-    currentStep: 1,
-    suppressStepCompletion: true,
-    lastStepDurationMs: null,
-    stats: createRunStats(),
-    runStats: createRunStats(),
-    stepStartTime: null,
-    taskStatsMap: new Map(),
-    taskStartTimes: new Map(),
-    taskReadyQueue: [],
-    taskPendingQueue: [],
-    currentStatusText: null,
-  };
-}
-
-function createMockConfig(overrides?: Partial<RunnerConfig>): RunnerConfig {
-  return {
-    verbosity: 'quiet',
-    enableLog: false,
-    logDir: 'logs',
-    maxIterations: 10,
-    parallelThresholdMs: 100,
-    iterationPauseMs: 0,
-    model: null,
-    ...overrides,
-  };
-}
-
 function createRunnerOptions(
   scriptFile: string,
   overrides?: Partial<RillRunnerOptions>
@@ -104,7 +66,7 @@ function createRunnerOptions(
   return {
     scriptFile,
     args: [],
-    config: createMockConfig(),
+    config: createMockConfig({ verbosity: 'quiet' }),
     logger: createMockLogger(),
     formatterState: createMockFormatterState(),
     cwd: process.cwd(),

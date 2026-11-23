@@ -35,7 +35,7 @@ async function runRill(
     commandsDir?: string;
     defaultModel?: string;
   } = {}
-): Promise<{ result: unknown }> {
+): ReturnType<typeof execute> {
   const ctx = createRunnerContext({
     executeClause: executor,
     ...options,
@@ -48,7 +48,7 @@ describe('createRunnerContext', () => {
   describe('default onLog callback', () => {
     it('strips trailing newlines from logged values', async () => {
       const executor = createMockExecutor();
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation();
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
       const ctx = createRunnerContext({
         executeClause: executor,
@@ -68,7 +68,7 @@ describe('createRunnerContext', () => {
 
     it('replaces internal newlines with spaces', async () => {
       const executor = createMockExecutor();
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation();
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
       const ctx = createRunnerContext({
         executeClause: executor,
@@ -84,7 +84,7 @@ describe('createRunnerContext', () => {
 
     it('strips carriage returns and newlines', async () => {
       const executor = createMockExecutor();
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation();
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
       const ctx = createRunnerContext({
         executeClause: executor,
@@ -660,7 +660,7 @@ describe('ccr::state', () => {
   it('status persists across multiple log messages (AC-10)', async () => {
     const executor = createMockExecutor();
     const onStateChange = vi.fn();
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation();
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
     const ctx = createRunnerContext({
       executeClause: executor,

@@ -14,7 +14,7 @@ interface QueuedMessage {
  * Serial message queue for deaddrop communication
  * Ensures messages are sent one at a time in order
  */
-export class DeadDropQueue {
+class DeadDropQueue {
   private sender: DeadDropSender | null = null;
   private messageQueue: QueuedMessage[] = [];
   private isProcessing = false;

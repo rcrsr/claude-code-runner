@@ -22,7 +22,7 @@ function makeState(pid: number): PersistedRunState {
     elapsedMs: 0,
     runStats: {
       messageCount: 5,
-      tokens: { input: 100, output: 200, cacheRead: 0, cacheWrite: 0 },
+      tokens: { prompt: 100, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 0, output: 200 },
       toolsUsed: ['Bash', 'Read'],
       toolUseCount: 3,
       outputChars: 512,
@@ -80,10 +80,11 @@ describe('saveRunState + loadRunState', () => {
     expect(loaded?.currentStep).toBe(2);
     expect(loaded?.runStats.messageCount).toBe(5);
     expect(loaded?.runStats.tokens).toEqual({
-      input: 100,
-      output: 200,
+      prompt: 100,
+      cacheWrite5m: 0,
+      cacheWrite1h: 0,
       cacheRead: 0,
-      cacheWrite: 0,
+      output: 200,
     });
     expect(loaded?.runStats.toolsUsed).toEqual(['Bash', 'Read']);
     expect(loaded?.runStats.toolUseCount).toBe(3);

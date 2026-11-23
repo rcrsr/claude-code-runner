@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 
 import {
   createFormatterState,
@@ -104,7 +104,7 @@ describe('resetFormatterState', () => {
 });
 
 describe('flushPendingTools', () => {
-  let consoleSpy: ReturnType<typeof vi.spyOn<typeof console, 'log'>>;
+  let consoleSpy: MockInstance<typeof console.log>;
 
   beforeEach(() => {
     consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
@@ -230,7 +230,7 @@ describe('flushPendingTools', () => {
 });
 
 describe('formatMessage', () => {
-  let consoleSpy: ReturnType<typeof vi.spyOn<typeof console, 'log'>>;
+  let consoleSpy: MockInstance<typeof console.log>;
   let mockTime: number;
 
   beforeEach(() => {

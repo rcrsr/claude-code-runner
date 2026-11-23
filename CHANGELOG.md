@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed unused dev dependencies `react` and `tsc-files`.
 - Enabled oxlint `typescript/no-unsafe-type-assertion` and removed all 74 unchecked type assertions (33 in `src`, 41 in tests). Host-function arguments now go through checked readers (`src/rill/host-args.ts`). Stream-json lines go through `isClaudeMessage`, and `package.json` is read by `getPackageVersion`. `renderStatusLine` and `clearStatusLine` take a narrow `StatusStream` type, and tests read spy arguments through a checked `callArg` helper.
 
+- `npm run check:types` now typechecks `tests/` too. Fixed the 42 test type errors this exposed, mostly fixtures written for older `RunnerConfig`, `RunStats`, and `FormatterState` shapes; they now use the shared mock factories. `npm run build` moves to `tsconfig.build.json`, which still emits `src/` only.
+- Promoted every oxlint and knip `warn` rule to `error`, and removed the unused exports this surfaced: 3 test helpers, plus the `export` on `DeadDropQueue`. `RillArgDef` is now exported from `src/rill/index.ts` next to `RillScriptMeta`, which uses it.
+
 ### Fixed
 
 - The stream parser now skips JSON lines that are not message objects (for example a bare number), where before it passed them on as messages.

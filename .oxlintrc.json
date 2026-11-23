@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["unicorn", "typescript", "oxc", "import"],
-  "categories": { "correctness": "error", "suspicious": "warn" },
+  "categories": { "correctness": "error", "suspicious": "error" },
   "options": { "typeAware": true, "reportUnusedDisableDirectives": "error" },
   "rules": {
     "max-lines": ["error", { "max": 1000, "skipBlankLines": true, "skipComments": true }],
@@ -16,8 +16,8 @@
     ],
     "typescript/prefer-nullish-coalescing": "error",
     "typescript/prefer-optional-chain": "error",
-    "typescript/no-explicit-any": "warn",
-    "typescript/no-non-null-assertion": "warn"
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "error"
   },
   "ignorePatterns": ["**/dist/**", "**/coverage/**"]
 }
