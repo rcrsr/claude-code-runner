@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`ccr::get_result` entities:** Decodes `&amp;`, `&lt;`, `&gt;`, `&quot;` and `&apos;` in attribute values, so a timeout tag's `name` round-trips. The timeout console line now prints the exact `minutes` value. ([#15](https://github.com/rcrsr/claude-code-runner/pull/15))
 - The stream parser now skips JSON lines that are not message objects (for example a bare number), where before it passed them on as messages. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
 - Crash recovery now ignores a run-state file that does not match the full schema (missing `runStats`, old token fields), where before it crashed on startup until the file was deleted. CI tests on Node 26 instead of 25, which vitest 5 does not support. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
 

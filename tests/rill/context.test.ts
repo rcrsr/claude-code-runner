@@ -327,6 +327,18 @@ describe('ccr::get_result', () => {
     });
   });
 
+  it('decodes XML entities in attribute values', async () => {
+    const executor = createMockExecutor();
+    const code =
+      'ccr::get_result("<ccr:result type=\\"done\\" name=\\"a&amp;b &lt;c&gt; &quot;d&quot; &apos;e&apos;\\"/>")';
+    const result = await runRill(code, executor);
+
+    expect(result.result).toEqual({
+      type: 'done',
+      name: 'a&b <c> "d" \'e\'',
+    });
+  });
+
   it('parses content tag with a URL in an attribute value', async () => {
     const executor = createMockExecutor();
     const code =

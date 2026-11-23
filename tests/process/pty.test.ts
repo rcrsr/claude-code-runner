@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ClaudeProcessOptions } from '../../src/process/pty.js';
 import { spawnClaude } from '../../src/process/pty.js';
 import type { ClaudeMessage } from '../../src/types/claude.js';
-import { DEFAULT_INACTIVITY_TIMEOUT_MS } from '../../src/utils/constants.js';
+import { DEFAULT_INACTIVITY_TIMEOUT_MS, MS_PER_MINUTE } from '../../src/utils/constants.js';
 import { createMockFormatterState, createMockLogger } from '../helpers/mocks.js';
 
 // Mock @lydell/node-pty
@@ -400,7 +400,7 @@ describe('spawnClaude', () => {
     });
 
     it('honors a per-call timeout longer than the default', async () => {
-      const customTimeoutMs = 30 * 60_000;
+      const customTimeoutMs = 30 * MS_PER_MINUTE;
       const promise = spawnClaude({ ...options, inactivityTimeoutMs: customTimeoutMs });
 
       // Silence for the default duration must not trigger the watchdog

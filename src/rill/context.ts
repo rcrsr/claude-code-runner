@@ -23,6 +23,7 @@ import {
 import {
   CCR_RESULT_SELF_CLOSING_PATTERN,
   CCR_RESULT_WITH_CONTENT_PATTERN,
+  MS_PER_MINUTE,
 } from '../utils/constants.js';
 import { definedEnv } from '../utils/env.js';
 import { formatRillValue } from '../utils/formatting.js';
@@ -91,6 +92,16 @@ export interface RunnerContextOptions {
  * Find the last ccr:result tag in the text, preferring the match that appears
  * latest in the input regardless of whether it is self-closing or has content.
  */
+/** Decode the five XML entities the runner writes into attribute values */
+function unescapeXml(s: string): string {
+  return s
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&');
+}
+
 function findLastResultMatch(text: string): { attrs: string; content?: string } | undefined {
   const withContentGlobal = new RegExp(CCR_RESULT_WITH_CONTENT_PATTERN.source, 'g');
   const selfClosingGlobal = new RegExp(CCR_RESULT_SELF_CLOSING_PATTERN.source, 'g');
@@ -192,7 +203,7 @@ export function createRunnerContext(options: RunnerContextOptions): RuntimeConte
         const result = await executeClause(text, model, {
           method: 'ccr::prompt',
           model: model ?? undefined,
-          ...(timeoutMin > 0 && { timeoutMs: timeoutMin * 60_000 }),
+          ...(timeoutMin > 0 && { timeoutMs: timeoutMin * MS_PER_MINUTE }),
         });
         return result.output;
       },
@@ -243,7 +254,7 @@ export function createRunnerContext(options: RunnerContextOptions): RuntimeConte
           method: 'ccr::command',
           name,
           model: model ?? undefined,
-          ...(timeoutMin > 0 && { timeoutMs: timeoutMin * 60_000 }),
+          ...(timeoutMin > 0 && { timeoutMs: timeoutMin * MS_PER_MINUTE }),
         });
         ctx.pipeValue = result.output;
         return result.output;
@@ -292,7 +303,7 @@ export function createRunnerContext(options: RunnerContextOptions): RuntimeConte
           method: 'ccr::skill',
           name,
           model: defaultModel ?? undefined,
-          ...(timeoutMin > 0 && { timeoutMs: timeoutMin * 60_000 }),
+          ...(timeoutMin > 0 && { timeoutMs: timeoutMin * MS_PER_MINUTE }),
         });
         ctx.pipeValue = result.output;
         return result.output;
@@ -387,7 +398,7 @@ export function createRunnerContext(options: RunnerContextOptions): RuntimeConte
           const key = attrMatch[1];
           const value = attrMatch[2];
           if (key && value !== undefined) {
-            result[key] = value;
+            result[key] = unescapeXml(value);
           }
         }
 

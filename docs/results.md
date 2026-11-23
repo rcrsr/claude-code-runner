@@ -77,12 +77,12 @@ When the inactivity watchdog kills a session, the runner discards any partial ou
 |-----------|-------------|
 | `type` | Always `timeout` |
 | `source` | Always `ccr`; marks the tag as written by the runner |
-| `minutes` | Inactivity timeout actually used (the per-call `timeout` or the 10-minute default) |
+| `minutes` | Inactivity timeout actually used (the per-call `timeout` or the 10-minute default); fractional when the timeout is not whole minutes |
 | `method` | Host function that was running (`ccr::prompt`, `ccr::command` or `ccr::skill`) |
 | `name` | Command or skill name; set for `ccr::command` and `ccr::skill` only |
 | `model` | Model the call used; present only when a model was set |
 
-`source="ccr"` is reserved for the runner. Skills must not print it. Branch on it to tell a runner timeout from a result Claude emitted:
+`source="ccr"` is reserved for the runner by convention. Skills must not print it. The runner does not authenticate the tag: `ccr::get_result` returns the last tag in the output, so Claude output that ends with a copy of this tag (for example, echoed file content) reads the same. Branch on it to tell a runner timeout from a result Claude emitted, but do not rely on it as a security boundary:
 
 ```rill
 ccr::skill("long-task") => $output
