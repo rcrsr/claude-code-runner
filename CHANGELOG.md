@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- The timeout result tag the runner generates when it kills a step now carries `source="ccr"` (reserved for the runner) and `minutes` (the inactivity timeout actually used), so scripts can tell a timeout kill from skill output: `<ccr:result type="timeout" source="ccr" minutes="..." .../>`. ([#13](https://github.com/rcrsr/claude-code-runner/issues/13))
+- **Timeout result tag:** Carries `source="ccr"` and `minutes` so scripts can tell a runner timeout kill from skill output. ([#15](https://github.com/rcrsr/claude-code-runner/pull/15))
 
 ### Security
 
@@ -27,8 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enabled oxlint `typescript/no-unsafe-type-assertion` and removed all 74 unchecked type assertions (33 in `src`, 41 in tests). Host-function arguments now go through checked readers (`src/rill/host-args.ts`). Stream-json lines go through `isClaudeMessage`, and `package.json` is read by `getPackageVersion`. `renderStatusLine` and `clearStatusLine` take a narrow `StatusStream` type, and tests read spy arguments through a checked `callArg` helper. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
 - `npm run check:types` now typechecks `tests/` too. Fixed the 42 test type errors this exposed, mostly fixtures written for older `RunnerConfig`, `RunStats`, and `FormatterState` shapes; they now use the shared mock factories. `npm run build` moves to `tsconfig.build.json`, which still emits `src/` only. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
 - Promoted every oxlint and knip `warn` rule to `error`, and removed the unused exports this surfaced: 3 test helpers, plus the `export` on `DeadDropQueue`. `RillArgDef` is now exported from `src/rill/index.ts` next to `RillScriptMeta`, which uses it. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
-- Added tests that a per-call timeout reaches the inactivity watchdog (a 30-minute timeout survives 10 minutes of silence) and that the runner forwards it. ([#13](https://github.com/rcrsr/claude-code-runner/issues/13))
-- Documented the reserved timeout result in `docs/results.md`. Documented in `docs/rill-scripting.md` that a skill must not end a turn waiting on a background task, Workflow, or notification, because the inactivity watchdog counts that wait as silence. ([#13](https://github.com/rcrsr/claude-code-runner/issues/13))
+- **Timeout docs:** Documented the reserved timeout result, and that skills must not end a turn waiting on background work. ([#15](https://github.com/rcrsr/claude-code-runner/pull/15))
 
 ### Fixed
 
