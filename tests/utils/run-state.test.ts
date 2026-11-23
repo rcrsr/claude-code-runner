@@ -7,6 +7,7 @@ import {
   clearRunState,
   generateStableId,
   getStateFilePath,
+  isPersistedRunState,
   loadRunState,
   saveRunState,
 } from '../../src/utils/run-state.js';
@@ -151,5 +152,50 @@ describe('clearRunState', () => {
     expect(() => {
       clearRunState(stableId);
     }).not.toThrow();
+  });
+});
+
+describe('isPersistedRunState', () => {
+  it('accepts a complete state', () => {
+    expect(isPersistedRunState(makeState(DEAD_PID))).toBe(true);
+  });
+
+  it('rejects a state without runStats', () => {
+    const { runStats: _runStats, ...partial } = makeState(DEAD_PID);
+    expect(isPersistedRunState(partial)).toBe(false);
+  });
+
+  it('rejects old-format token counts', () => {
+    const state = makeState(DEAD_PID);
+    const old = { ...state, runStats: { ...state.runStats, tokens: { input: 1, output: 2 } } };
+    expect(isPersistedRunState(old)).toBe(false);
+  });
+
+  it('rejects non-string toolsUsed entries', () => {
+    const state = makeState(DEAD_PID);
+    const bad = { ...state, runStats: { ...state.runStats, toolsUsed: [1] } };
+    expect(isPersistedRunState(bad)).toBe(false);
+  });
+
+  it('rejects a missing startedAt', () => {
+    const { startedAt: _startedAt, ...partial } = makeState(DEAD_PID);
+    expect(isPersistedRunState(partial)).toBe(false);
+  });
+});
+
+describe('loadRunState with a partial file', () => {
+  const stableId = generateStableId('/tmp/ccr-test-partial', ['partial']);
+
+  afterEach(() => {
+    clearRunState(stableId);
+  });
+
+  it('returns null when runStats is missing', () => {
+    fs.writeFileSync(
+      getStateFilePath(stableId),
+      JSON.stringify({ version: 1, pid: DEAD_PID, elapsedMs: 0 })
+    );
+
+    expect(loadRunState(stableId)).toBeNull();
   });
 });

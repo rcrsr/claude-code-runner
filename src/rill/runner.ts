@@ -130,7 +130,9 @@ function parseArgsDefinition(argsStr: string): RillArgDef[] {
     }
 
     const [, name, type, defaultStr] = match;
-    if (!name || !type || !isRillArgType(type)) continue;
+    if (!name || !type || !isRillArgType(type)) {
+      throw new Error(`Invalid arg definition: ${part}`);
+    }
 
     const def: RillArgDef = {
       name,

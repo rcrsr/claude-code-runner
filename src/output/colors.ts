@@ -216,6 +216,13 @@ export function timestampPrefix(): string {
  */
 const ANSI_CLEAR_LINE_CR = '\x1b[2K\r';
 
+/** The parts of a TTY stream the status line uses; process.stderr satisfies it */
+export interface StatusStream {
+  isTTY?: boolean | undefined;
+  columns?: number | undefined;
+  write(chunk: string): unknown;
+}
+
 /**
  * Render a status line on the current cursor line.
  * Uses \r to park cursor at column 0 so the next console.log overwrites it.
@@ -224,13 +231,6 @@ const ANSI_CLEAR_LINE_CR = '\x1b[2K\r';
  * @param text - Status text to display, or null to clear
  * @param stream - Output stream (expected: process.stderr)
  */
-/** The parts of a TTY stream the status line uses; process.stderr satisfies it */
-export interface StatusStream {
-  isTTY?: boolean | undefined;
-  columns?: number | undefined;
-  write(chunk: string): unknown;
-}
-
 export function renderStatusLine(text: string | null, stream: StatusStream): void {
   // No-op when not a TTY
   if (!stream.isTTY) {

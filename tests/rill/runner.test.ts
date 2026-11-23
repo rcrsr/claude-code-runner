@@ -261,7 +261,7 @@ ccr::prompt("test")`
 
     await runRillScript(
       createRunnerOptions(scriptPath, {
-        config: createMockConfig({ model: 'haiku' }),
+        config: createMockConfig({ verbosity: 'quiet', model: 'haiku' }),
       })
     );
 

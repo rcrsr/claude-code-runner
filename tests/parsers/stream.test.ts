@@ -3,6 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { createStreamParser } from '../../src/parsers/stream.js';
 
 describe('createStreamParser', () => {
+  it.each(['42', '"str"', 'null', '[]', '{}', '{"type":1}'])(
+    'skips JSON line %s that is not a message object',
+    (line) => {
+      const parser = createStreamParser();
+      expect(parser.process(`${line}\n`)).toHaveLength(0);
+    }
+  );
+
   it('parses complete JSON lines', () => {
     const parser = createStreamParser();
     const messages = parser.process('{"type":"system","subtype":"init"}\n');
