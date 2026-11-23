@@ -4,18 +4,16 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { FormatterState } from '../../src/output/formatter.js';
-import { createRunStats } from '../../src/output/stats.js';
 import {
   isRillScript,
   loadRillScript,
   type RillRunnerOptions,
   runRillScript,
 } from '../../src/rill/runner.js';
-import type { RunnerConfig } from '../../src/types/runner.js';
-import { createMockLogger } from '../helpers/mocks.js';
+import { createMockConfig, createMockFormatterState, createMockLogger } from '../helpers/mocks.js';
 
 // Mock the PTY module
 vi.mock('../../src/process/pty.js', () => ({
@@ -61,37 +59,18 @@ import * as rill from '@rcrsr/rill';
 
 import { spawnClaude } from '../../src/process/pty.js';
 
-function createMockFormatterState(): FormatterState {
+function createRunnerOptions(
+  scriptFile: string,
+  overrides?: Partial<RillRunnerOptions>
+): RillRunnerOptions {
   return {
-    pendingTools: [],
-    lastToolTime: null,
-    activeTasks: new Map(),
-    toolToTaskId: new Map(),
-    currentTaskId: null,
-    toolStartTimes: new Map(),
-    currentStep: 1,
-    suppressStepCompletion: true,
-    lastStepDurationMs: null,
-    stats: createRunStats(),
-    runStats: createRunStats(),
-    stepStartTime: null,
-    taskStatsMap: new Map(),
-    taskStartTimes: new Map(),
-    taskReadyQueue: [],
-    taskPendingQueue: [],
-    currentStatusText: null,
-  };
-}
-
-function createMockConfig(overrides?: Partial<RunnerConfig>): RunnerConfig {
-  return {
-    verbosity: 'quiet',
-    enableLog: false,
-    logDir: 'logs',
-    maxIterations: 10,
-    parallelThresholdMs: 100,
-    iterationPauseMs: 0,
-    model: null,
+    scriptFile,
+    args: [],
+    config: createMockConfig({ verbosity: 'quiet' }),
+    logger: createMockLogger(),
+    formatterState: createMockFormatterState(),
+    cwd: process.cwd(),
+    runId: 'test-run-1',
     ...overrides,
   };
 }
@@ -121,9 +100,7 @@ describe('loadRillScript', () => {
   });
 
   it('throws error when script file not found', () => {
-    expect(() => loadRillScript('/non/existent/file.rill')).toThrow(
-      'Script not found'
-    );
+    expect(() => loadRillScript('/non/existent/file.rill')).toThrow('Script not found');
   });
 
   it('loads script without frontmatter', () => {
@@ -230,22 +207,6 @@ describe('runRillScript', () => {
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 
-  function createRunnerOptions(
-    scriptFile: string,
-    overrides?: Partial<RillRunnerOptions>
-  ): RillRunnerOptions {
-    return {
-      scriptFile,
-      args: [],
-      config: createMockConfig(),
-      logger: createMockLogger(),
-      formatterState: createMockFormatterState(),
-      cwd: process.cwd(),
-      runId: 'test-run-1',
-      ...overrides,
-    };
-  }
-
   it('executes simple script successfully', async () => {
     const scriptPath = path.join(testDir, 'simple.rill');
     fs.writeFileSync(scriptPath, 'log("hello")');
@@ -300,7 +261,7 @@ ccr::prompt("test")`
 
     await runRillScript(
       createRunnerOptions(scriptPath, {
-        config: createMockConfig({ model: 'haiku' }),
+        config: createMockConfig({ verbosity: 'quiet', model: 'haiku' }),
       })
     );
 
@@ -404,9 +365,9 @@ args: file: string
 ccr::prompt($file)`
     );
 
-    await expect(
-      runRillScript(createRunnerOptions(scriptPath))
-    ).rejects.toThrow('Missing required argument: file');
+    await expect(runRillScript(createRunnerOptions(scriptPath))).rejects.toThrow(
+      'Missing required argument: file'
+    );
   });
 
   it('includes script filename in error when createRunnerContext throws', async () => {
@@ -418,14 +379,12 @@ ccr::prompt($file)`
       await import('../../src/rill/context.js'),
       'createRunnerContext'
     ).mockImplementationOnce(() => {
-      throw new Error(
-        "Invalid defaultValue for parameter 'model': expected any, got string"
-      );
+      throw new Error("Invalid defaultValue for parameter 'model': expected any, got string");
     });
 
-    await expect(
-      runRillScript(createRunnerOptions(scriptPath))
-    ).rejects.toThrow(`Script setup failed for ${scriptPath}:`);
+    await expect(runRillScript(createRunnerOptions(scriptPath))).rejects.toThrow(
+      `Script setup failed for ${scriptPath}:`
+    );
 
     vi.restoreAllMocks();
   });
@@ -482,12 +441,10 @@ this is not valid {{ syntax`
     fs.writeFileSync(scriptPath, 'log("hello")');
     const logger = createMockLogger();
 
-    const result = await runRillScript(
-      createRunnerOptions(scriptPath, { logger })
-    );
+    const result = await runRillScript(createRunnerOptions(scriptPath, { logger }));
 
     expect(result.success).toBe(false);
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+    // oxlint-disable-next-line typescript/unbound-method
     const logEventCalls = vi.mocked(logger.logEvent).mock.calls;
     expect(logEventCalls).toContainEqual([
       expect.objectContaining({ event: 'rill_script_cancelled' }),
@@ -504,7 +461,7 @@ this is not valid {{ syntax`
     const logger = createMockLogger();
     await runRillScript(createRunnerOptions(scriptPath, { logger }));
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+    // oxlint-disable-next-line typescript/unbound-method
     const logEventCalls = vi.mocked(logger.logEvent).mock.calls;
     expect(logEventCalls).toContainEqual([
       expect.objectContaining({
@@ -533,22 +490,6 @@ describe('status line clearing', () => {
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 
-  function createRunnerOptions(
-    scriptFile: string,
-    overrides?: Partial<RillRunnerOptions>
-  ): RillRunnerOptions {
-    return {
-      scriptFile,
-      args: [],
-      config: createMockConfig(),
-      logger: createMockLogger(),
-      formatterState: createMockFormatterState(),
-      cwd: process.cwd(),
-      runId: 'test-run-1',
-      ...overrides,
-    };
-  }
-
   it('clears status line on script completion (AC-4)', async () => {
     const scriptPath = path.join(testDir, 'status-complete.rill');
     fs.writeFileSync(
@@ -564,9 +505,7 @@ log("Work done")
 
     const formatterState = createMockFormatterState();
     const config = createMockConfig({ verbosity: 'normal' });
-    await runRillScript(
-      createRunnerOptions(scriptPath, { formatterState, config })
-    );
+    await runRillScript(createRunnerOptions(scriptPath, { formatterState, config }));
 
     // Verify clearStatusLine was called after script completion (AC-4)
     expect(clearStatusLine).toHaveBeenCalled();
@@ -587,14 +526,11 @@ error "Something went wrong"
 `
     );
 
-    const { clearStatusLine, printRunner } =
-      await import('../../src/output/colors.js');
+    const { clearStatusLine, printRunner } = await import('../../src/output/colors.js');
 
     const formatterState = createMockFormatterState();
     const config = createMockConfig({ verbosity: 'normal' });
-    const result = await runRillScript(
-      createRunnerOptions(scriptPath, { formatterState, config })
-    );
+    const result = await runRillScript(createRunnerOptions(scriptPath, { formatterState, config }));
 
     expect(result.success).toBe(false);
 
@@ -625,9 +561,7 @@ this is {{ invalid syntax
 
     const formatterState = createMockFormatterState();
     const config = createMockConfig({ verbosity: 'normal' });
-    const result = await runRillScript(
-      createRunnerOptions(scriptPath, { formatterState, config })
-    );
+    const result = await runRillScript(createRunnerOptions(scriptPath, { formatterState, config }));
 
     expect(result.success).toBe(false);
     expect(clearStatusLine).toHaveBeenCalled();
@@ -647,9 +581,7 @@ $nonexistent_variable + 1
 
     const formatterState = createMockFormatterState();
     const config = createMockConfig({ verbosity: 'normal' });
-    const result = await runRillScript(
-      createRunnerOptions(scriptPath, { formatterState, config })
-    );
+    const result = await runRillScript(createRunnerOptions(scriptPath, { formatterState, config }));
 
     expect(result.success).toBe(false);
     expect(clearStatusLine).toHaveBeenCalled();
@@ -691,8 +623,7 @@ log("All done")
 `
     );
 
-    const { renderStatusLine, clearStatusLine } =
-      await import('../../src/output/colors.js');
+    const { renderStatusLine, clearStatusLine } = await import('../../src/output/colors.js');
 
     // Create a spy on stderr.write to verify no writes occur
     const stderrWriteSpy = vi.spyOn(process.stderr, 'write');
@@ -700,9 +631,7 @@ log("All done")
     const formatterState = createMockFormatterState();
     const config = createMockConfig({ verbosity: 'quiet' });
 
-    await runRillScript(
-      createRunnerOptions(scriptPath, { formatterState, config })
-    );
+    await runRillScript(createRunnerOptions(scriptPath, { formatterState, config }));
 
     // Verify no status rendering functions were called
     expect(renderStatusLine).not.toHaveBeenCalled();
@@ -747,9 +676,7 @@ log("All done")
     const formatterState = createMockFormatterState();
     const config = createMockConfig({ verbosity: 'normal' }); // Normal verbosity, but non-TTY
 
-    await runRillScript(
-      createRunnerOptions(scriptPath, { formatterState, config })
-    );
+    await runRillScript(createRunnerOptions(scriptPath, { formatterState, config }));
 
     // Verify renderStatusLine was called but produced no output (silent no-op)
     expect(renderStatusLine).toHaveBeenCalled();
@@ -789,9 +716,7 @@ log("Work in progress")
     const initialListenerCount = process.stderr.listenerCount('resize');
 
     // Execute the script
-    await runRillScript(
-      createRunnerOptions(scriptPath, { config, formatterState })
-    );
+    await runRillScript(createRunnerOptions(scriptPath, { config, formatterState }));
 
     // Verify resize listener was removed after completion
     const finalListenerCount = process.stderr.listenerCount('resize');
@@ -804,10 +729,9 @@ log("Work in progress")
   it('rapid sequential state updates display only latest value (AC-EC-3)', async () => {
     const scriptPath = path.join(testDir, 'status-rapid.rill');
     // Create a script that rapidly updates state 10 times
-    const stateUpdates = Array.from(
-      { length: 10 },
-      (_, i) => `ccr::state("State ${i}")`
-    ).join('\n');
+    const stateUpdates = Array.from({ length: 10 }, (_, i) => `ccr::state("State ${i}")`).join(
+      '\n'
+    );
     fs.writeFileSync(scriptPath, stateUpdates);
 
     const { renderStatusLine } = await import('../../src/output/colors.js');

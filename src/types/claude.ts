@@ -102,18 +102,21 @@ export type ClaudeMessage =
   | ResultMessage
   | GenericMessage;
 
+/** Narrow parsed stream-json to a message: any object with a string `type` */
+export function isClaudeMessage(value: unknown): value is ClaudeMessage {
+  return (
+    typeof value === 'object' && value !== null && 'type' in value && typeof value.type === 'string'
+  );
+}
+
 /**
  * Type guard functions
  */
-export function isSystemInitMessage(
-  msg: ClaudeMessage
-): msg is SystemInitMessage {
+export function isSystemInitMessage(msg: ClaudeMessage): msg is SystemInitMessage {
   return msg.type === 'system' && 'subtype' in msg && msg.subtype === 'init';
 }
 
-export function isAssistantMessage(
-  msg: ClaudeMessage
-): msg is AssistantMessage {
+export function isAssistantMessage(msg: ClaudeMessage): msg is AssistantMessage {
   return msg.type === 'assistant';
 }
 
@@ -129,9 +132,7 @@ export function isToolUseBlock(block: ContentBlock): block is ToolUseBlock {
   return block.type === 'tool_use';
 }
 
-export function isToolResultBlock(
-  block: ContentBlock
-): block is ToolResultBlock {
+export function isToolResultBlock(block: ContentBlock): block is ToolResultBlock {
   return block.type === 'tool_result';
 }
 

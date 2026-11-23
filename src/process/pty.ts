@@ -6,19 +6,11 @@ import type { IPty } from '@lydell/node-pty';
 import * as pty from '@lydell/node-pty';
 
 import type { FormatterState } from '../output/formatter.js';
-import {
-  flushPendingTools,
-  formatMessage,
-  resetFormatterState,
-} from '../output/formatter.js';
+import { flushPendingTools, formatMessage, resetFormatterState } from '../output/formatter.js';
 import type { Logger } from '../output/logger.js';
 import { createStreamParser } from '../parsers/stream.js';
 import type { RunResult, Verbosity } from '../types/runner.js';
-import {
-  DEFAULT_INACTIVITY_TIMEOUT_MS,
-  PTY_COLS,
-  PTY_ROWS,
-} from '../utils/constants.js';
+import { DEFAULT_INACTIVITY_TIMEOUT_MS, PTY_COLS, PTY_ROWS } from '../utils/constants.js';
 
 export interface ClaudeProcessOptions {
   prompt: string;
@@ -104,13 +96,7 @@ export function spawnClaude(options: ClaudeProcessOptions): Promise<RunResult> {
       const messages = parser.process(data);
 
       for (const msg of messages) {
-        const text = formatMessage(
-          msg,
-          formatterState,
-          verbosity,
-          logger,
-          parallelThresholdMs
-        );
+        const text = formatMessage(msg, formatterState, verbosity, logger, parallelThresholdMs);
         claudeText += text;
         logger.log(JSON.stringify(msg));
       }

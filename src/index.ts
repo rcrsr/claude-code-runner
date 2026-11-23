@@ -4,26 +4,14 @@
  * Shows intermediate tool calls and responses in real-time
  */
 
-import { VERSION as RILL_VERSION } from '@rcrsr/rill';
 import { randomBytes } from 'crypto';
-import { createRequire } from 'module';
+
+import { VERSION as RILL_VERSION } from '@rcrsr/rill';
 
 import { generateDocs, parseArgs } from './cli/index.js';
-
-const require = createRequire(import.meta.url);
-const pkg = require('../package.json') as { version: string };
 import { createDeadDropClientFromEnv } from './deaddrop/index.js';
-import {
-  configureDeadDrop,
-  flushDeadDrop,
-  printRunner,
-  printRunnerInfo,
-} from './output/colors.js';
-import {
-  createFormatterState,
-  finalizeStepStats,
-  getRunStatsSummary,
-} from './output/formatter.js';
+import { configureDeadDrop, flushDeadDrop, printRunner, printRunnerInfo } from './output/colors.js';
+import { createFormatterState, finalizeStepStats, getRunStatsSummary } from './output/formatter.js';
 import { createLogger } from './output/logger.js';
 import { cloneStats, mergeStats } from './output/stats.js';
 import { spawnClaude } from './process/pty.js';
@@ -37,6 +25,7 @@ import {
   type PersistedRunStats,
   saveRunState,
 } from './utils/run-state.js';
+import { getPackageVersion } from './utils/version.js';
 
 /**
  * Generate a short unique run ID (8 chars, uppercase)
@@ -71,20 +60,14 @@ async function main(): Promise<void> {
   if (config.deaddrop) {
     const client = createDeadDropClientFromEnv(runId);
     if (!client) {
-      console.error(
-        'Error: --deaddrop requires DEADDROP_API_KEY environment variable'
-      );
+      console.error('Error: --deaddrop requires DEADDROP_API_KEY environment variable');
       process.exit(1);
     }
     configureDeadDrop(client.send.bind(client));
   }
 
   // Create logger
-  const logger = createLogger(
-    config.enableLog,
-    config.logDir,
-    parsed.subcommand
-  );
+  const logger = createLogger(config.enableLog, config.logDir, parsed.subcommand);
 
   // Create formatter state
   const formatterState = createFormatterState();
@@ -136,15 +119,13 @@ async function main(): Promise<void> {
   };
 
   // Print version info
-  printRunnerInfo(`v${pkg.version} (rill v${RILL_VERSION})`);
+  printRunnerInfo(`v${getPackageVersion()} (rill v${RILL_VERSION})`);
 
   // Emit starting run message (operational, sent to deaddrop)
   printRunner(`Starting run ${runId}`);
 
   // Print config with [RUNNER] messages (informational, not sent to deaddrop)
-  printRunnerInfo(
-    `Mode: ${parsed.subcommand} | Verbosity: ${config.verbosity}`
-  );
+  printRunnerInfo(`Mode: ${parsed.subcommand} | Verbosity: ${config.verbosity}`);
   if (config.model) {
     printRunnerInfo(`Model: ${config.model}`);
   }
@@ -181,10 +162,7 @@ async function main(): Promise<void> {
 
   // Handle prompt, command, and skill subcommands (single execution)
   const promptText = parsed.prompt;
-  if (
-    (parsed.subcommand === 'command' || parsed.subcommand === 'skill') &&
-    !promptText
-  ) {
+  if ((parsed.subcommand === 'command' || parsed.subcommand === 'skill') && !promptText) {
     // This shouldn't happen - parseArgs should have handled it
     console.error('Error: no prompt text');
     process.exit(1);

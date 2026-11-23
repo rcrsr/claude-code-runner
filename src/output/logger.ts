@@ -27,11 +27,7 @@ export interface Logger {
 /**
  * Create a logger that writes to a timestamped log file
  */
-export function createLogger(
-  enabled: boolean,
-  logDir: string,
-  commandName: string
-): Logger {
+export function createLogger(enabled: boolean, logDir: string, commandName: string): Logger {
   if (!enabled) {
     return {
       log: () => undefined,

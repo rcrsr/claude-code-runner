@@ -12,6 +12,10 @@ import {
 import { createRunnerContext } from '../rill/context.js';
 import type { DocsOptions } from '../types/runner.js';
 
+/** Executor stub for the docs context; docs generation never runs a step */
+const stubExecutor = (): Promise<{ output: string; exitCode: number }> =>
+  Promise.reject(new Error('Executor called in docs context'));
+
 /**
  * Generate Rill documentation for LLM prompt context
  */
@@ -21,10 +25,6 @@ export function generateDocs(options: DocsOptions): string {
   // If both flags are true, treat as neither (show both)
   const showLanguage = !functionsOnly || languageOnly;
   const showFunctions = !languageOnly || functionsOnly;
-
-  // Create minimal context with stub executor
-  const stubExecutor = (): Promise<{ output: string; exitCode: number }> =>
-    Promise.reject(new Error('Executor called in docs context'));
 
   const context: RuntimeContext = createRunnerContext({
     executeClause: stubExecutor,
@@ -53,9 +53,7 @@ export function generateDocs(options: DocsOptions): string {
 function formatFunctions(functions: FunctionMetadata[]): string {
   const lines: string[] = ['# CCR Host Functions'];
 
-  const sortedFunctions = functions
-    .slice()
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const sortedFunctions = functions.toSorted((a, b) => a.name.localeCompare(b.name));
 
   for (const fn of sortedFunctions) {
     lines.push('', `## ${fn.name}`);
@@ -67,8 +65,7 @@ function formatFunctions(functions: FunctionMetadata[]): string {
     if (fn.params.length > 0) {
       lines.push('', '**Parameters:**');
       for (const param of fn.params) {
-        const required =
-          param.defaultValue === undefined ? 'required' : 'optional';
+        const required = param.defaultValue === undefined ? 'required' : 'optional';
         lines.push(`- \`${param.name}\` (${param.type}, ${required})`);
       }
     }

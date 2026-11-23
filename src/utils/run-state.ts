@@ -59,17 +59,41 @@ export function getStateFilePath(stableId: string): string {
   return join(tmpdir(), 'ccr-state-' + stableId + '.json');
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+const TOKEN_FIELDS = ['prompt', 'cacheWrite5m', 'cacheWrite1h', 'cacheRead', 'output'] as const;
+
+function isTokenCounts(value: unknown): value is TokenCounts {
+  return isRecord(value) && TOKEN_FIELDS.every((field) => typeof value[field] === 'number');
+}
+
+function isPersistedRunStats(value: unknown): value is PersistedRunStats {
+  return (
+    isRecord(value) &&
+    typeof value['messageCount'] === 'number' &&
+    isTokenCounts(value['tokens']) &&
+    Array.isArray(value['toolsUsed']) &&
+    value['toolsUsed'].every((tool) => typeof tool === 'string') &&
+    typeof value['toolUseCount'] === 'number' &&
+    typeof value['outputChars'] === 'number'
+  );
+}
+
 /**
  * Type guard for PersistedRunState.
- * Parses the raw JSON value (unknown) and confirms it has version === 1.
+ * Validates every field, so a stale or partial file from an older schema is ignored.
  */
-function isPersistedRunState(value: unknown): value is PersistedRunState {
-  if (typeof value !== 'object' || value === null) return false;
-  const v = value as Record<string, unknown>;
+export function isPersistedRunState(value: unknown): value is PersistedRunState {
   return (
-    v['version'] === 1 &&
-    typeof v['pid'] === 'number' &&
-    typeof v['elapsedMs'] === 'number'
+    isRecord(value) &&
+    value['version'] === 1 &&
+    typeof value['pid'] === 'number' &&
+    typeof value['startedAt'] === 'string' &&
+    typeof value['currentStep'] === 'number' &&
+    typeof value['elapsedMs'] === 'number' &&
+    isPersistedRunStats(value['runStats'])
   );
 }
 
@@ -77,7 +101,7 @@ function isPersistedRunState(value: unknown): value is PersistedRunState {
  * Load persisted run state for a given stable ID.
  * Returns null if:
  *   - File does not exist
- *   - Schema version is not 1
+ *   - The file does not match the PersistedRunState schema
  *   - The writing process is still alive (concurrent run)
  *   - Any parse or I/O error occurs
  * Returns the state if the writing process is dead (crash recovery scenario).
@@ -97,8 +121,7 @@ export function loadRunState(stableId: string): PersistedRunState | null {
       // Signal 0 succeeded — process is still alive — concurrent run, do not corrupt it
       return null;
     } catch (err: unknown) {
-      const nodeErr = err as NodeJS.ErrnoException;
-      if (nodeErr.code === 'ESRCH') {
+      if (err instanceof Error && 'code' in err && err.code === 'ESRCH') {
         // Process is dead — this is a recovery scenario
         return parsed;
       }

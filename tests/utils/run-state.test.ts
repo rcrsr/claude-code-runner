@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+
 import { afterEach, describe, expect, it } from 'vitest';
 
 import type { PersistedRunState } from '../../src/utils/run-state.js';
@@ -6,6 +7,7 @@ import {
   clearRunState,
   generateStableId,
   getStateFilePath,
+  isPersistedRunState,
   loadRunState,
   saveRunState,
 } from '../../src/utils/run-state.js';
@@ -21,7 +23,7 @@ function makeState(pid: number): PersistedRunState {
     elapsedMs: 0,
     runStats: {
       messageCount: 5,
-      tokens: { input: 100, output: 200, cacheRead: 0, cacheWrite: 0 },
+      tokens: { prompt: 100, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 0, output: 200 },
       toolsUsed: ['Bash', 'Read'],
       toolUseCount: 3,
       outputChars: 512,
@@ -79,10 +81,11 @@ describe('saveRunState + loadRunState', () => {
     expect(loaded?.currentStep).toBe(2);
     expect(loaded?.runStats.messageCount).toBe(5);
     expect(loaded?.runStats.tokens).toEqual({
-      input: 100,
-      output: 200,
+      prompt: 100,
+      cacheWrite5m: 0,
+      cacheWrite1h: 0,
       cacheRead: 0,
-      cacheWrite: 0,
+      output: 200,
     });
     expect(loaded?.runStats.toolsUsed).toEqual(['Bash', 'Read']);
     expect(loaded?.runStats.toolUseCount).toBe(3);
@@ -149,5 +152,50 @@ describe('clearRunState', () => {
     expect(() => {
       clearRunState(stableId);
     }).not.toThrow();
+  });
+});
+
+describe('isPersistedRunState', () => {
+  it('accepts a complete state', () => {
+    expect(isPersistedRunState(makeState(DEAD_PID))).toBe(true);
+  });
+
+  it('rejects a state without runStats', () => {
+    const { runStats: _runStats, ...partial } = makeState(DEAD_PID);
+    expect(isPersistedRunState(partial)).toBe(false);
+  });
+
+  it('rejects old-format token counts', () => {
+    const state = makeState(DEAD_PID);
+    const old = { ...state, runStats: { ...state.runStats, tokens: { input: 1, output: 2 } } };
+    expect(isPersistedRunState(old)).toBe(false);
+  });
+
+  it('rejects non-string toolsUsed entries', () => {
+    const state = makeState(DEAD_PID);
+    const bad = { ...state, runStats: { ...state.runStats, toolsUsed: [1] } };
+    expect(isPersistedRunState(bad)).toBe(false);
+  });
+
+  it('rejects a missing startedAt', () => {
+    const { startedAt: _startedAt, ...partial } = makeState(DEAD_PID);
+    expect(isPersistedRunState(partial)).toBe(false);
+  });
+});
+
+describe('loadRunState with a partial file', () => {
+  const stableId = generateStableId('/tmp/ccr-test-partial', ['partial']);
+
+  afterEach(() => {
+    clearRunState(stableId);
+  });
+
+  it('returns null when runStats is missing', () => {
+    fs.writeFileSync(
+      getStateFilePath(stableId),
+      JSON.stringify({ version: 1, pid: DEAD_PID, elapsedMs: 0 })
+    );
+
+    expect(loadRunState(stableId)).toBeNull();
   });
 });

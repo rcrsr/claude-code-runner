@@ -80,10 +80,8 @@ export function resetRunStats(stats: RunStats): void {
 export function updateTokenStats(stats: RunStats, usage: TokenUsage): void {
   stats.tokens.prompt += usage.input_tokens ?? 0;
   stats.tokens.output += usage.output_tokens ?? 0;
-  stats.tokens.cacheWrite5m +=
-    usage.cache_creation?.ephemeral_5m_input_tokens ?? 0;
-  stats.tokens.cacheWrite1h +=
-    usage.cache_creation?.ephemeral_1h_input_tokens ?? 0;
+  stats.tokens.cacheWrite5m += usage.cache_creation?.ephemeral_5m_input_tokens ?? 0;
+  stats.tokens.cacheWrite1h += usage.cache_creation?.ephemeral_1h_input_tokens ?? 0;
   stats.tokens.cacheRead += usage.cache_read_input_tokens ?? 0;
 }
 
@@ -143,9 +141,7 @@ export function cloneStats(stats: RunStats): RunStats {
  * Calculate total input tokens
  */
 function totalInputTokens(tokens: TokenCounts): number {
-  return (
-    tokens.prompt + tokens.cacheWrite5m + tokens.cacheWrite1h + tokens.cacheRead
-  );
+  return tokens.prompt + tokens.cacheWrite5m + tokens.cacheWrite1h + tokens.cacheRead;
 }
 
 /**
@@ -159,10 +155,7 @@ function formatNumber(n: number): string {
  * Format stats summary for display
  * Example: 33s | 14 msgs | 319,449 in (32 p / 6,579 cw5m / 312,838 cr) | 931 out | 3 tools (Bash, Edit, Read)
  */
-export function formatStatsSummary(
-  stats: RunStats,
-  durationMs: number
-): string {
+export function formatStatsSummary(stats: RunStats, durationMs: number): string {
   const parts: string[] = [];
 
   // Duration
@@ -186,8 +179,7 @@ export function formatStatsSummary(
   if (stats.tokens.cacheRead > 0) {
     breakdownParts.push(`${formatNumber(stats.tokens.cacheRead)} cr`);
   }
-  const breakdown =
-    breakdownParts.length > 0 ? ` (${breakdownParts.join(' / ')})` : '';
+  const breakdown = breakdownParts.length > 0 ? ` (${breakdownParts.join(' / ')})` : '';
   parts.push(`${formatNumber(totalIn)} in${breakdown}`);
 
   // Output tokens
@@ -195,7 +187,7 @@ export function formatStatsSummary(
 
   // Tools
   if (stats.toolUseCount > 0) {
-    const toolList = Array.from(stats.toolsUsed).sort().join(', ');
+    const toolList = Array.from(stats.toolsUsed).toSorted().join(', ');
     parts.push(`${stats.toolUseCount} tools (${toolList})`);
   }
 

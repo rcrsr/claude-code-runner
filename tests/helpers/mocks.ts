@@ -13,12 +13,20 @@ import type {
   SystemInitMessage,
   UserMessage,
 } from '../../src/types/claude.js';
-import type {
-  RunnerConfig,
-  RunResult,
-  Verbosity,
-} from '../../src/types/runner.js';
+import type { RunnerConfig } from '../../src/types/runner.js';
 import { DEFAULT_INACTIVITY_TIMEOUT_MS } from '../../src/utils/constants.js';
+
+/**
+ * Read one argument of a recorded mock call as a string.
+ * Throws when the call is missing or the argument is not a string, so the test fails clearly.
+ */
+export function callArg(call: readonly unknown[] | undefined, index = 0): string {
+  const value = call?.[index];
+  if (typeof value !== 'string') {
+    throw new TypeError(`Expected string mock-call argument ${index}, got ${typeof value}`);
+  }
+  return value;
+}
 
 /**
  * Create a mock logger
@@ -62,30 +70,16 @@ export function createMockFormatterState(): FormatterState {
 /**
  * Create a mock runner config with optional overrides
  */
-export function createMockConfig(
-  overrides?: Partial<RunnerConfig>
-): RunnerConfig {
+export function createMockConfig(overrides?: Partial<RunnerConfig>): RunnerConfig {
   return {
     verbosity: 'normal',
     enableLog: false,
     logDir: 'logs',
-    maxIterations: 10,
     parallelThresholdMs: 100,
-    iterationPauseMs: 0,
     model: null,
+    effort: null,
+    deaddrop: false,
     inactivityTimeoutMs: DEFAULT_INACTIVITY_TIMEOUT_MS,
-    ...overrides,
-  };
-}
-
-/**
- * Create a mock RunResult
- */
-export function createMockRunResult(overrides?: Partial<RunResult>): RunResult {
-  return {
-    exitCode: 0,
-    duration: 5,
-    claudeText: '',
     ...overrides,
   };
 }
@@ -167,31 +161,4 @@ export function createResultMessage(durationMs = 5000): ResultMessage {
     type: 'result',
     duration_ms: durationMs,
   };
-}
-
-/**
- * Create an AssistantMessage with multiple tool use blocks
- */
-export function createMultiToolMessage(
-  tools: { name: string; input: Record<string, unknown>; id: string }[]
-): AssistantMessage {
-  return {
-    type: 'assistant',
-    message: {
-      role: 'assistant',
-      content: tools.map((t) => ({
-        type: 'tool_use' as const,
-        id: t.id,
-        name: t.name,
-        input: t.input,
-      })),
-    },
-  };
-}
-
-/**
- * Create a mock verbosity setting
- */
-export function createVerbosity(level: Verbosity = 'normal'): Verbosity {
-  return level;
 }

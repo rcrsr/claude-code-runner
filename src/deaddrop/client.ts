@@ -21,9 +21,7 @@ const DEFAULT_HOST = 'https://deaddrop.bezoan.com';
  * Create a DeadDrop client from environment variables
  * Returns null if DEADDROP_API_KEY is not set
  */
-export function createDeadDropClientFromEnv(
-  runId: string
-): DeadDropClient | null {
+export function createDeadDropClientFromEnv(runId: string): DeadDropClient | null {
   const apiKey = process.env['DEADDROP_API_KEY'];
   if (!apiKey) {
     return null;
@@ -55,12 +53,10 @@ export function createDeadDropClient(config: DeadDropConfig): DeadDropClient {
         });
 
         if (!response.ok) {
-          console.warn(
-            `[DEADDROP] Warning: Failed to send message (${response.status})`
-          );
+          console.warn(`[DEADDROP] Warning: Failed to send message (${response.status})`);
         }
       } catch (err) {
-        console.warn(`[DEADDROP] Warning: ${(err as Error).message}`);
+        console.warn(`[DEADDROP] Warning: ${err instanceof Error ? err.message : String(err)}`);
       }
     },
   };

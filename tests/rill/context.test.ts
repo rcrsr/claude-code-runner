@@ -14,9 +14,7 @@ import {
 /**
  * Create a mock executor that returns configurable responses
  */
-function createMockExecutor(
-  response: Partial<ExecutionResult> = {}
-): ClaudeExecutor {
+function createMockExecutor(response: Partial<ExecutionResult> = {}): ClaudeExecutor {
   const defaultResponse: ExecutionResult = {
     output: 'mock output',
     exitCode: 0,
@@ -37,7 +35,7 @@ async function runRill(
     commandsDir?: string;
     defaultModel?: string;
   } = {}
-): Promise<{ result: unknown }> {
+): ReturnType<typeof execute> {
   const ctx = createRunnerContext({
     executeClause: executor,
     ...options,
@@ -50,7 +48,7 @@ describe('createRunnerContext', () => {
   describe('default onLog callback', () => {
     it('strips trailing newlines from logged values', async () => {
       const executor = createMockExecutor();
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation();
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
       const ctx = createRunnerContext({
         executeClause: executor,
@@ -60,9 +58,7 @@ describe('createRunnerContext', () => {
       await execute(ast, ctx);
 
       // printRunner adds timestamp and [runner] prefix, but the value should have newlines replaced
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('text with newline')
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('text with newline'));
       expect(consoleLogSpy).not.toHaveBeenCalledWith(
         expect.stringContaining('text with newline\n')
       );
@@ -72,7 +68,7 @@ describe('createRunnerContext', () => {
 
     it('replaces internal newlines with spaces', async () => {
       const executor = createMockExecutor();
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation();
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
       const ctx = createRunnerContext({
         executeClause: executor,
@@ -81,16 +77,14 @@ describe('createRunnerContext', () => {
       const ast = parse('log("line1\\nline2\\nline3")');
       await execute(ast, ctx);
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('line1 line2 line3')
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('line1 line2 line3'));
 
       consoleLogSpy.mockRestore();
     });
 
     it('strips carriage returns and newlines', async () => {
       const executor = createMockExecutor();
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation();
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
       const ctx = createRunnerContext({
         executeClause: executor,
@@ -99,9 +93,7 @@ describe('createRunnerContext', () => {
       const ast = parse('log("text\\r\\nwith\\r\\ncrlf")');
       await execute(ast, ctx);
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('text with crlf')
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('text with crlf'));
 
       consoleLogSpy.mockRestore();
     });
@@ -217,11 +209,11 @@ describe('ccr::skill', () => {
     const executor = createMockExecutor({ output: 'output' });
     await runRill('ccr::skill("review", ["--strict", "file.ts"])', executor);
 
-    expect(executor).toHaveBeenCalledWith(
-      '/review --strict file.ts',
-      undefined,
-      { method: 'ccr::skill', name: 'review', model: undefined }
-    );
+    expect(executor).toHaveBeenCalledWith('/review --strict file.ts', undefined, {
+      method: 'ccr::skill',
+      name: 'review',
+      model: undefined,
+    });
   });
 });
 
@@ -269,10 +261,7 @@ describe('ccr::get_result', () => {
 
   it('returns empty dict when no result tag found', async () => {
     const executor = createMockExecutor();
-    const result = await runRill(
-      'ccr::get_result("no result tag here")',
-      executor
-    );
+    const result = await runRill('ccr::get_result("no result tag here")', executor);
 
     expect(result.result).toEqual({});
   });
@@ -366,8 +355,7 @@ describe('ccr::get_result', () => {
 
   it('returns consistent result on repeated calls (no lastIndex leakage)', async () => {
     const executor = createMockExecutor();
-    const input =
-      '"<ccr:result type=\\"first\\"/> text <ccr:result type=\\"last\\"/>"';
+    const input = '"<ccr:result type=\\"first\\"/> text <ccr:result type=\\"last\\"/>"';
     const code1 = `ccr::get_result(${input})`;
     const code2 = `ccr::get_result(${input})`;
     const result1 = await runRill(code1, executor);
@@ -381,8 +369,7 @@ describe('ccr::get_result', () => {
 describe('ccr::has_result', () => {
   it('returns true for self-closing result tag', async () => {
     const executor = createMockExecutor();
-    const code =
-      'ccr::has_result("Some text <ccr:result type=\\"done\\"/> more")';
+    const code = 'ccr::has_result("Some text <ccr:result type=\\"done\\"/> more")';
     const result = await runRill(code, executor);
 
     expect(result.result).toBe(true);
@@ -390,8 +377,7 @@ describe('ccr::has_result', () => {
 
   it('returns true for result tag with content', async () => {
     const executor = createMockExecutor();
-    const code =
-      'ccr::has_result("<ccr:result type=\\"blocked\\">Details</ccr:result>")';
+    const code = 'ccr::has_result("<ccr:result type=\\"blocked\\">Details</ccr:result>")';
     const result = await runRill(code, executor);
 
     expect(result.result).toBe(true);
@@ -399,20 +385,14 @@ describe('ccr::has_result', () => {
 
   it('returns false when no result tag found', async () => {
     const executor = createMockExecutor();
-    const result = await runRill(
-      'ccr::has_result("no result tag here")',
-      executor
-    );
+    const result = await runRill('ccr::has_result("no result tag here")', executor);
 
     expect(result.result).toBe(false);
   });
 
   it('returns false for malformed tags', async () => {
     const executor = createMockExecutor();
-    const result = await runRill(
-      'ccr::has_result("<ccr:resulttype=\\"done\\"/>")',
-      executor
-    );
+    const result = await runRill('ccr::has_result("<ccr:resulttype=\\"done\\"/>")', executor);
 
     expect(result.result).toBe(false);
   });
@@ -441,10 +421,7 @@ describe('ccr::has_frontmatter', () => {
 
   it('returns false for non-existing file', async () => {
     const executor = createMockExecutor();
-    const result = await runRill(
-      'ccr::has_frontmatter("non-existent-file.md")',
-      executor
-    );
+    const result = await runRill('ccr::has_frontmatter("non-existent-file.md")', executor);
 
     expect(result.result).toBe(false);
   });
@@ -454,9 +431,9 @@ describe('ccr::get_frontmatter', () => {
   it('throws error for non-existing file', async () => {
     const executor = createMockExecutor();
 
-    await expect(
-      runRill('ccr::get_frontmatter("non-existent-file.md")', executor)
-    ).rejects.toThrow('File not found');
+    await expect(runRill('ccr::get_frontmatter("non-existent-file.md")', executor)).rejects.toThrow(
+      'File not found'
+    );
   });
 
   it('returns empty dict for file without frontmatter', async () => {
@@ -491,11 +468,9 @@ describe('ccr::command', () => {
     // instead of rejecting execute().
     const executor = createMockExecutor();
 
-    const { result } = await runRill(
-      'ccr::command("non-existent-cmd")',
-      executor,
-      { commandsDir: '.claude/commands' }
-    );
+    const { result } = await runRill('ccr::command("non-existent-cmd")', executor, {
+      commandsDir: '.claude/commands',
+    });
 
     expect(isInvalid(result)).toBe(true);
     expect(getStatus(result).message).toContain('Command not found');
@@ -619,10 +594,7 @@ describe('ccr::state', () => {
     });
 
     // Build Rill code that calls ccr::state 100 times
-    const calls = Array.from(
-      { length: 100 },
-      (_, i) => `ccr::state("State ${i}")`
-    );
+    const calls = Array.from({ length: 100 }, (_, i) => `ccr::state("State ${i}")`);
     const code = calls.join('\n');
 
     const ast = parse(code);
@@ -688,7 +660,7 @@ describe('ccr::state', () => {
   it('status persists across multiple log messages (AC-10)', async () => {
     const executor = createMockExecutor();
     const onStateChange = vi.fn();
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation();
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
     const ctx = createRunnerContext({
       executeClause: executor,
@@ -716,18 +688,9 @@ describe('ccr::state', () => {
 
     // Verify log messages were emitted (default onLog callback uses console.log)
     expect(consoleSpy).toHaveBeenCalledTimes(3);
-    expect(consoleSpy).toHaveBeenNthCalledWith(
-      1,
-      expect.stringContaining('Log message 1')
-    );
-    expect(consoleSpy).toHaveBeenNthCalledWith(
-      2,
-      expect.stringContaining('Log message 2')
-    );
-    expect(consoleSpy).toHaveBeenNthCalledWith(
-      3,
-      expect.stringContaining('Log message 3')
-    );
+    expect(consoleSpy).toHaveBeenNthCalledWith(1, expect.stringContaining('Log message 1'));
+    expect(consoleSpy).toHaveBeenNthCalledWith(2, expect.stringContaining('Log message 2'));
+    expect(consoleSpy).toHaveBeenNthCalledWith(3, expect.stringContaining('Log message 3'));
 
     consoleSpy.mockRestore();
   });

@@ -17,9 +17,7 @@ export interface ArgumentHintResult {
  * @param hint - Argument hint string like "<file> [options]"
  * @returns Object with requiredCount and set of optional positions
  */
-export function parseArgumentHint(
-  hint: string | undefined
-): ArgumentHintResult {
+export function parseArgumentHint(hint: string | undefined): ArgumentHintResult {
   if (!hint) {
     return { requiredCount: 0, optionalPositions: new Set() };
   }

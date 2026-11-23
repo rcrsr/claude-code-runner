@@ -2,10 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ClaudeProcessOptions } from '../../src/process/pty.js';
 import { spawnClaude } from '../../src/process/pty.js';
-import {
-  createMockFormatterState,
-  createMockLogger,
-} from '../helpers/mocks.js';
+import type { ClaudeMessage } from '../../src/types/claude.js';
+import { createMockFormatterState, createMockLogger } from '../helpers/mocks.js';
 
 // Mock @lydell/node-pty
 const mockOnData = vi.fn();
@@ -28,7 +26,7 @@ vi.mock('../../src/output/formatter.js', () => ({
 }));
 
 // Mock stream parser
-const mockParserProcess = vi.fn(() => []);
+const mockParserProcess = vi.fn<(data: string) => ClaudeMessage[]>(() => []);
 vi.mock('../../src/parsers/stream.js', () => ({
   createStreamParser: vi.fn(() => ({
     process: mockParserProcess,
@@ -68,6 +66,8 @@ describe('spawnClaude', () => {
       logger: createMockLogger(),
       formatterState: createMockFormatterState(),
       parallelThresholdMs: 100,
+      model: null,
+      effort: null,
     };
   });
 
@@ -81,11 +81,7 @@ describe('spawnClaude', () => {
       onExitCallback({ exitCode: 0 });
       await promise;
 
-      expect(pty.spawn).toHaveBeenCalledWith(
-        'claude',
-        expect.any(Array),
-        expect.any(Object)
-      );
+      expect(pty.spawn).toHaveBeenCalledWith('claude', expect.any(Array), expect.any(Object));
     });
 
     it('spawns pty with correct arguments', async () => {
@@ -113,7 +109,8 @@ describe('spawnClaude', () => {
       onExitCallback({ exitCode: 0 });
       await promise;
 
-      const args = vi.mocked(pty.spawn).mock.calls[0]?.[1] as string[];
+      const args = vi.mocked(pty.spawn).mock.calls[0]?.[1];
+      if (!Array.isArray(args)) throw new TypeError('pty.spawn was not called with an args array');
       expect(args).toContain('--effort');
       expect(args[args.indexOf('--effort') + 1]).toBe('high');
     });
@@ -124,7 +121,8 @@ describe('spawnClaude', () => {
       onExitCallback({ exitCode: 0 });
       await promise;
 
-      const args = vi.mocked(pty.spawn).mock.calls[0]?.[1] as string[];
+      const args = vi.mocked(pty.spawn).mock.calls[0]?.[1];
+      if (!Array.isArray(args)) throw new TypeError('pty.spawn was not called with an args array');
       expect(args).not.toContain('--effort');
     });
 
@@ -175,9 +173,7 @@ describe('spawnClaude', () => {
     });
 
     it('formats parsed messages', async () => {
-      mockParserProcess.mockReturnValueOnce([
-        { type: 'system', subtype: 'init' },
-      ]);
+      mockParserProcess.mockReturnValueOnce([{ type: 'system', subtype: 'init' }]);
 
       const promise = spawnClaude(options);
 
@@ -206,14 +202,12 @@ describe('spawnClaude', () => {
 
       await promise;
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+      // oxlint-disable-next-line typescript/unbound-method
       expect(options.logger.log).toHaveBeenCalledWith(JSON.stringify(msg));
     });
 
     it('accumulates claudeText from formatMessage', async () => {
-      vi.mocked(formatMessage)
-        .mockReturnValueOnce('Hello ')
-        .mockReturnValueOnce('world');
+      vi.mocked(formatMessage).mockReturnValueOnce('Hello ').mockReturnValueOnce('world');
       mockParserProcess
         .mockReturnValueOnce([{ type: 'assistant' }])
         .mockReturnValueOnce([{ type: 'assistant' }]);
@@ -283,10 +277,7 @@ describe('spawnClaude', () => {
       onExitCallback({ exitCode: 0 });
       await promise;
 
-      expect(flushPendingTools).toHaveBeenCalledWith(
-        options.formatterState,
-        'normal'
-      );
+      expect(flushPendingTools).toHaveBeenCalledWith(options.formatterState, 'normal');
     });
 
     it('returns accumulated claudeText', async () => {
@@ -330,13 +321,8 @@ describe('spawnClaude', () => {
     });
 
     it('handles multiple messages in one data chunk', async () => {
-      mockParserProcess.mockReturnValueOnce([
-        { type: 'system' },
-        { type: 'assistant' },
-      ]);
-      vi.mocked(formatMessage)
-        .mockReturnValueOnce('')
-        .mockReturnValueOnce('text');
+      mockParserProcess.mockReturnValueOnce([{ type: 'system' }, { type: 'assistant' }]);
+      vi.mocked(formatMessage).mockReturnValueOnce('').mockReturnValueOnce('text');
 
       const promise = spawnClaude(options);
 

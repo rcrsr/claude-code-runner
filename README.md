@@ -199,7 +199,7 @@ Sessions are logged to `./logs/` with timestamped filenames when `--log` is spec
 ## Development
 
 ```bash
-npm run check    # Run all checks (typecheck, lint, format, test)
+npm run check    # Run all checks (types, lint, format, deps, test)
 npm run build    # Build the project
 npm test         # Run tests
 ```

@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Cleared all 27 open Dependabot alerts (1 critical, 11 high, 14 medium, 1 low). All were in dev-only packages: `vitest`, `@vitest/mocker`, `vite`, `rollup`, `postcss`, `nanoid`, `source-map-js`, `picomatch`, `flatted`, `brace-expansion`, `minimatch`, and `@humanfs/node`. `npm audit` reports 0 vulnerabilities. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
+
+### Changed
+
+- Bumped `@rcrsr/rill` from `0.19.3` to `0.19.6`, staying inside the `~0.19` range. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
+- Upgraded dev tooling: `vitest` and `@vitest/coverage-v8` from `4.0` to `5.1`, and `@types/node` from `25` to `26`. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
+- Replaced ESLint and Prettier with oxlint (type-aware, via `oxlint-tsgolint`) and oxfmt. Lint now covers `tests/` as well as `src/`, and oxfmt sorts imports and wraps at 100 columns. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
+- Upgraded `typescript` from `5.9` to `7.0`, which became possible once `typescript-eslint` was removed. `tsconfig.build.json` sets `"types": ["node"]` and `tsconfig.json` sets `"types": ["node", "vitest/globals"]`, because TypeScript 6 and later no longer load `@types/*` automatically. `lib` moves to `ES2023`. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
+- Added knip (`npm run check:deps`) for unused files and dependencies, and lefthook hooks: oxfmt and oxlint on pre-commit, `npm run check` on pre-push. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
+- Renamed scripts to `check:types`, `check:lint`, `check:format`, `check:deps`, `fix:lint`, and `fix:format`. Removed `typecheck`, `lint`, `lint:fix`, `format`, and `format:check`. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
+- Removed unused dev dependencies `react` and `tsc-files`. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
+- Enabled oxlint `typescript/no-unsafe-type-assertion` and removed all 74 unchecked type assertions (33 in `src`, 41 in tests). Host-function arguments now go through checked readers (`src/rill/host-args.ts`). Stream-json lines go through `isClaudeMessage`, and `package.json` is read by `getPackageVersion`. `renderStatusLine` and `clearStatusLine` take a narrow `StatusStream` type, and tests read spy arguments through a checked `callArg` helper. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
+- `npm run check:types` now typechecks `tests/` too. Fixed the 42 test type errors this exposed, mostly fixtures written for older `RunnerConfig`, `RunStats`, and `FormatterState` shapes; they now use the shared mock factories. `npm run build` moves to `tsconfig.build.json`, which still emits `src/` only. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
+- Promoted every oxlint and knip `warn` rule to `error`, and removed the unused exports this surfaced: 3 test helpers, plus the `export` on `DeadDropQueue`. `RillArgDef` is now exported from `src/rill/index.ts` next to `RillScriptMeta`, which uses it. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
+
+### Fixed
+
+- The stream parser now skips JSON lines that are not message objects (for example a bare number), where before it passed them on as messages. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
+- Crash recovery now ignores a run-state file that does not match the full schema (missing `runStats`, old token fields), where before it crashed on startup until the file was deleted. CI tests on Node 26 instead of 25, which vitest 5 does not support. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
+
 ## [0.15.0] — 2026-06-18
 
 ### BREAKING

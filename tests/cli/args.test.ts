@@ -13,6 +13,7 @@ vi.mock('../../src/rill/index.js', () => ({
 
 import { parseArgs, printUsage } from '../../src/cli/args.js';
 import { loadCommandTemplate } from '../../src/templates/command.js';
+import { callArg } from '../helpers/mocks.js';
 
 describe('parseArgs', () => {
   let exitSpy: MockInstance;
@@ -42,9 +43,7 @@ describe('parseArgs', () => {
 
     it('exits with error for unknown subcommand', () => {
       expect(() => parseArgs(['--invalid'])).toThrow('process.exit(1)');
-      expect(errorSpy).toHaveBeenCalledWith(
-        "Error: unknown subcommand '--invalid'"
-      );
+      expect(errorSpy).toHaveBeenCalledWith("Error: unknown subcommand '--invalid'");
     });
 
     it('parses prompt subcommand', () => {
@@ -74,12 +73,8 @@ describe('parseArgs', () => {
     });
 
     it('rejects non-.rill script files', () => {
-      expect(() => parseArgs(['script', 'test.txt'])).toThrow(
-        'process.exit(1)'
-      );
-      expect(errorSpy).toHaveBeenCalledWith(
-        'Error: script must be a .rill file'
-      );
+      expect(() => parseArgs(['script', 'test.txt'])).toThrow('process.exit(1)');
+      expect(errorSpy).toHaveBeenCalledWith('Error: script must be a .rill file');
     });
   });
 
@@ -117,10 +112,7 @@ describe('parseArgs', () => {
 
       parseArgs(['command', 'my-cmd', 'arg1', 'arg2']);
 
-      expect(loadCommandTemplate).toHaveBeenCalledWith('my-cmd', [
-        'arg1',
-        'arg2',
-      ]);
+      expect(loadCommandTemplate).toHaveBeenCalledWith('my-cmd', ['arg1', 'arg2']);
     });
 
     it('exits with error when name missing', () => {
@@ -362,7 +354,7 @@ describe('printUsage', () => {
   it('includes all subcommands', () => {
     printUsage();
 
-    const output = logSpy.mock.calls[0]?.[0] as string;
+    const output = callArg(logSpy.mock.calls[0]);
     expect(output).toContain('prompt');
     expect(output).toContain('command');
     expect(output).toContain('skill');
@@ -372,7 +364,7 @@ describe('printUsage', () => {
   it('includes all options', () => {
     printUsage();
 
-    const output = logSpy.mock.calls[0]?.[0] as string;
+    const output = callArg(logSpy.mock.calls[0]);
     expect(output).toContain('--quiet');
     expect(output).toContain('--verbose');
     expect(output).toContain('--log');
@@ -383,7 +375,7 @@ describe('printUsage', () => {
   it('mentions .rill files for script subcommand', () => {
     printUsage();
 
-    const output = logSpy.mock.calls[0]?.[0] as string;
+    const output = callArg(logSpy.mock.calls[0]);
     expect(output).toContain('.rill');
   });
 });

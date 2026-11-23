@@ -1,4 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type MockInstance,
+  type Mock,
+  vi,
+} from 'vitest';
 
 import {
   bindFormatterState,
@@ -8,6 +17,7 @@ import {
   printRunner,
   renderStatusLine,
   shortenPath,
+  type StatusStream,
   stripAnsi,
   terminalLog,
   timestampPrefix,
@@ -16,6 +26,7 @@ import {
 } from '../../src/output/colors.js';
 import type { FormatterState } from '../../src/output/formatter.js';
 import { STATUS_LINE_MIN_WIDTH } from '../../src/utils/constants.js';
+import { callArg, createMockFormatterState } from '../helpers/mocks.js';
 
 describe('stripAnsi', () => {
   it('removes ANSI color codes', () => {
@@ -64,15 +75,11 @@ describe('formatDuration', () => {
 
 describe('shortenPath', () => {
   it('shortens apps paths', () => {
-    expect(shortenPath('/home/user/project/apps/web/src/file.ts')).toBe(
-      'apps/web/src/file.ts'
-    );
+    expect(shortenPath('/home/user/project/apps/web/src/file.ts')).toBe('apps/web/src/file.ts');
   });
 
   it('shortens packages paths', () => {
-    expect(shortenPath('/home/user/project/packages/core/index.ts')).toBe(
-      'packages/core/index.ts'
-    );
+    expect(shortenPath('/home/user/project/packages/core/index.ts')).toBe('packages/core/index.ts');
   });
 
   it('shortens .claude paths', () => {
@@ -124,7 +131,7 @@ describe('timestampPrefix', () => {
 });
 
 describe('printRunner', () => {
-  let consoleSpy: ReturnType<typeof vi.spyOn<typeof console, 'log'>>;
+  let consoleSpy: MockInstance<typeof console.log>;
 
   beforeEach(() => {
     consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
@@ -138,7 +145,7 @@ describe('printRunner', () => {
     printRunner('Test message');
 
     expect(consoleSpy).toHaveBeenCalledTimes(1);
-    const output = consoleSpy.mock.calls[0]?.[0] as string;
+    const output = callArg(consoleSpy.mock.calls[0]);
     expect(output).toContain('[runner]');
     expect(output).toContain('Test message');
     expect(output).toMatch(/\d{2}:\d{2}:\d{2}\.\d{3}/);
@@ -147,22 +154,22 @@ describe('printRunner', () => {
   it('uses magenta color for [RUNNER] label', () => {
     printRunner('Test');
 
-    const output = consoleSpy.mock.calls[0]?.[0] as string;
+    const output = callArg(consoleSpy.mock.calls[0]);
     expect(output).toContain('\x1b[35m'); // magenta
   });
 });
 
 describe('renderStatusLine', () => {
-  let mockStream: NodeJS.WriteStream;
-  let writeSpy: ReturnType<typeof vi.fn>;
+  let mockStream: StatusStream;
+  let writeSpy: Mock<(chunk: string) => boolean>;
 
   beforeEach(() => {
-    writeSpy = vi.fn();
+    writeSpy = vi.fn<(chunk: string) => boolean>();
     mockStream = {
       isTTY: true,
       columns: 80,
       write: writeSpy,
-    } as unknown as NodeJS.WriteStream;
+    };
   });
 
   it('renders text with dim styling', () => {
@@ -170,9 +177,7 @@ describe('renderStatusLine', () => {
 
     // Should write: save cursor, newline, clear line, dim text, reset, restore cursor
     expect(writeSpy).toHaveBeenCalled();
-    const allWrites = writeSpy.mock.calls
-      .map((call) => call[0] as string)
-      .join('');
+    const allWrites = writeSpy.mock.calls.map((call) => callArg(call)).join('');
     expect(allWrites).toContain('\x1b[2m'); // dim
     expect(allWrites).toContain('Status text');
     expect(allWrites).toContain('\x1b[0m'); // reset
@@ -183,9 +188,7 @@ describe('renderStatusLine', () => {
 
     // Should write: clear line + \r (no text)
     expect(writeSpy).toHaveBeenCalled();
-    const allWrites = writeSpy.mock.calls
-      .map((call) => call[0] as string)
-      .join('');
+    const allWrites = writeSpy.mock.calls.map((call) => callArg(call)).join('');
     expect(allWrites).toContain('\x1b[2K'); // clear line
     expect(allWrites).toContain('\r'); // carriage return
     expect(allWrites).not.toContain('Status'); // no text
@@ -195,9 +198,7 @@ describe('renderStatusLine', () => {
     renderStatusLine('', mockStream);
 
     expect(writeSpy).toHaveBeenCalled();
-    const allWrites = writeSpy.mock.calls
-      .map((call) => call[0] as string)
-      .join('');
+    const allWrites = writeSpy.mock.calls.map((call) => callArg(call)).join('');
     expect(allWrites).toContain('\x1b[2K'); // clear line
     expect(allWrites).not.toContain('\x1b[2m'); // no dim styling (no text)
   });
@@ -229,12 +230,10 @@ describe('renderStatusLine', () => {
 
     renderStatusLine(longText, mockStream);
 
-    const allWrites = writeSpy.mock.calls
-      .map((call) => call[0] as string)
-      .join('');
+    const allWrites = writeSpy.mock.calls.map((call) => callArg(call)).join('');
     expect(allWrites).toContain('...');
     // Text should be truncated to fit within 20 columns
-    // eslint-disable-next-line no-control-regex -- Testing ANSI escape codes
+    // oxlint-disable-next-line no-control-regex -- Testing ANSI escape codes
     const dimMatch = /\x1b\[2m(.*?)\x1b\[0m/.exec(allWrites);
     expect(dimMatch).toBeTruthy();
     const renderedText = dimMatch?.[1] ?? '';
@@ -245,11 +244,9 @@ describe('renderStatusLine', () => {
     const textWithAnsi = '\x1b[31mRed text\x1b[0m with codes';
     renderStatusLine(textWithAnsi, mockStream);
 
-    const allWrites = writeSpy.mock.calls
-      .map((call) => call[0] as string)
-      .join('');
+    const allWrites = writeSpy.mock.calls.map((call) => callArg(call)).join('');
     // Should contain dim styling we add, but not the red color from input
-    // eslint-disable-next-line no-control-regex -- Testing ANSI escape codes
+    // oxlint-disable-next-line no-control-regex -- Testing ANSI escape codes
     const dimMatch = /\x1b\[2m(.*?)\x1b\[0m/.exec(allWrites);
     expect(dimMatch?.[1]).toBe('Red text with codes');
   });
@@ -258,10 +255,8 @@ describe('renderStatusLine', () => {
     const textWithNewlines = 'Line 1\nLine 2\r\nLine 3';
     renderStatusLine(textWithNewlines, mockStream);
 
-    const allWrites = writeSpy.mock.calls
-      .map((call) => call[0] as string)
-      .join('');
-    // eslint-disable-next-line no-control-regex -- Testing ANSI escape codes
+    const allWrites = writeSpy.mock.calls.map((call) => callArg(call)).join('');
+    // oxlint-disable-next-line no-control-regex -- Testing ANSI escape codes
     const dimMatch = /\x1b\[2m(.*?)\x1b\[0m/.exec(allWrites);
     expect(dimMatch?.[1]).toBe('Line 1 Line 2 Line 3');
     expect(dimMatch?.[1]).not.toContain('\n');
@@ -282,27 +277,23 @@ describe('renderStatusLine', () => {
   it('handles whitespace-only text as empty', () => {
     renderStatusLine('   ', mockStream);
 
-    const allWrites = writeSpy.mock.calls
-      .map((call) => call[0] as string)
-      .join('');
+    const allWrites = writeSpy.mock.calls.map((call) => callArg(call)).join('');
     expect(allWrites).not.toContain('\x1b[2m'); // no dim styling
   });
 
   it('falls back to 80 columns when stream.columns is undefined (EC-5)', () => {
     // Create stream with undefined columns (edge case for misconfigured TTY)
-    const streamWithUndefinedCols = {
+    const streamWithUndefinedCols: StatusStream = {
       isTTY: true,
       columns: undefined,
       write: writeSpy,
-    } as unknown as NodeJS.WriteStream;
+    };
 
     const text = 'A'.repeat(100); // Text longer than 80 chars
     renderStatusLine(text, streamWithUndefinedCols);
 
-    const allWrites = writeSpy.mock.calls
-      .map((call) => call[0] as string)
-      .join('');
-    // eslint-disable-next-line no-control-regex -- Testing ANSI escape codes
+    const allWrites = writeSpy.mock.calls.map((call) => callArg(call)).join('');
+    // oxlint-disable-next-line no-control-regex -- Testing ANSI escape codes
     const dimMatch = /\x1b\[2m(.*?)\x1b\[0m/.exec(allWrites);
     expect(dimMatch).toBeTruthy();
     const renderedText = dimMatch?.[1] ?? '';
@@ -339,14 +330,12 @@ describe('renderStatusLine', () => {
     // Last set of writes should contain latest status
     const lastWrites = writeSpy.mock.calls
       .slice(-5) // Get last 5 calls (enough to capture one complete render)
-      .map((call) => call[0] as string)
+      .map((call) => callArg(call))
       .join('');
     expect(lastWrites).toContain('Status 3');
 
     // Verify each call replaces previous by checking all writes contain all statuses
-    const allWrites = writeSpy.mock.calls
-      .map((call) => call[0] as string)
-      .join('');
+    const allWrites = writeSpy.mock.calls.map((call) => callArg(call)).join('');
     expect(allWrites).toContain('Status 1');
     expect(allWrites).toContain('Status 2');
     expect(allWrites).toContain('Status 3');
@@ -354,16 +343,16 @@ describe('renderStatusLine', () => {
 });
 
 describe('clearStatusLine', () => {
-  let mockStream: NodeJS.WriteStream;
-  let writeSpy: ReturnType<typeof vi.fn>;
+  let mockStream: StatusStream;
+  let writeSpy: Mock<(chunk: string) => boolean>;
 
   beforeEach(() => {
-    writeSpy = vi.fn();
+    writeSpy = vi.fn<(chunk: string) => boolean>();
     mockStream = {
       isTTY: true,
       columns: 80,
       write: writeSpy,
-    } as unknown as NodeJS.WriteStream;
+    };
   });
 
   it('erases status line using clear-line + carriage return', () => {
@@ -394,16 +383,12 @@ describe('clearStatusLine', () => {
   it('is idempotent - clearing twice produces same result', () => {
     clearStatusLine(mockStream);
     const firstCallCount = writeSpy.mock.calls.length;
-    const firstWrites = writeSpy.mock.calls
-      .map((call) => call[0] as string)
-      .join('');
+    const firstWrites = writeSpy.mock.calls.map((call) => callArg(call)).join('');
 
     writeSpy.mockClear();
     clearStatusLine(mockStream);
     const secondCallCount = writeSpy.mock.calls.length;
-    const secondWrites = writeSpy.mock.calls
-      .map((call) => call[0] as string)
-      .join('');
+    const secondWrites = writeSpy.mock.calls.map((call) => callArg(call)).join('');
 
     expect(firstCallCount).toBe(secondCallCount);
     expect(firstWrites).toBe(secondWrites);
@@ -411,13 +396,12 @@ describe('clearStatusLine', () => {
 });
 
 describe('terminalLog', () => {
-  let consoleSpy: ReturnType<typeof vi.spyOn<typeof console, 'log'>>;
-  let stderrWriteSpy: ReturnType<typeof vi.fn>;
+  let consoleSpy: MockInstance<typeof console.log>;
+  let stderrWriteSpy: MockInstance<typeof process.stderr.write>;
 
   beforeEach(() => {
     consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    stderrWriteSpy = vi.fn().mockReturnValue(true) as ReturnType<typeof vi.fn>;
-    vi.spyOn(process.stderr, 'write').mockImplementation(stderrWriteSpy);
+    stderrWriteSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     // Make stderr appear as TTY for testing
     Object.defineProperty(process.stderr, 'isTTY', {
       value: true,
@@ -450,44 +434,9 @@ describe('terminalLog', () => {
 
   it('logs without re-rendering when state.currentStatusText is null', () => {
     const state: FormatterState = {
+      ...createMockFormatterState(),
       currentStatusText: null,
-      pendingTools: [],
-      lastToolTime: null,
-      activeTasks: new Map(),
-      toolToTaskId: new Map(),
-
-      currentTaskId: null,
-      toolStartTimes: new Map(),
-      currentStep: 1,
       suppressStepCompletion: false,
-      lastStepDurationMs: null,
-      stats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      runStats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      stepStartTime: null,
-      taskStatsMap: new Map(),
-      taskStartTimes: new Map(),
-      taskReadyQueue: [],
-      taskPendingQueue: [],
     };
 
     terminalLog('Test message', state);
@@ -499,44 +448,9 @@ describe('terminalLog', () => {
 
   it('re-renders status line when state.currentStatusText is non-null', () => {
     const state: FormatterState = {
+      ...createMockFormatterState(),
       currentStatusText: 'Current status text',
-      pendingTools: [],
-      lastToolTime: null,
-      activeTasks: new Map(),
-      toolToTaskId: new Map(),
-
-      currentTaskId: null,
-      toolStartTimes: new Map(),
-      currentStep: 1,
       suppressStepCompletion: false,
-      lastStepDurationMs: null,
-      stats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      runStats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      stepStartTime: null,
-      taskStatsMap: new Map(),
-      taskStartTimes: new Map(),
-      taskReadyQueue: [],
-      taskPendingQueue: [],
     };
 
     terminalLog('Test message', state);
@@ -545,9 +459,7 @@ describe('terminalLog', () => {
     expect(consoleSpy).toHaveBeenCalledWith('Test message');
     // Should call renderStatusLine with the status text
     expect(stderrWriteSpy).toHaveBeenCalled();
-    const allWrites = stderrWriteSpy.mock.calls
-      .map((call) => call[0] as string)
-      .join('');
+    const allWrites = stderrWriteSpy.mock.calls.map((call) => callArg(call)).join('');
     expect(allWrites).toContain('Current status text');
   });
 
@@ -560,44 +472,9 @@ describe('terminalLog', () => {
 
   it('clears status line before log and re-renders after', () => {
     const state: FormatterState = {
+      ...createMockFormatterState(),
       currentStatusText: 'Active status',
-      pendingTools: [],
-      lastToolTime: null,
-      activeTasks: new Map(),
-      toolToTaskId: new Map(),
-
-      currentTaskId: null,
-      toolStartTimes: new Map(),
-      currentStep: 1,
       suppressStepCompletion: false,
-      lastStepDurationMs: null,
-      stats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      runStats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      stepStartTime: null,
-      taskStatsMap: new Map(),
-      taskStartTimes: new Map(),
-      taskReadyQueue: [],
-      taskPendingQueue: [],
     };
 
     terminalLog('Log line', state);
@@ -605,7 +482,7 @@ describe('terminalLog', () => {
     // stderr writes happen in order: clear (before log), render (after log)
     // clear = \x1b[2K\r (1 write)
     // render = \x1b[2K\r + dim-text\r (2 writes)
-    const calls = stderrWriteSpy.mock.calls.map((call: [string]) => call[0]);
+    const calls = stderrWriteSpy.mock.calls.map((call) => callArg(call));
 
     // First: clearStatusLine (1 write)
     expect(calls[0]).toBe('\x1b[2K\r');
@@ -621,13 +498,12 @@ describe('terminalLog', () => {
 });
 
 describe('bindFormatterState / unbindFormatterState', () => {
-  let consoleSpy: ReturnType<typeof vi.spyOn<typeof console, 'log'>>;
-  let stderrWriteSpy: ReturnType<typeof vi.fn>;
+  let consoleSpy: MockInstance<typeof console.log>;
+  let stderrWriteSpy: MockInstance<typeof process.stderr.write>;
 
   beforeEach(() => {
     consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    stderrWriteSpy = vi.fn().mockReturnValue(true) as ReturnType<typeof vi.fn>;
-    vi.spyOn(process.stderr, 'write').mockImplementation(stderrWriteSpy);
+    stderrWriteSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     Object.defineProperty(process.stderr, 'isTTY', {
       value: true,
       configurable: true,
@@ -646,96 +522,24 @@ describe('bindFormatterState / unbindFormatterState', () => {
 
   it('bound state causes terminalLog to re-render without explicit state param', () => {
     const state: FormatterState = {
+      ...createMockFormatterState(),
       currentStatusText: 'Bound status',
-      pendingTools: [],
-      lastToolTime: null,
-      activeTasks: new Map(),
-      toolToTaskId: new Map(),
-
-      currentTaskId: null,
-      toolStartTimes: new Map(),
-      currentStep: 1,
       suppressStepCompletion: false,
-      lastStepDurationMs: null,
-      stats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      runStats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      stepStartTime: null,
-      taskStatsMap: new Map(),
-      taskStartTimes: new Map(),
-      taskReadyQueue: [],
-      taskPendingQueue: [],
     };
 
     bindFormatterState(state);
     terminalLog('Test line');
 
     expect(consoleSpy).toHaveBeenCalledWith('Test line');
-    const allWrites = stderrWriteSpy.mock.calls
-      .map((call: [string]) => call[0])
-      .join('');
+    const allWrites = stderrWriteSpy.mock.calls.map((call) => callArg(call)).join('');
     expect(allWrites).toContain('Bound status');
   });
 
   it('unbind stops re-rendering on subsequent terminalLog calls', () => {
     const state: FormatterState = {
+      ...createMockFormatterState(),
       currentStatusText: 'Will unbind',
-      pendingTools: [],
-      lastToolTime: null,
-      activeTasks: new Map(),
-      toolToTaskId: new Map(),
-
-      currentTaskId: null,
-      toolStartTimes: new Map(),
-      currentStep: 1,
       suppressStepCompletion: false,
-      lastStepDurationMs: null,
-      stats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      runStats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      stepStartTime: null,
-      taskStatsMap: new Map(),
-      taskStartTimes: new Map(),
-      taskReadyQueue: [],
-      taskPendingQueue: [],
     };
 
     bindFormatterState(state);
@@ -750,44 +554,9 @@ describe('bindFormatterState / unbindFormatterState', () => {
 
   it('explicit state param takes precedence over bound state', () => {
     const boundState: FormatterState = {
+      ...createMockFormatterState(),
       currentStatusText: 'Bound text',
-      pendingTools: [],
-      lastToolTime: null,
-      activeTasks: new Map(),
-      toolToTaskId: new Map(),
-
-      currentTaskId: null,
-      toolStartTimes: new Map(),
-      currentStep: 1,
       suppressStepCompletion: false,
-      lastStepDurationMs: null,
-      stats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      runStats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      stepStartTime: null,
-      taskStatsMap: new Map(),
-      taskStartTimes: new Map(),
-      taskReadyQueue: [],
-      taskPendingQueue: [],
     };
 
     const explicitState: FormatterState = {
@@ -798,53 +567,16 @@ describe('bindFormatterState / unbindFormatterState', () => {
     bindFormatterState(boundState);
     terminalLog('Test', explicitState);
 
-    const allWrites = stderrWriteSpy.mock.calls
-      .map((call: [string]) => call[0])
-      .join('');
+    const allWrites = stderrWriteSpy.mock.calls.map((call) => callArg(call)).join('');
     expect(allWrites).toContain('Explicit text');
     expect(allWrites).not.toContain('Bound text');
   });
 
   it('no-op when bound state has null currentStatusText', () => {
     const state: FormatterState = {
+      ...createMockFormatterState(),
       currentStatusText: null,
-      pendingTools: [],
-      lastToolTime: null,
-      activeTasks: new Map(),
-      toolToTaskId: new Map(),
-
-      currentTaskId: null,
-      toolStartTimes: new Map(),
-      currentStep: 1,
       suppressStepCompletion: false,
-      lastStepDurationMs: null,
-      stats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      runStats: {
-        totalMessages: 0,
-        userMessages: 0,
-        assistantMessages: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        toolUses: 0,
-        outputLines: 0,
-      },
-      stepStartTime: null,
-      taskStatsMap: new Map(),
-      taskStartTimes: new Map(),
-      taskReadyQueue: [],
-      taskPendingQueue: [],
     };
 
     bindFormatterState(state);

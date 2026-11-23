@@ -19,6 +19,7 @@ import {
   type PendingTool,
   type Verbosity,
 } from '../types/runner.js';
+import { getToolInputString } from '../types/tools.js';
 import {
   MAX_RESULT_LINES,
   TRUNCATE_BASH_CMD,
@@ -140,10 +141,7 @@ export function resetFormatterState(state: FormatterState): void {
 /**
  * Finalize step stats: merge into runStats and return step summary
  */
-export function finalizeStepStats(
-  state: FormatterState,
-  stepDurationMs: number
-): string {
+export function finalizeStepStats(state: FormatterState, stepDurationMs: number): string {
   // Merge step stats into run stats
   mergeStats(state.runStats, state.stats);
   // Format and return the step summary
@@ -153,10 +151,7 @@ export function finalizeStepStats(
 /**
  * Get the overall run stats summary
  */
-export function getRunStatsSummary(
-  state: FormatterState,
-  runDurationMs: number
-): string {
+export function getRunStatsSummary(state: FormatterState, runDurationMs: number): string {
   return formatStatsSummary(state.runStats, runDurationMs);
 }
 
@@ -197,11 +192,7 @@ function formatTaskMarker(colorIndex: number): string {
 /**
  * Format a single tool use for display
  */
-function formatToolUse(
-  tool: PendingTool,
-  indented: boolean,
-  state: FormatterState
-): void {
+function formatToolUse(tool: PendingTool, indented: boolean, state: FormatterState): void {
   const colorIndex = getToolTaskColorIndex(tool.id, state);
   const inTask = colorIndex >= 0;
   const labelPrefix = inTask ? `${formatTaskMarker(colorIndex)} ` : '';
@@ -213,16 +204,13 @@ function formatToolUse(
 
   let summary: string;
   if (name === 'Read') {
-    summary = shortenPath((input['file_path'] as string | undefined) ?? '');
+    summary = shortenPath(getToolInputString(input, 'file_path'));
   } else if (name === 'Glob') {
-    summary = (input['pattern'] as string | undefined) ?? '';
+    summary = getToolInputString(input, 'pattern');
   } else if (name === 'Grep') {
-    summary = `"${truncate((input['pattern'] as string | undefined) ?? '', TRUNCATE_GREP_PATTERN)}"`;
+    summary = `"${truncate(getToolInputString(input, 'pattern'), TRUNCATE_GREP_PATTERN)}"`;
   } else if (name === 'Bash') {
-    const cmd = ((input['command'] as string | undefined) ?? '').replace(
-      /[\r\n]+/g,
-      ' '
-    );
+    const cmd = getToolInputString(input, 'command').replace(/[\r\n]+/g, ' ');
     summary = truncate(cmd, TRUNCATE_BASH_CMD);
   } else if (name === 'Task' || name === 'Agent') {
     // Task state already initialized in pre-scan, just print header
@@ -234,7 +222,7 @@ function formatToolUse(
     }
     return;
   } else if (name === 'Write' || name === 'Edit') {
-    summary = shortenPath((input['file_path'] as string | undefined) ?? '');
+    summary = shortenPath(getToolInputString(input, 'file_path'));
   } else {
     summary = truncate(JSON.stringify(input), TRUNCATE_TOOL_JSON);
   }
@@ -248,10 +236,7 @@ function formatToolUse(
 /**
  * Flush pending tools, grouping parallel calls
  */
-export function flushPendingTools(
-  state: FormatterState,
-  verbosity: Verbosity
-): void {
+export function flushPendingTools(state: FormatterState, verbosity: Verbosity): void {
   if (state.pendingTools.length === 0) {
     return;
   }
@@ -300,9 +285,7 @@ function printToolResult(
 
   // Verbose only: show detailed results
   const content =
-    typeof result.content === 'string'
-      ? result.content
-      : JSON.stringify(result.content);
+    typeof result.content === 'string' ? result.content : JSON.stringify(result.content);
   const filtered = filterNoiseLines(content);
   const lines = filtered.split('\n').filter((l) => l.trim());
 
@@ -324,11 +307,7 @@ function printToolResult(
 /**
  * Print a task result and clean up task state
  */
-function printTaskResult(
-  taskId: string,
-  _verbosity: Verbosity,
-  state: FormatterState
-): void {
+function printTaskResult(taskId: string, _verbosity: Verbosity, state: FormatterState): void {
   const task = state.activeTasks.get(taskId);
   if (!task) return;
 
@@ -386,17 +365,12 @@ export function formatMessage(
     // Check for Task tools first to initialize task tracking
     const preTaskCount = state.activeTasks.size;
     for (const block of msg.message.content) {
-      if (
-        isToolUseBlock(block) &&
-        (block.name === 'Task' || block.name === 'Agent')
-      ) {
+      if (isToolUseBlock(block) && (block.name === 'Task' || block.name === 'Agent')) {
         const input = block.input;
-        const taskType =
-          (input['subagent_type'] as string | undefined) ?? 'agent';
+        const taskType = getToolInputString(input, 'subagent_type', 'agent');
+        const description = getToolInputString(input, 'description');
         const taskDesc = truncate(
-          (input['description'] as string | undefined) ??
-            (input['prompt'] as string | undefined) ??
-            '',
+          description !== '' ? description : getToolInputString(input, 'prompt'),
           TRUNCATE_TASK_DESC
         );
         // Assign stable color from agent ID hash
@@ -424,8 +398,7 @@ export function formatMessage(
       // Multiple concurrent tasks: use queue-based attribution
       // Ready queue = tasks that just got a tool result (conversation continues)
       // Pending queue = tasks awaiting their first action (creation order)
-      const candidateId =
-        state.taskReadyQueue.shift() ?? state.taskPendingQueue.shift() ?? null;
+      const candidateId = state.taskReadyQueue.shift() ?? state.taskPendingQueue.shift() ?? null;
       if (candidateId && state.activeTasks.has(candidateId)) {
         messageTaskId = candidateId;
       }
@@ -435,9 +408,7 @@ export function formatMessage(
 
     // Track message and token usage in stats
     const statsTaskId = messageTaskId ?? state.currentTaskId;
-    const currentTaskStats = statsTaskId
-      ? state.taskStatsMap.get(statsTaskId)
-      : null;
+    const currentTaskStats = statsTaskId ? state.taskStatsMap.get(statsTaskId) : null;
     const stats = currentTaskStats ?? state.stats;
     incrementMessageCount(stats);
     if (msg.message.usage) {
@@ -452,10 +423,7 @@ export function formatMessage(
 
         if (verbosity === 'quiet') {
           // Show answers but not thinking/status updates
-          if (
-            !block.text.startsWith("I'll ") &&
-            !block.text.startsWith('Let me ')
-          ) {
+          if (!block.text.startsWith("I'll ") && !block.text.startsWith('Let me ')) {
             const displayText = block.text.replace(/[\r\n]+/g, ' ').trim();
             terminalLog(
               `${timestampPrefix()}${colors.green}[answer]${colors.reset} ${displayText}`
@@ -482,10 +450,7 @@ export function formatMessage(
           recordToolUse(stats, block.name);
         }
 
-        if (
-          state.lastToolTime &&
-          now - state.lastToolTime < parallelThresholdMs
-        ) {
+        if (state.lastToolTime && now - state.lastToolTime < parallelThresholdMs) {
           // Part of parallel batch
           state.pendingTools.push({
             name: block.name,
@@ -509,9 +474,7 @@ export function formatMessage(
 
     // Track usage from task results (tool_use_result has aggregated stats)
     if (msg.tool_use_result?.usage) {
-      const taskStats = state.currentTaskId
-        ? state.taskStatsMap.get(state.currentTaskId)
-        : null;
+      const taskStats = state.currentTaskId ? state.taskStatsMap.get(state.currentTaskId) : null;
       updateTokenStats(taskStats ?? state.stats, msg.tool_use_result.usage);
     }
 
@@ -519,9 +482,7 @@ export function formatMessage(
       if (isToolResultBlock(block)) {
         const toolUseId = block.tool_use_id;
         const content =
-          typeof block.content === 'string'
-            ? block.content
-            : JSON.stringify(block.content);
+          typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
 
         // Calculate duration
         let durationStr = '';
@@ -540,8 +501,7 @@ export function formatMessage(
 
         if (isError) {
           const colorIndex = getToolTaskColorIndex(toolUseId, state);
-          const indent =
-            colorIndex >= 0 ? `${formatTaskMarker(colorIndex)} ` : '';
+          const indent = colorIndex >= 0 ? `${formatTaskMarker(colorIndex)} ` : '';
           // Strip <tool_use_error> tags for cleaner display
           const cleanError = content
             .replace(/<\/?tool_use_error>/g, '')
@@ -583,9 +543,7 @@ export function formatMessage(
 
     // Track usage from result message
     if (msg.usage) {
-      const taskStats = state.currentTaskId
-        ? state.taskStatsMap.get(state.currentTaskId)
-        : null;
+      const taskStats = state.currentTaskId ? state.taskStatsMap.get(state.currentTaskId) : null;
       updateTokenStats(taskStats ?? state.stats, msg.usage);
     }
 

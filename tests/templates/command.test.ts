@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  parseGenericFrontmatter,
-  stripFrontmatter,
-} from '../../src/templates/command.js';
+import { parseGenericFrontmatter, stripFrontmatter } from '../../src/templates/command.js';
 
 describe('stripFrontmatter', () => {
   it('strips YAML frontmatter', () => {

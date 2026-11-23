@@ -5,6 +5,8 @@
  * integrated with the existing Claude runner infrastructure.
  */
 
+import * as fs from 'fs';
+
 import type { RillValue, RuntimeCallbacks } from '@rcrsr/rill';
 import {
   atomName,
@@ -17,7 +19,6 @@ import {
   RuntimeHaltSignal,
   TimeoutError,
 } from '@rcrsr/rill';
-import * as fs from 'fs';
 
 import {
   bindFormatterState,
@@ -34,12 +35,9 @@ import { spawnClaude } from '../process/pty.js';
 import { parseFrontmatter } from '../templates/command.js';
 import type { RunnerConfig } from '../types/runner.js';
 import { STATUS_TIMER_INTERVAL_MS } from '../utils/constants.js';
+import { definedEnv } from '../utils/env.js';
 import { formatRillValue } from '../utils/formatting.js';
-import {
-  createRunnerContext,
-  type ExecutionResult,
-  type InvocationContext,
-} from './context.js';
+import { createRunnerContext, type ExecutionResult, type InvocationContext } from './context.js';
 
 // ============================================================
 // TYPES
@@ -69,10 +67,19 @@ export interface RillRunResult {
   lastOutput: string;
 }
 
+const RILL_ARG_TYPES = ['string', 'number', 'bool'] as const;
+
+/** Type names allowed in an `args` frontmatter definition */
+type RillArgType = (typeof RILL_ARG_TYPES)[number];
+
+function isRillArgType(value: string): value is RillArgType {
+  return (RILL_ARG_TYPES as readonly string[]).includes(value);
+}
+
 /** Parsed argument definition from frontmatter */
 export interface RillArgDef {
   name: string;
-  type: 'string' | 'number' | 'bool';
+  type: RillArgType;
   required: boolean;
   defaultValue?: string | number | boolean | undefined;
 }
@@ -92,6 +99,16 @@ export interface RillScriptMeta {
 // SCRIPT LOADING
 // ============================================================
 
+/** Escape a value for use inside an XML attribute */
+function escapeXml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 /**
  * Parse args definition from frontmatter
  * Format: "file: string, retries: number = 3"
@@ -107,19 +124,19 @@ function parseArgsDefinition(argsStr: string): RillArgDef[] {
     if (!part) continue;
 
     // Pattern: name: type or name: type = default
-    const match = /^(\w+)\s*:\s*(string|number|bool)(?:\s*=\s*(.+))?$/.exec(
-      part
-    );
+    const match = /^(\w+)\s*:\s*(string|number|bool)(?:\s*=\s*(.+))?$/.exec(part);
     if (!match) {
       throw new Error(`Invalid arg definition: ${part}`);
     }
 
     const [, name, type, defaultStr] = match;
-    if (!name || !type) continue;
+    if (!name || !type || !isRillArgType(type)) {
+      throw new Error(`Invalid arg definition: ${part}`);
+    }
 
     const def: RillArgDef = {
       name,
-      type: type as 'string' | 'number' | 'bool',
+      type,
       required: defaultStr === undefined,
     };
 
@@ -184,11 +201,8 @@ export function loadRillScript(scriptFile: string): {
 /**
  * Execute a Rill script
  */
-export async function runRillScript(
-  options: RillRunnerOptions
-): Promise<RillRunResult> {
-  const { scriptFile, args, config, logger, formatterState, cwd, runId } =
-    options;
+export async function runRillScript(options: RillRunnerOptions): Promise<RillRunResult> {
+  const { scriptFile, args, config, logger, formatterState, cwd, runId } = options;
 
   // Load and parse script
   const { source, meta } = loadRillScript(scriptFile);
@@ -274,21 +288,13 @@ export async function runRillScript(
       const { timeoutMs: _, ...reportFields } = invocation ?? {
         method: 'ccr::prompt',
       };
-      const escapeXml = (s: string): string =>
-        s
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-          .replace(/'/g, '&apos;');
       const attrsStr = Object.entries(reportFields)
         .filter(([, v]) => v !== undefined)
         .map(([k, v]) => `${k}="${escapeXml(String(v))}"`)
         .join(' ');
       const timeoutTag = `<ccr:result type="timeout"${attrsStr ? ` ${attrsStr}` : ''}/>`;
 
-      const effectiveTimeoutMs =
-        invocation?.timeoutMs ?? config.inactivityTimeoutMs;
+      const effectiveTimeoutMs = invocation?.timeoutMs ?? config.inactivityTimeoutMs;
       logger.logEvent({
         event: 'step_timeout',
         step: state.stepNum,
@@ -346,10 +352,7 @@ export async function runRillScript(
 
     // Render or clear status line
     if (text !== null) {
-      renderStatusLine(
-        statusDisplayText(formatterState) ?? text,
-        process.stderr
-      );
+      renderStatusLine(statusDisplayText(formatterState) ?? text, process.stderr);
       // Start interval to keep the elapsed timer ticking
       statusInterval ??= setInterval(() => {
         if (formatterState.currentStatusText !== null) {
@@ -384,7 +387,7 @@ export async function runRillScript(
       executeClause,
       namedArgs,
       rawArgs: args,
-      env: process.env as Record<string, string>,
+      env: definedEnv(),
       commandsDir: '.claude/commands',
       defaultModel: effectiveModel ?? undefined,
       callbacks,
@@ -400,8 +403,7 @@ export async function runRillScript(
       process.stderr.off('resize', handleResize);
       clearStatusInterval();
     }
-    const msg =
-      setupError instanceof Error ? setupError.message : String(setupError);
+    const msg = setupError instanceof Error ? setupError.message : String(setupError);
     throw new Error(`Script setup failed for ${scriptFile}: ${msg}`, {
       cause: setupError,
     });
@@ -539,9 +541,7 @@ export async function runRillScript(
       clearStatusLine(process.stderr);
     }
     const msg = error instanceof Error ? error.message : String(error);
-    printRunner(
-      `${colors.red}Script error${colors.reset} [${scriptFile}]: ${msg}`
-    );
+    printRunner(`${colors.red}Script error${colors.reset} [${scriptFile}]: ${msg}`);
     logger.logEvent({ event: 'rill_script_error', runId, error: msg });
     return { success: false, lastOutput: state.lastOutput };
   }
