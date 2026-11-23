@@ -34,7 +34,7 @@ import type { Logger } from '../output/logger.js';
 import { spawnClaude } from '../process/pty.js';
 import { parseFrontmatter } from '../templates/command.js';
 import type { RunnerConfig } from '../types/runner.js';
-import { STATUS_TIMER_INTERVAL_MS } from '../utils/constants.js';
+import { MS_PER_MINUTE, STATUS_TIMER_INTERVAL_MS } from '../utils/constants.js';
 import { definedEnv } from '../utils/env.js';
 import { formatRillValue } from '../utils/formatting.js';
 import { createRunnerContext, type ExecutionResult, type InvocationContext } from './context.js';
@@ -264,6 +264,8 @@ export async function runRillScript(options: RillRunnerOptions): Promise<RillRun
       printRunner(`Running step ${state.stepNum}: "${preview}"`);
     }
 
+    const effectiveTimeoutMs = invocation?.timeoutMs ?? config.inactivityTimeoutMs;
+
     // Execute via existing PTY infrastructure
     const result = await spawnClaude({
       prompt,
@@ -274,7 +276,7 @@ export async function runRillScript(options: RillRunnerOptions): Promise<RillRun
       parallelThresholdMs: config.parallelThresholdMs,
       model: model ?? effectiveModel,
       effort: effectiveEffort,
-      inactivityTimeoutMs: invocation?.timeoutMs ?? config.inactivityTimeoutMs,
+      inactivityTimeoutMs: effectiveTimeoutMs,
     });
 
     // Finalize step stats (merge into runStats for final summary)
@@ -292,17 +294,18 @@ export async function runRillScript(options: RillRunnerOptions): Promise<RillRun
         .filter(([, v]) => v !== undefined)
         .map(([k, v]) => `${k}="${escapeXml(String(v))}"`)
         .join(' ');
-      const timeoutTag = `<ccr:result type="timeout"${attrsStr ? ` ${attrsStr}` : ''}/>`;
+      const minutes = effectiveTimeoutMs / MS_PER_MINUTE;
+      const timeoutTag = `<ccr:result type="timeout" source="ccr" minutes="${minutes}"${attrsStr ? ` ${attrsStr}` : ''}/>`;
 
-      const effectiveTimeoutMs = invocation?.timeoutMs ?? config.inactivityTimeoutMs;
       logger.logEvent({
         event: 'step_timeout',
         step: state.stepNum,
+        minutes,
         ...reportFields,
       });
 
       printRunner(
-        `${colors.red}Step ${state.stepNum} timed out (no output for ${Math.round(effectiveTimeoutMs / 60_000)}m)${colors.reset}`
+        `${colors.red}Step ${state.stepNum} timed out (no output for ${minutes}m)${colors.reset}`
       );
 
       return { output: timeoutTag, exitCode: 1 };

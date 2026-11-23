@@ -48,6 +48,8 @@ export const PTY_ROWS = 50;
 export const MS_PER_SECOND = 1000;
 /** Seconds per minute */
 export const SECONDS_PER_MINUTE = 60;
+/** Milliseconds per minute */
+export const MS_PER_MINUTE = MS_PER_SECOND * SECONDS_PER_MINUTE;
 /** Seconds per hour */
 export const SECONDS_PER_HOUR = 3600;
 /** Default inactivity timeout in ms (10 minutes) — kills the process when no output is received */

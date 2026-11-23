@@ -243,6 +243,140 @@ describe('runRillScript', () => {
     expect(result.lastOutput).toBe('Analysis complete');
   });
 
+  it('forwards per-call timeout minutes as inactivityTimeoutMs', async () => {
+    const scriptPath = path.join(testDir, 'skill-timeout.rill');
+    fs.writeFileSync(scriptPath, 'ccr::skill("long-skill", [], 30)');
+
+    vi.mocked(spawnClaude).mockResolvedValue({
+      exitCode: 0,
+      duration: 100,
+      claudeText: 'Done',
+    });
+
+    await runRillScript(createRunnerOptions(scriptPath));
+
+    expect(spawnClaude).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: '/long-skill',
+        inactivityTimeoutMs: 1_800_000,
+      })
+    );
+  });
+
+  it('uses config inactivityTimeoutMs when no per-call timeout is given', async () => {
+    const scriptPath = path.join(testDir, 'skill-default-timeout.rill');
+    fs.writeFileSync(scriptPath, 'ccr::skill("long-skill")');
+
+    vi.mocked(spawnClaude).mockResolvedValue({
+      exitCode: 0,
+      duration: 100,
+      claudeText: 'Done',
+    });
+
+    const config = createMockConfig({ verbosity: 'quiet' });
+    await runRillScript(createRunnerOptions(scriptPath, { config }));
+
+    expect(spawnClaude).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: '/long-skill',
+        inactivityTimeoutMs: config.inactivityTimeoutMs,
+      })
+    );
+  });
+
+  it('exposes source="ccr" via get_result on per-call timeout', async () => {
+    const scriptPath = path.join(testDir, 'skill-timed-out.rill');
+    fs.writeFileSync(
+      scriptPath,
+      `ccr::skill("long-skill", [], 30) => $out
+ccr::get_result($out).source`
+    );
+
+    vi.mocked(spawnClaude).mockResolvedValue({
+      exitCode: 1,
+      duration: 100,
+      claudeText: 'partial',
+      timedOut: true,
+    });
+
+    const result = await runRillScript(createRunnerOptions(scriptPath));
+
+    expect(result.lastOutput).toBe('ccr');
+  });
+
+  it('timeout tag carries invocation details and drops partial output', async () => {
+    const scriptPath = path.join(testDir, 'skill-timed-out-tag.rill');
+    fs.writeFileSync(scriptPath, 'ccr::skill("long-skill", [], 30)');
+
+    vi.mocked(spawnClaude).mockResolvedValue({
+      exitCode: 1,
+      duration: 100,
+      claudeText: 'partial',
+      timedOut: true,
+    });
+
+    const result = await runRillScript(createRunnerOptions(scriptPath));
+
+    expect(result.lastOutput).toContain('type="timeout"');
+    expect(result.lastOutput).toContain('source="ccr"');
+    expect(result.lastOutput).toContain('minutes="30"');
+    expect(result.lastOutput).toContain('method="ccr::skill"');
+    expect(result.lastOutput).toContain('name="long-skill"');
+    expect(result.lastOutput).not.toContain('partial');
+  });
+
+  it('timeout tag reports default minutes when no per-call timeout is given', async () => {
+    const scriptPath = path.join(testDir, 'skill-timed-out-default.rill');
+    fs.writeFileSync(scriptPath, 'ccr::skill("long-skill")');
+
+    vi.mocked(spawnClaude).mockResolvedValue({
+      exitCode: 1,
+      duration: 100,
+      claudeText: 'partial',
+      timedOut: true,
+    });
+
+    const result = await runRillScript(createRunnerOptions(scriptPath));
+
+    expect(result.lastOutput).toContain('minutes="10"');
+  });
+
+  it('timeout tag reports fractional minutes exactly', async () => {
+    const scriptPath = path.join(testDir, 'skill-timed-out-fraction.rill');
+    fs.writeFileSync(scriptPath, 'ccr::skill("long-skill", [], 0.5)');
+
+    vi.mocked(spawnClaude).mockResolvedValue({
+      exitCode: 1,
+      duration: 100,
+      claudeText: '',
+      timedOut: true,
+    });
+
+    const result = await runRillScript(createRunnerOptions(scriptPath));
+
+    expect(result.lastOutput).toContain('minutes="0.5"');
+  });
+
+  it('timeout tag name round-trips through get_result unescaped', async () => {
+    const scriptPath = path.join(testDir, 'skill-timed-out-escape.rill');
+    fs.writeFileSync(
+      scriptPath,
+      `ccr::skill("a&b", [], 30) => $out
+ccr::get_result($out).name`
+    );
+
+    vi.mocked(spawnClaude).mockResolvedValue({
+      exitCode: 1,
+      duration: 100,
+      claudeText: '',
+      timedOut: true,
+    });
+
+    const result = await runRillScript(createRunnerOptions(scriptPath));
+
+    expect(result.lastOutput).toBe('a&b');
+  });
+
   it('uses CLI model over frontmatter model', async () => {
     const scriptPath = path.join(testDir, 'model.rill');
     fs.writeFileSync(

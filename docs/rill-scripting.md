@@ -59,6 +59,10 @@ ccr::skill("commit")
 ccr::skill("conduct:create-language-policy", ["typescript"])
 ```
 
+When the inactivity watchdog kills a call, it returns the reserved timeout tag instead of output. See [Runner-reserved result: timeout](results.md#runner-reserved-result-timeout).
+
+The watchdog counts only output from the Claude process, so waiting on background work counts as silence. A skill must not end its turn to wait for a background task, Workflow or notification. Either keep the main turn producing output while waiting, or pass a `timeout` longer than the longest background phase.
+
 ### ccr::file_exists(path) -> boolean
 
 Check if a file exists.
