@@ -297,7 +297,7 @@ describe('formatMessage', () => {
       flushPendingTools(state, 'normal');
 
       // displayWidth() falls back to 120 when stdout is not a TTY
-      const line = consoleSpy.mock.calls[0]?.[0] as string;
+      const line = callArg(consoleSpy.mock.calls[0]);
       expect(stripAnsi(line)).toContain('...');
       expect(stripAnsi(line).length).toBeLessThanOrEqual(120);
     });
@@ -310,7 +310,7 @@ describe('formatMessage', () => {
       formatMessage(msg, state, 'normal', logger, 100);
       flushPendingTools(state, 'normal');
 
-      const line = consoleSpy.mock.calls[0]?.[0] as string;
+      const line = callArg(consoleSpy.mock.calls[0]);
       expect(stripAnsi(line)).toContain('ls -la');
       expect(stripAnsi(line)).not.toContain('...');
     });
