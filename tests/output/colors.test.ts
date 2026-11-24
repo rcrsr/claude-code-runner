@@ -674,12 +674,18 @@ describe('contextWindowForModel', () => {
     expect(contextWindowForModel('claude-sonnet-5')).toBe(1_000_000);
     expect(contextWindowForModel('claude-sonnet-4-6')).toBe(1_000_000);
     expect(contextWindowForModel('claude-haiku-5-5')).toBe(1_000_000);
+    expect(contextWindowForModel('claude-fable-5-2')).toBe(1_000_000);
+    expect(contextWindowForModel('claude-fable-5-1')).toBe(1_000_000);
+    expect(contextWindowForModel('claude-mythos-5-2')).toBe(1_000_000);
+    expect(contextWindowForModel('claude-opus-5-5')).toBe(1_000_000);
+    expect(contextWindowForModel('claude-sonnet-5-5')).toBe(1_000_000);
   });
 
   it('returns 200k for smaller-context models', () => {
     expect(contextWindowForModel('claude-haiku-4-5-20251001')).toBe(200_000);
     expect(contextWindowForModel('claude-sonnet-4-5-20250929')).toBe(200_000);
     expect(contextWindowForModel('claude-opus-4-5-20251101')).toBe(200_000);
+    expect(contextWindowForModel('claude-opus-4-1-20250805')).toBe(200_000);
   });
 
   it('does not confuse sonnet-4-5 with sonnet-5', () => {

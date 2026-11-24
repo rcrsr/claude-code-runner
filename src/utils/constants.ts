@@ -66,11 +66,12 @@ export const CONTEXT_WINDOW_DEFAULT_TOKENS = 200_000;
 export const CONTEXT_WINDOW_1M_TOKENS = 1_000_000;
 /**
  * Model families with a 1M-token context window, matched by shortened model
- * name prefix (see shortModelName). All other models use the 200k default.
+ * name prefix (see shortModelName), so "opus-5" also covers "opus-5-5".
+ * All other models use the 200k default.
  * Verified against platform.claude.com/docs/en/about-claude/models/overview
- * (July 2026): Fable 5, Mythos 5, Opus 5/4.8/4.7/4.6, and Sonnet 5/4.6 are 1M;
- * Haiku 5 is 1M (confirmed by maintainer, November 2026).
- * Haiku 4.5, Sonnet 4.5, Opus 4.5/4.1 and older are 200k.
+ * (2026-11-23). 1M: Fable 5/5.1/5.2, Mythos 5/5.1/5.2, Opus 5/5.5/4.8/4.7/4.6,
+ * Sonnet 5/5.5/4.6, Haiku 5.5. 200k: Haiku 4.5, Sonnet 4.5, Opus 4.5/4.1.
+ * Mythos Preview (deprecated) has no documented window; kept at 1M from PR #12.
  */
 export const CONTEXT_WINDOW_1M_MODEL_PREFIXES = [
   'fable-5',
