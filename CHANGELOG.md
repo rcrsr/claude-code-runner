@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Timeout result tag:** Carries `source="ccr"` and `minutes` so scripts can tell a runner timeout kill from skill output. ([#15](https://github.com/rcrsr/claude-code-runner/pull/15))
 
-- The status line (set via `ccr::state`) now shows the active model and context usage next to the elapsed timer, e.g. `[00:12:34] [opus-4-8 · ctx 42%] reviewing implementation`. The model comes from each step's init message. Context % uses the latest top-level assistant message against the model's context window (1M or 200k) and resets each step. Model IDs show without the `claude-` prefix and date suffix. (#12)
+- **Status line model and context:** The status line (set via `ccr::state`) now shows the active model and context usage next to the elapsed timer, e.g. `[00:12:34] [opus-4-8 · ctx 42%] reviewing implementation`. The model comes from each step's init message. Context % uses the latest top-level assistant message against the model's context window (1M or 200k) and resets each step. Model IDs show without the `claude-` prefix and date suffix. Ported from #12. ([#17](https://github.com/rcrsr/claude-code-runner/pull/17))
 
 ### Security
 
@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Tool call lines (`[Bash]`, `[Grep]`, etc.) now truncate to the terminal width instead of fixed 30-60 character limits. (#12)
+- **Tool line width:** Tool call lines (`[Bash]`, `[Grep]`, etc.) now truncate to the terminal width instead of fixed 30-60 character limits. Ported from #12. ([#17](https://github.com/rcrsr/claude-code-runner/pull/17))
 - Bumped `@rcrsr/rill` from `0.19.3` to `0.19.6`, staying inside the `~0.19` range. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
 - Upgraded dev tooling: `vitest` and `@vitest/coverage-v8` from `4.0` to `5.1`, and `@types/node` from `25` to `26`. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
 - Replaced ESLint and Prettier with oxlint (type-aware, via `oxlint-tsgolint`) and oxfmt. Lint now covers `tests/` as well as `src/`, and oxfmt sorts imports and wraps at 100 columns. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
@@ -35,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- The run completion line shows active runtime beside wall clock when a resumed run has a crash gap, e.g. `2h 10m 0s active / 18h 38m 57s wall`. (#11)
+- **Active runtime:** The run completion line shows active runtime beside wall clock when a resumed run has a crash gap, e.g. `2h 10m 0s active / 18h 38m 57s wall`. Ported from #11. ([#17](https://github.com/rcrsr/claude-code-runner/pull/17))
 - **`ccr::get_result` entities:** Decodes `&amp;`, `&lt;`, `&gt;`, `&quot;` and `&apos;` in attribute values, so a timeout tag's `name` round-trips. The timeout console line now prints the exact `minutes` value. ([#15](https://github.com/rcrsr/claude-code-runner/pull/15))
 - The stream parser now skips JSON lines that are not message objects (for example a bare number), where before it passed them on as messages. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
 - Crash recovery now ignores a run-state file that does not match the full schema (missing `runStats`, old token fields), where before it crashed on startup until the file was deleted. CI tests on Node 26 instead of 25, which vitest 5 does not support. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
