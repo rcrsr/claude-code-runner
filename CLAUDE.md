@@ -59,13 +59,7 @@ This repo borrows the TypeScript tooling from `APP-MONOREPO-STANDARDS.md`. As a 
 
 ## Releasing
 
-1. Bump `version` in `package.json`
-2. Stamp `[Unreleased]` in `CHANGELOG.md` with version and date (`[x.y.z] — YYYY-MM-DD`)
-3. Commit: `chore: vX.Y.Z — summary`
-4. Tag: `git tag -a vX.Y.Z -m "vX.Y.Z"`
-5. Push commit and tag: `git push && git push origin vX.Y.Z`
-
-The tag push triggers the release workflow, which handles npm publish and GitHub release creation.
+Follow `.github/release-sop.md`, or run `/conduct:cut-release <version>`, which reads it. `main` is protected, so releases land through a PR; the `v*` tag push then triggers npm publish and GitHub release creation.
 
 ## Testing
 
