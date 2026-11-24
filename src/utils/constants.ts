@@ -32,8 +32,8 @@ export const TRUNCATE_ANSWER = 500;
 export const TRUNCATE_TASK_VERBOSE = 500;
 /** Minimum width for tool summary display (floor when terminal is narrow) */
 export const TOOL_SUMMARY_MIN_WIDTH = 40;
-/** Columns reserved when width-truncating: truncate() appends '...' beyond the given length, plus one column so lines never wrap */
-export const TRUNCATE_ELLIPSIS_RESERVE = 4;
+/** Columns left free at the end of a width-truncated line so it never wraps */
+export const TOOL_LINE_WRAP_RESERVE = 1;
 /** Fallback display width when stdout is not a TTY */
 export const DISPLAY_FALLBACK_WIDTH = 120;
 
@@ -58,6 +58,13 @@ export const DEFAULT_INACTIVITY_TIMEOUT_MS = 600_000;
 // === Default Configuration ===
 /** Default parallel tool detection threshold in ms */
 export const DEFAULT_PARALLEL_THRESHOLD_MS = 100;
+
+// === Run Summary ===
+/**
+ * Minimum gap in ms between wall clock and active runtime before the run
+ * summary shows both. Only a crash/resume gap makes them diverge this much.
+ */
+export const ACTIVE_TIME_DIVERGENCE_MS = 1000;
 
 // === Context Tracking ===
 /** Default context window in tokens when the model is unknown (200k) */

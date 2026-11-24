@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Tool line width:** Tool call lines (`[Bash]`, `[Grep]`, etc.) now truncate to the terminal width instead of fixed 30-60 character limits. Ported from #12. ([#17](https://github.com/rcrsr/claude-code-runner/pull/17))
+- **Tool line width:** Tool call lines (`[Bash]`, `[Grep]`, etc.) now truncate to the terminal width instead of fixed 30-60 character limits. Width counts wide characters as 2 columns, file paths keep the filename, and escape sequences and newlines in tool input are stripped. Ported from #12. ([#17](https://github.com/rcrsr/claude-code-runner/pull/17))
 - Bumped `@rcrsr/rill` from `0.19.3` to `0.19.6`, staying inside the `~0.19` range. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
 - Upgraded dev tooling: `vitest` and `@vitest/coverage-v8` from `4.0` to `5.1`, and `@types/node` from `25` to `26`. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
 - Replaced ESLint and Prettier with oxlint (type-aware, via `oxlint-tsgolint`) and oxfmt. Lint now covers `tests/` as well as `src/`, and oxfmt sorts imports and wraps at 100 columns. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))

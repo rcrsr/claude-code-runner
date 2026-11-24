@@ -55,7 +55,8 @@ export interface MessageEnvelope {
 export interface SystemInitMessage {
   type: 'system';
   subtype: 'init';
-  model: string;
+  /** Optional at runtime: the stream is external input and may omit it */
+  model?: string;
   tools?: string[];
   mcp_servers?: McpServer[];
 }
@@ -64,6 +65,8 @@ export interface SystemInitMessage {
 export interface AssistantMessage {
   type: 'assistant';
   message: MessageEnvelope;
+  /** Task/Agent tool_use id for subagent messages; null for top-level. Absent on older CLIs. */
+  parent_tool_use_id?: string | null;
 }
 
 // Tool use result (from task completions)

@@ -4,6 +4,7 @@
  */
 
 import type { TokenUsage } from '../types/claude.js';
+import { ACTIVE_TIME_DIVERGENCE_MS } from '../utils/constants.js';
 import { formatDuration } from './colors.js';
 
 /**
@@ -88,14 +89,15 @@ export function updateTokenStats(stats: RunStats, usage: TokenUsage): void {
 /**
  * Compute the current context size in tokens from a single message's usage.
  * Context = non-cached input + cache reads + cache writes for that request.
- * Prefers the cache_creation breakdown; falls back to the aggregate field.
+ * Prefers the cache_creation breakdown; falls back to the aggregate field when
+ * the breakdown is absent or sums to 0.
  */
 export function contextTokensFromUsage(usage: TokenUsage): number {
-  const cacheWrite =
-    usage.cache_creation !== undefined
-      ? (usage.cache_creation.ephemeral_5m_input_tokens ?? 0) +
-        (usage.cache_creation.ephemeral_1h_input_tokens ?? 0)
-      : (usage.cache_creation_input_tokens ?? 0);
+  const breakdown =
+    (usage.cache_creation?.ephemeral_5m_input_tokens ?? 0) +
+    (usage.cache_creation?.ephemeral_1h_input_tokens ?? 0);
+  // An empty or partial breakdown object reports 0 while the aggregate holds the real count
+  const cacheWrite = breakdown > 0 ? breakdown : (usage.cache_creation_input_tokens ?? 0);
   return (usage.input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) + cacheWrite;
 }
 
@@ -164,12 +166,6 @@ function totalInputTokens(tokens: TokenCounts): number {
 function formatNumber(n: number): string {
   return n.toLocaleString();
 }
-
-/**
- * Wall clock and active time are the same for a run that never went down;
- * only a crash/resume gap makes them diverge enough to be worth two numbers.
- */
-const ACTIVE_TIME_DIVERGENCE_MS = 1000;
 
 /**
  * Format stats summary for display

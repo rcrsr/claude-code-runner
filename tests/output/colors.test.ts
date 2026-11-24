@@ -16,6 +16,10 @@ import {
   formatTimestamp,
   printRunner,
   renderStatusLine,
+  sanitizeForTerminal,
+  stringWidth,
+  truncateStartToWidth,
+  truncateToWidth,
   contextWindowForModel,
   shortenPath,
   type StatusStream,
@@ -603,6 +607,66 @@ describe('shortModelName', () => {
 
   it('strips only the prefix when no date suffix', () => {
     expect(shortModelName('claude-sonnet-4-5')).toBe('sonnet-4-5');
+  });
+
+  it('strips the date and [1m] suffix from 1M-context beta IDs', () => {
+    expect(shortModelName('claude-sonnet-4-5-20250929[1m]')).toBe('sonnet-4-5');
+  });
+});
+
+describe('sanitizeForTerminal', () => {
+  it('removes OSC, private-mode CSI and bare ESC sequences', () => {
+    expect(sanitizeForTerminal('a\x1b]0;title\x07b\x1b[?1049hc\x1bcd')).toBe('abcd');
+  });
+
+  it('collapses newlines, tabs and other control characters to one space', () => {
+    expect(sanitizeForTerminal('a\r\n\tb\x00c')).toBe('a b c');
+  });
+
+  it('leaves plain and non-ASCII text unchanged', () => {
+    expect(sanitizeForTerminal('grep "héllo 世界"')).toBe('grep "héllo 世界"');
+  });
+});
+
+describe('stringWidth', () => {
+  it('counts wide characters and emoji as 2 columns', () => {
+    expect(stringWidth('ab世界🎉')).toBe(8);
+  });
+
+  it('counts combining marks as 0 columns', () => {
+    expect(stringWidth('e\u0301')).toBe(1);
+  });
+});
+
+describe('truncateToWidth', () => {
+  it('returns the string unchanged when it fits', () => {
+    expect(truncateToWidth('hello', 5)).toBe('hello');
+  });
+
+  it('fits the ellipsis inside the width', () => {
+    expect(truncateToWidth('abcdefghij', 8)).toBe('abcde...');
+  });
+
+  it('measures wide characters in columns', () => {
+    const out = truncateToWidth('世界世界世界', 8);
+    expect(out).toBe('世界...');
+    expect(stringWidth(out)).toBeLessThanOrEqual(8);
+  });
+
+  it('never splits a surrogate pair', () => {
+    const out = truncateToWidth('🎉🎉🎉🎉', 6);
+    expect(out).toBe('🎉...');
+    expect(out).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+  });
+});
+
+describe('truncateStartToWidth', () => {
+  it('keeps the tail and prefixes the ellipsis', () => {
+    expect(truncateStartToWidth('/a/b/c/file.ts', 10)).toBe('...file.ts');
+  });
+
+  it('returns the string unchanged when it fits', () => {
+    expect(truncateStartToWidth('file.ts', 10)).toBe('file.ts');
   });
 });
 

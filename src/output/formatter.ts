@@ -3,6 +3,7 @@
  */
 
 import {
+  type AssistantMessage,
   type ClaudeMessage,
   isAssistantMessage,
   isResultMessage,
@@ -22,8 +23,8 @@ import {
 import { getToolInputString } from '../types/tools.js';
 import {
   MAX_RESULT_LINES,
+  TOOL_LINE_WRAP_RESERVE,
   TOOL_SUMMARY_MIN_WIDTH,
-  TRUNCATE_ELLIPSIS_RESERVE,
   TRUNCATE_ERROR,
   TRUNCATE_MESSAGE,
   TRUNCATE_TASK_DESC,
@@ -37,11 +38,15 @@ import {
   hashAgentId,
   printClaude,
   printRunner,
+  sanitizeForTerminal,
   shortenPath,
+  stringWidth,
   stripAnsi,
   terminalLog,
   timestampPrefix,
   truncate,
+  truncateStartToWidth,
+  truncateToWidth,
 } from './colors.js';
 import type { Logger } from './logger.js';
 import {
@@ -172,14 +177,6 @@ export function getRunStatsSummary(
 }
 
 /**
- * Active runtime as of `now`: accumulated ticks plus the delta since the
- * last tick. Excludes gaps where the process was not running (crash/resume).
- */
-export function getActiveElapsedMs(state: FormatterState, now: number): number {
-  return state.elapsedMs + (state.lastTickTime !== null ? now - state.lastTickTime : 0);
-}
-
-/**
  * Check if a line contains noise patterns (node_modules, venv, etc.)
  */
 function isNoise(text: string): boolean {
@@ -214,6 +211,24 @@ function formatTaskMarker(colorIndex: number): string {
 }
 
 /**
+ * Whether an assistant message belongs to the main conversation, not a subagent.
+ * Prefers the stream's parent_tool_use_id; older CLIs omit it, so fall back to
+ * the queue heuristic, treating an unattributed message as top-level only when
+ * no subagent could have sent it.
+ */
+function isTopLevelMessage(
+  msg: AssistantMessage,
+  messageTaskId: string | null,
+  createdTasks: boolean,
+  state: FormatterState
+): boolean {
+  if (msg.parent_tool_use_id !== undefined) {
+    return msg.parent_tool_use_id === null;
+  }
+  return messageTaskId === null && (createdTasks || state.activeTasks.size === 0);
+}
+
+/**
  * Format a single tool use for display
  */
 function formatToolUse(tool: PendingTool, indented: boolean, state: FormatterState): void {
@@ -226,15 +241,21 @@ function formatToolUse(tool: PendingTool, indented: boolean, state: FormatterSta
   const name = tool.name;
   const input = tool.input;
 
+  // How to fit the summary to the terminal: paths keep their tail (the
+  // filename), everything else keeps its head. Grep quotes wrap the result.
   let summary: string;
-  if (name === 'Read') {
+  let keepTail = false;
+  let quoted = false;
+  if (name === 'Read' || name === 'Write' || name === 'Edit') {
     summary = shortenPath(getToolInputString(input, 'file_path'));
+    keepTail = true;
   } else if (name === 'Glob') {
     summary = getToolInputString(input, 'pattern');
   } else if (name === 'Grep') {
-    summary = `"${getToolInputString(input, 'pattern')}"`;
+    summary = getToolInputString(input, 'pattern');
+    quoted = true;
   } else if (name === 'Bash') {
-    summary = getToolInputString(input, 'command').replace(/[\r\n]+/g, ' ');
+    summary = getToolInputString(input, 'command');
   } else if (name === 'Task' || name === 'Agent') {
     // Task state already initialized in pre-scan, just print header
     const task = state.activeTasks.get(tool.id);
@@ -244,23 +265,27 @@ function formatToolUse(tool: PendingTool, indented: boolean, state: FormatterSta
       );
     }
     return;
-  } else if (name === 'Write' || name === 'Edit') {
-    summary = shortenPath(getToolInputString(input, 'file_path'));
   } else {
     summary = JSON.stringify(input);
   }
+  // Tool input is model-generated: strip escape sequences and collapse newlines
+  summary = sanitizeForTerminal(summary);
 
   const nameDisplay = indented
     ? `${colors.cyan}${name}${colors.reset}`
     : `${colors.blue}[${name}]${colors.reset}`;
-  // Truncate the summary to fit the terminal width (floor for narrow terminals).
-  // Reserve room for the '...' truncate() appends, so the line never wraps.
+  // Fit the summary to the terminal width (floor for narrow terminals), leaving
+  // the last column free so the line never wraps
   const lineStart = `${prefix}${nameDisplay} `;
+  const quoteWidth = quoted ? 2 : 0;
   const available = Math.max(
     TOOL_SUMMARY_MIN_WIDTH,
-    displayWidth() - stripAnsi(lineStart).length - TRUNCATE_ELLIPSIS_RESERVE
+    displayWidth() - stringWidth(stripAnsi(lineStart)) - TOOL_LINE_WRAP_RESERVE - quoteWidth
   );
-  terminalLog(`${lineStart}${truncate(summary, available)}`);
+  const fitted = keepTail
+    ? truncateStartToWidth(summary, available)
+    : truncateToWidth(summary, available);
+  terminalLog(`${lineStart}${quoted ? `"${fitted}"` : fitted}`);
 }
 
 /**
@@ -388,8 +413,12 @@ export function formatMessage(
   let claudeText = '';
 
   if (isSystemInitMessage(msg)) {
-    // Config is shown by runner; capture the model for the status line
-    state.currentModel = msg.model;
+    // Config is shown by runner; capture the model for the status line.
+    // The stream is external input, so a missing or non-string model is ignored.
+    const model: unknown = msg.model;
+    if (typeof model === 'string' && model !== '') {
+      state.currentModel = sanitizeForTerminal(model);
+    }
   } else if (isAssistantMessage(msg)) {
     flushPendingTools(state, verbosity);
 
@@ -446,7 +475,7 @@ export function formatMessage(
       updateTokenStats(stats, msg.message.usage);
       // Subagent messages carry their own (smaller) context; only top-level
       // messages reflect the main conversation's context size
-      if (messageTaskId === null) {
+      if (isTopLevelMessage(msg, messageTaskId, createdTasks, state)) {
         state.contextTokens = contextTokensFromUsage(msg.message.usage);
       }
     }

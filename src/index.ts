@@ -10,13 +10,14 @@ import { VERSION as RILL_VERSION } from '@rcrsr/rill';
 
 import { generateDocs, parseArgs } from './cli/index.js';
 import { createDeadDropClientFromEnv } from './deaddrop/index.js';
-import { configureDeadDrop, flushDeadDrop, printRunner, printRunnerInfo } from './output/colors.js';
 import {
-  createFormatterState,
-  finalizeStepStats,
+  configureDeadDrop,
+  flushDeadDrop,
   getActiveElapsedMs,
-  getRunStatsSummary,
-} from './output/formatter.js';
+  printRunner,
+  printRunnerInfo,
+} from './output/colors.js';
+import { createFormatterState, finalizeStepStats, getRunStatsSummary } from './output/formatter.js';
 import { createLogger } from './output/logger.js';
 import { cloneStats, mergeStats } from './output/stats.js';
 import { spawnClaude } from './process/pty.js';

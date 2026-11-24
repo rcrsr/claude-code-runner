@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { createFormatterState, getActiveElapsedMs } from '../../src/output/formatter.js';
-import { createRunStats, formatStatsSummary } from '../../src/output/stats.js';
+import { getActiveElapsedMs } from '../../src/output/colors.js';
+import { createFormatterState } from '../../src/output/formatter.js';
+import {
+  contextTokensFromUsage,
+  createRunStats,
+  formatStatsSummary,
+} from '../../src/output/stats.js';
 
 describe('formatStatsSummary', () => {
   it('shows a single duration when no active time is given', () => {
@@ -52,5 +57,34 @@ describe('getActiveElapsedMs', () => {
     state.lastTickTime = null;
 
     expect(getActiveElapsedMs(state, 103_000)).toBe(5_000);
+  });
+});
+
+describe('contextTokensFromUsage', () => {
+  it('sums input, cache reads and the cache_creation breakdown', () => {
+    expect(
+      contextTokensFromUsage({
+        input_tokens: 100,
+        cache_read_input_tokens: 1_000,
+        cache_creation: { ephemeral_5m_input_tokens: 20, ephemeral_1h_input_tokens: 30 },
+        cache_creation_input_tokens: 50,
+      })
+    ).toBe(1_150);
+  });
+
+  it('falls back to the aggregate when the breakdown is absent', () => {
+    expect(contextTokensFromUsage({ input_tokens: 100, cache_creation_input_tokens: 400 })).toBe(
+      500
+    );
+  });
+
+  it('falls back to the aggregate when the breakdown object is empty', () => {
+    expect(
+      contextTokensFromUsage({
+        input_tokens: 100,
+        cache_creation: {},
+        cache_creation_input_tokens: 400,
+      })
+    ).toBe(500);
   });
 });
