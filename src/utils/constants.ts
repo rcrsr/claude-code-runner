@@ -69,6 +69,7 @@ export const CONTEXT_WINDOW_1M_TOKENS = 1_000_000;
  * name prefix (see shortModelName). All other models use the 200k default.
  * Verified against platform.claude.com/docs/en/about-claude/models/overview
  * (July 2026): Fable 5, Mythos 5, Opus 5/4.8/4.7/4.6, and Sonnet 5/4.6 are 1M;
+ * Haiku 5 is 1M (confirmed by maintainer, November 2026).
  * Haiku 4.5, Sonnet 4.5, Opus 4.5/4.1 and older are 200k.
  */
 export const CONTEXT_WINDOW_1M_MODEL_PREFIXES = [
@@ -81,6 +82,7 @@ export const CONTEXT_WINDOW_1M_MODEL_PREFIXES = [
   'opus-4-6',
   'sonnet-5',
   'sonnet-4-6',
+  'haiku-5',
 ] as const;
 
 // === Status Line ===

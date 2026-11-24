@@ -673,6 +673,7 @@ describe('contextWindowForModel', () => {
     expect(contextWindowForModel('claude-opus-4-8')).toBe(1_000_000);
     expect(contextWindowForModel('claude-sonnet-5')).toBe(1_000_000);
     expect(contextWindowForModel('claude-sonnet-4-6')).toBe(1_000_000);
+    expect(contextWindowForModel('claude-haiku-5-5')).toBe(1_000_000);
   });
 
   it('returns 200k for smaller-context models', () => {
