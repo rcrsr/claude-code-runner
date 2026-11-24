@@ -364,6 +364,18 @@ describe('formatMessage', () => {
       expect(line).not.toContain('x'.repeat(38));
     });
 
+    it('does not truncate a summary that exactly fills the available width', () => {
+      setColumns(80);
+      const prefixWidth = printTool(consoleSpy, 'Bash', { command: '' }).length;
+      consoleSpy.mockClear();
+      const command = 'y'.repeat(79 - prefixWidth);
+      const line = printTool(consoleSpy, 'Bash', { command });
+
+      expect(line).toContain(command);
+      expect(line).not.toContain('...');
+      expect(line.length).toBe(79);
+    });
+
     it('does not truncate summaries that already fit', () => {
       setColumns(80);
       const line = printTool(consoleSpy, 'Bash', { command: 'ls -la' });
@@ -444,6 +456,17 @@ describe('formatMessage', () => {
 
       formatMessage(msg, state, 'normal', createMockLogger(), 100);
 
+      expect(state.contextTokens).toBe(70_000);
+    });
+
+    it('without parent_tool_use_id, updates from a message that creates the first Task', () => {
+      const state = createMockFormatterState();
+      const msg = createToolUseMessage('Task', { subagent_type: 'explorer', description: 'x' });
+      msg.message.usage = { input_tokens: 70_000, output_tokens: 5 };
+
+      formatMessage(msg, state, 'normal', createMockLogger(), 100);
+
+      expect(state.activeTasks.size).toBe(1);
       expect(state.contextTokens).toBe(70_000);
     });
 

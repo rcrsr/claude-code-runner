@@ -225,7 +225,8 @@ function isTopLevelMessage(
   if (msg.parent_tool_use_id !== undefined) {
     return msg.parent_tool_use_id === null;
   }
-  return messageTaskId === null && (createdTasks || state.activeTasks.size === 0);
+  // Only the main agent spawns Tasks, so a Task-creating message is top-level
+  return createdTasks || (messageTaskId === null && state.activeTasks.size === 0);
 }
 
 /**
