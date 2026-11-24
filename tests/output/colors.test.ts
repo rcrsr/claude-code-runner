@@ -16,8 +16,16 @@ import {
   formatTimestamp,
   printRunner,
   renderStatusLine,
+  sanitizeForTerminal,
+  stringWidth,
+  truncateStartToWidth,
+  truncateToWidth,
+  contextWindowForModel,
   shortenPath,
   type StatusStream,
+  shortModelName,
+  statusDisplayText,
+  statusInfoSegment,
   stripAnsi,
   terminalLog,
   timestampPrefix,
@@ -25,6 +33,7 @@ import {
   unbindFormatterState,
 } from '../../src/output/colors.js';
 import type { FormatterState } from '../../src/output/formatter.js';
+import { createFormatterState } from '../../src/output/formatter.js';
 import { STATUS_LINE_MIN_WIDTH } from '../../src/utils/constants.js';
 import { callArg, createMockFormatterState } from '../helpers/mocks.js';
 
@@ -584,5 +593,170 @@ describe('bindFormatterState / unbindFormatterState', () => {
 
     expect(consoleSpy).toHaveBeenCalledWith('No status');
     expect(stderrWriteSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('shortModelName', () => {
+  it('strips claude- prefix and date suffix', () => {
+    expect(shortModelName('claude-opus-4-5-20250929')).toBe('opus-4-5');
+  });
+
+  it('handles alias-style names', () => {
+    expect(shortModelName('sonnet')).toBe('sonnet');
+  });
+
+  it('strips only the prefix when no date suffix', () => {
+    expect(shortModelName('claude-sonnet-4-5')).toBe('sonnet-4-5');
+  });
+
+  it('strips the date and [1m] suffix from 1M-context beta IDs', () => {
+    expect(shortModelName('claude-sonnet-4-5-20250929[1m]')).toBe('sonnet-4-5');
+  });
+});
+
+describe('sanitizeForTerminal', () => {
+  it('removes OSC, private-mode CSI and bare ESC sequences', () => {
+    expect(sanitizeForTerminal('a\x1b]0;title\x07b\x1b[?1049hc\x1bcd')).toBe('abcd');
+  });
+
+  it('collapses newlines, tabs and other control characters to one space', () => {
+    expect(sanitizeForTerminal('a\r\n\tb\x00c')).toBe('a b c');
+  });
+
+  it('leaves plain and non-ASCII text unchanged', () => {
+    expect(sanitizeForTerminal('grep "héllo 世界"')).toBe('grep "héllo 世界"');
+  });
+});
+
+describe('stringWidth', () => {
+  it('counts wide characters and emoji as 2 columns', () => {
+    expect(stringWidth('ab世界🎉')).toBe(8);
+  });
+
+  it('counts combining marks as 0 columns', () => {
+    expect(stringWidth('e\u0301')).toBe(1);
+  });
+});
+
+describe('truncateToWidth', () => {
+  it('returns the string unchanged when it fits', () => {
+    expect(truncateToWidth('hello', 5)).toBe('hello');
+  });
+
+  it('fits the ellipsis inside the width', () => {
+    expect(truncateToWidth('abcdefghij', 8)).toBe('abcde...');
+  });
+
+  it('measures wide characters in columns', () => {
+    const out = truncateToWidth('世界世界世界', 8);
+    expect(out).toBe('世界...');
+    expect(stringWidth(out)).toBeLessThanOrEqual(8);
+  });
+
+  it('never splits a surrogate pair', () => {
+    const out = truncateToWidth('🎉🎉🎉🎉', 6);
+    expect(out).toBe('🎉...');
+    expect(out).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+  });
+});
+
+describe('truncateStartToWidth', () => {
+  it('keeps the tail and prefixes the ellipsis', () => {
+    expect(truncateStartToWidth('/a/b/c/file.ts', 10)).toBe('...file.ts');
+  });
+
+  it('returns the string unchanged when it fits', () => {
+    expect(truncateStartToWidth('file.ts', 10)).toBe('file.ts');
+  });
+});
+
+describe('statusInfoSegment', () => {
+  it('returns null when neither model nor context is known', () => {
+    const state = createFormatterState();
+    expect(statusInfoSegment(state)).toBeNull();
+  });
+
+  it('shows model alone when context is unknown', () => {
+    const state = createFormatterState();
+    state.currentModel = 'claude-opus-4-5-20250929';
+    expect(statusInfoSegment(state)).toBe('[opus-4-5]');
+  });
+
+  it('shows context percent alone when model is unknown', () => {
+    const state = createFormatterState();
+    state.contextTokens = 100_000;
+    expect(statusInfoSegment(state)).toBe('[ctx 50%]');
+  });
+
+  it('shows model and context percent together', () => {
+    const state = createFormatterState();
+    state.currentModel = 'claude-opus-4-5-20250929';
+    state.contextTokens = 84_000;
+    expect(statusInfoSegment(state)).toBe('[opus-4-5 · ctx 42%]');
+  });
+
+  it('caps context percent at 100', () => {
+    const state = createFormatterState();
+    state.contextTokens = 500_000;
+    expect(statusInfoSegment(state)).toBe('[ctx 100%]');
+  });
+});
+
+describe('statusDisplayText', () => {
+  it('returns null without status text', () => {
+    const state = createFormatterState();
+    state.currentModel = 'claude-opus-4-5-20250929';
+    expect(statusDisplayText(state)).toBeNull();
+  });
+
+  it('renders elapsed and status text without model info', () => {
+    const state = createFormatterState();
+    state.currentStatusText = 'reviewing implementation';
+    expect(statusDisplayText(state)).toBe('[00:00:00] reviewing implementation');
+  });
+
+  it('includes model and context segment when available', () => {
+    const state = createFormatterState();
+    state.currentStatusText = 'reviewing implementation';
+    state.currentModel = 'claude-opus-4-5-20250929';
+    state.contextTokens = 84_000;
+    expect(statusDisplayText(state)).toBe(
+      '[00:00:00] [opus-4-5 · ctx 42%] reviewing implementation'
+    );
+  });
+});
+
+describe('contextWindowForModel', () => {
+  it('returns 200k default when model is unknown', () => {
+    expect(contextWindowForModel(null)).toBe(200_000);
+  });
+
+  it('returns 1M for current large-context models', () => {
+    expect(contextWindowForModel('claude-opus-5')).toBe(1_000_000);
+    expect(contextWindowForModel('claude-fable-5')).toBe(1_000_000);
+    expect(contextWindowForModel('claude-opus-4-8')).toBe(1_000_000);
+    expect(contextWindowForModel('claude-sonnet-5')).toBe(1_000_000);
+    expect(contextWindowForModel('claude-sonnet-4-6')).toBe(1_000_000);
+    expect(contextWindowForModel('claude-haiku-5-5')).toBe(1_000_000);
+    expect(contextWindowForModel('claude-fable-5-2')).toBe(1_000_000);
+    expect(contextWindowForModel('claude-fable-5-1')).toBe(1_000_000);
+    expect(contextWindowForModel('claude-mythos-5-2')).toBe(1_000_000);
+    expect(contextWindowForModel('claude-opus-5-5')).toBe(1_000_000);
+    expect(contextWindowForModel('claude-sonnet-5-5')).toBe(1_000_000);
+  });
+
+  it('returns 200k for smaller-context models', () => {
+    expect(contextWindowForModel('claude-haiku-4-5-20251001')).toBe(200_000);
+    expect(contextWindowForModel('claude-sonnet-4-5-20250929')).toBe(200_000);
+    expect(contextWindowForModel('claude-opus-4-5-20251101')).toBe(200_000);
+    expect(contextWindowForModel('claude-opus-4-1-20250805')).toBe(200_000);
+  });
+
+  it('does not confuse sonnet-4-5 with sonnet-5', () => {
+    expect(contextWindowForModel('claude-sonnet-4-5-20250929')).toBe(200_000);
+  });
+
+  it('honors the [1m] beta suffix on any model', () => {
+    expect(contextWindowForModel('claude-sonnet-4-5[1m]')).toBe(1_000_000);
   });
 });

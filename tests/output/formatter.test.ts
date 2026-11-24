@@ -24,6 +24,27 @@ function stripAnsi(str: string): string {
   return str.replace(/\x1b\[[0-9;]*m/g, '');
 }
 
+/** Override process.stdout.columns (undefined = not a TTY) */
+function setColumns(columns: number | undefined): void {
+  Object.defineProperty(process.stdout, 'columns', {
+    value: columns,
+    configurable: true,
+    writable: true,
+  });
+}
+
+/** Format one tool use and return its printed line without ANSI codes */
+function printTool(
+  spy: MockInstance<typeof console.log>,
+  name: string,
+  input: Record<string, unknown>
+): string {
+  const state = createMockFormatterState();
+  formatMessage(createToolUseMessage(name, input), state, 'normal', createMockLogger(), 100);
+  flushPendingTools(state, 'normal');
+  return stripAnsi(callArg(spy.mock.calls[0]));
+}
+
 describe('createFormatterState', () => {
   it('returns empty pendingTools array', () => {
     const state = createFormatterState();
@@ -100,6 +121,17 @@ describe('resetFormatterState', () => {
     resetFormatterState(state);
 
     expect(state.currentStatusText).toBe('Processing...');
+  });
+
+  it('clears contextTokens but preserves currentModel', () => {
+    const state = createMockFormatterState();
+    state.currentModel = 'claude-opus-4-5-20250929';
+    state.contextTokens = 84_000;
+
+    resetFormatterState(state);
+
+    expect(state.contextTokens).toBeNull();
+    expect(state.currentModel).toBe('claude-opus-4-5-20250929');
   });
 });
 
@@ -262,6 +294,203 @@ describe('formatMessage', () => {
       formatMessage(msg, state, 'quiet', logger, 100);
 
       expect(consoleSpy).not.toHaveBeenCalled();
+    });
+
+    it('captures the model for the status line', () => {
+      const state = createMockFormatterState();
+      const logger = createMockLogger();
+      const msg = createSystemInitMessage('claude-opus-4-5-20250929');
+
+      formatMessage(msg, state, 'normal', logger, 100);
+
+      expect(state.currentModel).toBe('claude-opus-4-5-20250929');
+    });
+
+    it('ignores an init message without a string model', () => {
+      const state = createMockFormatterState();
+      state.currentModel = 'claude-opus-5';
+      const msg = createSystemInitMessage();
+      Reflect.deleteProperty(msg, 'model');
+
+      formatMessage(msg, state, 'normal', createMockLogger(), 100);
+
+      expect(state.currentModel).toBe('claude-opus-5');
+    });
+
+    it('strips escape sequences from the model name', () => {
+      const state = createMockFormatterState();
+      const msg = createSystemInitMessage('claude-opus-5\x1b]0;title\x07');
+
+      formatMessage(msg, state, 'normal', createMockLogger(), 100);
+
+      expect(state.currentModel).toBe('claude-opus-5');
+    });
+  });
+
+  describe('tool line width truncation', () => {
+    const originalColumns = Object.getOwnPropertyDescriptor(process.stdout, 'columns');
+
+    afterEach(() => {
+      if (originalColumns) {
+        Object.defineProperty(process.stdout, 'columns', originalColumns);
+      } else {
+        Reflect.deleteProperty(process.stdout, 'columns');
+      }
+    });
+
+    it('keeps truncated tool lines one column short of the terminal width', () => {
+      setColumns(80);
+      const line = printTool(consoleSpy, 'Bash', {
+        command: 'node scripts/conduct.mjs plan-status ' + 'x'.repeat(400),
+      });
+
+      expect(line).toContain('...');
+      expect(line.length).toBe(79);
+    });
+
+    it('falls back to 120 columns when stdout is not a TTY', () => {
+      setColumns(undefined);
+      const line = printTool(consoleSpy, 'Bash', { command: 'x'.repeat(400) });
+
+      expect(line.length).toBe(119);
+    });
+
+    it('never truncates a summary below the minimum width on narrow terminals', () => {
+      setColumns(20);
+      const line = printTool(consoleSpy, 'Bash', { command: 'x'.repeat(400) });
+
+      // 40-column summary floor: 37 chars plus '...'
+      expect(line).toContain('x'.repeat(37) + '...');
+      expect(line).not.toContain('x'.repeat(38));
+    });
+
+    it('does not truncate a summary that exactly fills the available width', () => {
+      setColumns(80);
+      const prefixWidth = printTool(consoleSpy, 'Bash', { command: '' }).length;
+      consoleSpy.mockClear();
+      const command = 'y'.repeat(79 - prefixWidth);
+      const line = printTool(consoleSpy, 'Bash', { command });
+
+      expect(line).toContain(command);
+      expect(line).not.toContain('...');
+      expect(line.length).toBe(79);
+    });
+
+    it('does not truncate summaries that already fit', () => {
+      setColumns(80);
+      const line = printTool(consoleSpy, 'Bash', { command: 'ls -la' });
+
+      expect(line).toContain('ls -la');
+      expect(line).not.toContain('...');
+    });
+
+    it('keeps the closing quote on a truncated Grep pattern', () => {
+      setColumns(80);
+      const line = printTool(consoleSpy, 'Grep', { pattern: 'p'.repeat(400) });
+
+      expect(line).toMatch(/"p+\.\.\."$/);
+      expect(line.length).toBe(79);
+    });
+
+    it('keeps the filename when truncating a long path', () => {
+      setColumns(80);
+      const line = printTool(consoleSpy, 'Read', {
+        file_path: '/srv/' + 'nested/'.repeat(30) + 'target-file.ts',
+      });
+
+      expect(line).toMatch(/\[Read\] \.\.\..*target-file\.ts$/);
+      expect(line.length).toBe(79);
+    });
+
+    it('strips escape sequences and newlines from tool input', () => {
+      setColumns(120);
+      const line = printTool(consoleSpy, 'Bash', {
+        command: 'echo a\x1b]0;pwned\x07\nrm -rf x\x1b[?25l',
+      });
+
+      expect(line).not.toContain('\x1b');
+      expect(line).not.toContain('\x07');
+      expect(line).toContain('echo a rm -rf x');
+    });
+  });
+
+  describe('context tracking', () => {
+    it('captures context tokens from assistant message usage', () => {
+      const state = createMockFormatterState();
+      const logger = createMockLogger();
+      const msg = createTextMessage('Hello');
+      msg.message.usage = {
+        input_tokens: 100,
+        output_tokens: 50,
+        cache_read_input_tokens: 60_000,
+        cache_creation: {
+          ephemeral_5m_input_tokens: 2_000,
+          ephemeral_1h_input_tokens: 1_000,
+        },
+      };
+
+      formatMessage(msg, state, 'normal', logger, 100);
+
+      expect(state.contextTokens).toBe(63_100);
+    });
+
+    it('ignores subagent messages flagged by parent_tool_use_id', () => {
+      const state = createMockFormatterState();
+      state.contextTokens = 50_000;
+      const msg = createTextMessage('Hello');
+      msg.parent_tool_use_id = 'task-1';
+      msg.message.usage = { input_tokens: 10, output_tokens: 5 };
+
+      formatMessage(msg, state, 'normal', createMockLogger(), 100);
+
+      expect(state.contextTokens).toBe(50_000);
+    });
+
+    it('updates from top-level messages with a null parent_tool_use_id while tasks run', () => {
+      const state = createMockFormatterState();
+      state.activeTasks.set('task-1', { name: 'a', description: '', id: 'task-1', colorIndex: 0 });
+      state.activeTasks.set('task-2', { name: 'b', description: '', id: 'task-2', colorIndex: 1 });
+      const msg = createTextMessage('Hello');
+      msg.parent_tool_use_id = null;
+      msg.message.usage = { input_tokens: 70_000, output_tokens: 5 };
+
+      formatMessage(msg, state, 'normal', createMockLogger(), 100);
+
+      expect(state.contextTokens).toBe(70_000);
+    });
+
+    it('without parent_tool_use_id, updates from a message that creates the first Task', () => {
+      const state = createMockFormatterState();
+      const msg = createToolUseMessage('Task', { subagent_type: 'explorer', description: 'x' });
+      msg.message.usage = { input_tokens: 70_000, output_tokens: 5 };
+
+      formatMessage(msg, state, 'normal', createMockLogger(), 100);
+
+      expect(state.activeTasks.size).toBe(1);
+      expect(state.contextTokens).toBe(70_000);
+    });
+
+    it('without parent_tool_use_id, ignores unattributed messages while tasks run', () => {
+      const state = createMockFormatterState();
+      state.contextTokens = 50_000;
+      state.activeTasks.set('task-1', { name: 'a', description: '', id: 'task-1', colorIndex: 0 });
+      state.activeTasks.set('task-2', { name: 'b', description: '', id: 'task-2', colorIndex: 1 });
+      const msg = createTextMessage('Hello');
+      msg.message.usage = { input_tokens: 10, output_tokens: 5 };
+
+      formatMessage(msg, state, 'normal', createMockLogger(), 100);
+
+      expect(state.contextTokens).toBe(50_000);
+    });
+
+    it('leaves contextTokens null when usage is absent', () => {
+      const state = createMockFormatterState();
+      const logger = createMockLogger();
+      const msg = createTextMessage('Hello');
+
+      formatMessage(msg, state, 'normal', logger, 100);
+
+      expect(state.contextTokens).toBeNull();
     });
   });
 

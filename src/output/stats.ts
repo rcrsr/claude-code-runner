@@ -4,6 +4,7 @@
  */
 
 import type { TokenUsage } from '../types/claude.js';
+import { ACTIVE_TIME_DIVERGENCE_MS } from '../utils/constants.js';
 import { formatDuration } from './colors.js';
 
 /**
@@ -86,6 +87,21 @@ export function updateTokenStats(stats: RunStats, usage: TokenUsage): void {
 }
 
 /**
+ * Compute the current context size in tokens from a single message's usage.
+ * Context = non-cached input + cache reads + cache writes for that request.
+ * Prefers the cache_creation breakdown; falls back to the aggregate field when
+ * the breakdown is absent or sums to 0.
+ */
+export function contextTokensFromUsage(usage: TokenUsage): number {
+  const breakdown =
+    (usage.cache_creation?.ephemeral_5m_input_tokens ?? 0) +
+    (usage.cache_creation?.ephemeral_1h_input_tokens ?? 0);
+  // An empty or partial breakdown object reports 0 while the aggregate holds the real count
+  const cacheWrite = breakdown > 0 ? breakdown : (usage.cache_creation_input_tokens ?? 0);
+  return (usage.input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) + cacheWrite;
+}
+
+/**
  * Record a tool use
  */
 export function recordToolUse(stats: RunStats, toolName: string): void {
@@ -154,12 +170,19 @@ function formatNumber(n: number): string {
 /**
  * Format stats summary for display
  * Example: 33s | 14 msgs | 319,449 in (32 p / 6,579 cw5m / 312,838 cr) | 931 out | 3 tools (Bash, Edit, Read)
+ *
+ * When activeMs is provided and materially less than durationMs (a resumed
+ * run with dead time), the duration shows both: "2h 10m 0s active / 18h 38m 57s wall"
  */
-export function formatStatsSummary(stats: RunStats, durationMs: number): string {
+export function formatStatsSummary(stats: RunStats, durationMs: number, activeMs?: number): string {
   const parts: string[] = [];
 
   // Duration
-  parts.push(formatDuration(durationMs));
+  if (activeMs !== undefined && durationMs - activeMs > ACTIVE_TIME_DIVERGENCE_MS) {
+    parts.push(`${formatDuration(activeMs)} active / ${formatDuration(durationMs)} wall`);
+  } else {
+    parts.push(formatDuration(durationMs));
+  }
 
   // Message count
   parts.push(`${stats.messageCount} msgs`);

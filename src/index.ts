@@ -10,7 +10,13 @@ import { VERSION as RILL_VERSION } from '@rcrsr/rill';
 
 import { generateDocs, parseArgs } from './cli/index.js';
 import { createDeadDropClientFromEnv } from './deaddrop/index.js';
-import { configureDeadDrop, flushDeadDrop, printRunner, printRunnerInfo } from './output/colors.js';
+import {
+  configureDeadDrop,
+  flushDeadDrop,
+  getActiveElapsedMs,
+  printRunner,
+  printRunnerInfo,
+} from './output/colors.js';
 import { createFormatterState, finalizeStepStats, getRunStatsSummary } from './output/formatter.js';
 import { createLogger } from './output/logger.js';
 import { cloneStats, mergeStats } from './output/stats.js';
@@ -150,8 +156,12 @@ async function main(): Promise<void> {
     });
 
     // Print run completion
-    const totalDuration = Date.now() - totalStart;
-    const runSummary = getRunStatsSummary(formatterState, totalDuration);
+    const now = Date.now();
+    const runSummary = getRunStatsSummary(
+      formatterState,
+      now - totalStart,
+      getActiveElapsedMs(formatterState, now)
+    );
     printRunner(`Run ${runId} complete: ${runSummary}`);
 
     logger.close();
@@ -197,8 +207,12 @@ async function main(): Promise<void> {
   printRunner(`Step 1 complete: ${stepSummary}`);
 
   // Print run completion
-  const totalDuration = Date.now() - totalStart;
-  const runSummary = getRunStatsSummary(formatterState, totalDuration);
+  const now = Date.now();
+  const runSummary = getRunStatsSummary(
+    formatterState,
+    now - totalStart,
+    getActiveElapsedMs(formatterState, now)
+  );
   printRunner(`Run ${runId} complete: ${runSummary}`);
 
   logger.logEvent({ event: 'run_complete', runId, exit: result.exitCode });
