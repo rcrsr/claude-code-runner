@@ -21,7 +21,7 @@ This file defines how to release this package. `/conduct:cut-release <version>` 
 ## Constraints
 
 - **`main` is protected.** It requires the `check (22)`, `check (24)` and `check (26)` status checks and linear history, and it applies those rules to admins too. A release must land through a pull request (PR). A direct push to `main` is rejected.
-- **The tag publishes to npm.** Pushing a `v*` tag runs `.github/workflows/release.yml`. That workflow runs `npm ci`, `npm run build` and `npm run check`, then confirms the tag matches the `package.json` version. It then publishes to npm with `NPM_TOKEN` and creates the GitHub release with `--generate-notes`. Treat pushing the tag as the publish step.
+- **The tag publishes to npm.** Pushing a `v*` tag runs `.github/workflows/release.yml`. That workflow runs `npm ci`, `npm run build` and `npm run check`, then confirms the tag matches the `package.json` version. It then publishes to npm with `NPM_TOKEN` and creates the GitHub release with `--generate-notes`. `npm publish` also runs the `prepublishOnly` script (`npm run check && npm run build`), so a check can fail at publish time too. Treat pushing the tag as the publish step.
 - **npm versions are permanent.** A published version cannot be republished, even after `npm unpublish`. A broken release needs a new patch version.
 
 ## Choosing the version
@@ -29,7 +29,7 @@ This file defines how to release this package. `/conduct:cut-release <version>` 
 The package is pre-1.0 (`0.x.y`):
 
 - A breaking change to the CLI, a host function or the result-tag format bumps MINOR (`0.15.0` → `0.16.0`).
-- Anything else that is listed in `Added`, `Changed` or `Security` bumps MINOR.
+- Anything else that is listed in `Added`, `Changed`, `Deprecated`, `Removed` or `Security` bumps MINOR.
 - A release that contains only `Fixed` entries bumps PATCH (`0.15.0` → `0.15.1`).
 
 ## Steps
@@ -39,6 +39,10 @@ The package is pre-1.0 (`0.x.y`):
 1. Start from `main` with a clean working tree: `git checkout main && git pull --ff-only && git status --porcelain`. The last command must print nothing.
 2. Confirm `## [Unreleased]` in `CHANGELOG.md` has at least 1 entry. If it is empty, there is nothing to release.
 3. Confirm `gh auth status` succeeds.
+4. Create a scratch directory outside the working tree with `mktemp -d`, and note the path it prints as `{tmp}`. Every scratch file in later steps lives there:
+   - `{notes}` is `{tmp}/notes.md`, the release narrative. Step 5 writes it, and steps 7 and 8 reuse it.
+   - `{tag-message-file}` is `{tmp}/tag-message.txt`, written in step 7.
+   - `{tmp}/release-body.md` and `{tmp}/release-merged.md` are written in step 8.
 
 ### 2. Branch and bump
 
@@ -52,10 +56,10 @@ Do not hand-edit `package.json` alone. If `package-lock.json` keeps the old vers
 Check that both files carry the new version:
 
 ```bash
-git grep -n '"version": "{version}"' -- package.json package-lock.json
+node -p "const p = require('./package.json'), l = require('./package-lock.json'); [p.version, l.version, l.packages[''].version].join(' ')"
 ```
 
-This must print 3 lines: 1 from `package.json` and 2 from `package-lock.json`.
+This must print `{version}` 3 times: `package.json` `version`, then the lockfile's root `version` and `packages[""].version`.
 
 ### 3. Stamp the changelog
 
@@ -112,9 +116,9 @@ The release workflow creates the GitHub release itself, so do not run `gh releas
 3. Put the narrative above the generated `## What's Changed` list:
 
 ```bash
-gh release view v{version} --json body -q .body > release-body.md
-{ cat {notes}; printf '\n'; cat release-body.md; } > release-merged.md
-gh release edit v{version} --notes-file release-merged.md
+gh release view v{version} --json body -q .body > {tmp}/release-body.md
+{ cat {notes}; printf '\n'; cat {tmp}/release-body.md; } > {tmp}/release-merged.md
+gh release edit v{version} --notes-file {tmp}/release-merged.md
 ```
 
 Passing `--notes-file {notes}` alone replaces the generated list. Always merge the two files.
@@ -123,8 +127,9 @@ The workflow titles the release `v{version}`, for example `v0.15.0`. Keep that t
 
 ### 9. Close out
 
-1. Delete the local release branch: `git branch -D release/{version}`.
-2. Check the npm page and the GitHub release page once each.
+1. `gh pr merge --delete-branch` in step 7 already deletes the local and remote release branches. Run `git branch -D release/{version}` only if `git branch --list release/{version}` still prints it.
+2. Delete the scratch directory: `rm -rf {tmp}`.
+3. Check the npm page and the GitHub release page once each.
 
 ## Recovery
 
