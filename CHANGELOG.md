@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `npm run check:types` now typechecks `tests/` too. Fixed the 42 test type errors this exposed, mostly fixtures written for older `RunnerConfig`, `RunStats`, and `FormatterState` shapes; they now use the shared mock factories. `npm run build` moves to `tsconfig.build.json`, which still emits `src/` only. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
 - Promoted every oxlint and knip `warn` rule to `error`, and removed the unused exports this surfaced: 3 test helpers, plus the `export` on `DeadDropQueue`. `RillArgDef` is now exported from `src/rill/index.ts` next to `RillScriptMeta`, which uses it. ([#14](https://github.com/rcrsr/claude-code-runner/pull/14))
 - **Timeout docs:** Documented the reserved timeout result, and that skills must not end a turn waiting on background work. ([#15](https://github.com/rcrsr/claude-code-runner/pull/15))
+- **Release SOP:** Added a release procedure covering PR-based releases on protected `main` and recovery from a failed tag workflow. ([#16](https://github.com/rcrsr/claude-code-runner/pull/16))
 
 ### Fixed
 
