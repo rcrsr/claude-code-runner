@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] — 2026-11-23
+
 ### Added
 
 - **Timeout result tag:** Carries `source="ccr"` and `minutes` so scripts can tell a runner timeout kill from skill output. ([#15](https://github.com/rcrsr/claude-code-runner/pull/15))
